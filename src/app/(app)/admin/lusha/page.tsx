@@ -4,12 +4,13 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
-import { getLushaLimits, lushaCycleWindow } from "@/lib/lusha/cap";
+import { CREDITS_PER_CONTACT, MAX_PERSONAL_DAILY_CAP, getLushaLimits, lushaCycleWindow } from "@/lib/lusha/cap";
 import { getLushaUsageReport } from "@/lib/lusha/adminDb";
 import { getCreditSpend } from "@/lib/lusha/revealDb";
 import { REPORT_PERIODS, isNewBd, parseReportPeriod, periodWindow, personalCapLines, shareOf, summarizeUsage } from "@/lib/lusha/usageReport";
 import { formatArgentinaDayMonth, formatArgentinaDayMonthYear, relativeTime } from "@/lib/i18n/format";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
+import { LushaCapEditor, type CapEditorLabels } from "./LushaCapEditor";
 import { LushaSwitch } from "./LushaSwitch";
 import { RevealsKpiCard } from "./RevealsKpiCard";
 
@@ -35,7 +36,7 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
   const d = dict.lushaAdmin;
   const now = new Date();
   const window = periodWindow(period, now);
-  const rows = await getLushaUsageReport(window);
+  const rows = await getLushaUsageReport(window, now);
   const limits = getLushaLimits();
   const spent = await getCreditSpend(now, limits.cycleStartDay);
   const cap = limits.monthlyCap;
@@ -60,6 +61,41 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
     toastDisabled: fill(d.toastDisabled, { name }),
     errorSave: d.errorSave,
   });
+  const capLabels: CapEditorLabels = {
+    setButton: d.capSet,
+    editAria: d.capEditAria,
+    title: d.capTitle,
+    fieldLabel: d.capField,
+    placeholder: d.capPlaceholder,
+    creditsOne: d.capCreditsOne,
+    creditsMany: d.capCreditsMany,
+    equivalence: d.capEquivalence,
+    costNote: d.capCostNote,
+    usedToday: d.capUsedToday,
+    hintEmptySet: d.capHintEmptySet,
+    hintEmptyEdit: d.capHintEmptyEdit,
+    hintZeroBefore: d.capHintZeroBefore,
+    hintZeroAfter: d.capHintZeroAfter,
+    recordedSet: d.capRecordedSet,
+    recordedChange: d.capRecordedChange,
+    invalid: d.capInvalid,
+    warnRailTitle: d.capWarnRailTitle,
+    warnRailBody: d.capWarnRailBody,
+    warnZeroTitle: d.capWarnZeroTitle,
+    warnZeroBody: d.capWarnZeroBody,
+    clear: d.capClear,
+    cancel: d.cancel,
+    save: d.capSave,
+    toastSet: d.capToastSet,
+    toastCleared: d.capToastCleared,
+    toastBlocked: d.capToastBlocked,
+    toastUnchanged: d.capToastUnchanged,
+    errorSave: d.errorSave,
+    personalContacts: d.personalContacts,
+    personalContactsOne: d.personalContactsOne,
+    personalContactsNone: d.personalContactsNone,
+    personalContactsBlocked: d.personalContactsBlocked,
+  };
   const split = (emails: number, phones: number) => [emails > 0 && fill(d.emailsCount, { n: emails }), phones > 0 && fill(d.phonesCount, { n: phones })].filter(Boolean).join(" · ");
 
   return (
@@ -165,11 +201,19 @@ export default async function LushaAdminPage({ searchParams }: { searchParams: P
                     <div className="stack-sm">
                       <LushaSwitch bdId={r.bdId} name={r.name} enabled={r.lushaEnabled} labels={switchLabels(r.name)} />
                       {!r.lushaEnabled && (r.toggledByName && r.toggledAt ? <div className="meta">{fill(d.toggledBy, { name: r.toggledByName, date: formatArgentinaDayMonth(r.toggledAt) })}</div> : isNew ? <div className="meta">{d.newDefault}</div> : null)}
-                      {r.personalDailyCap !== null && (
-                        <div className="meta">
-                          <strong>{personalCapLines(r.personalDailyCap, d).headline}</strong> · {personalCapLines(r.personalDailyCap, d).contacts}
-                        </div>
-                      )}
+                      <LushaCapEditor
+                        bdId={r.bdId}
+                        name={r.name}
+                        adminName={admin.name}
+                        cap={r.personalDailyCap}
+                        headline={r.personalDailyCap === null ? "" : personalCapLines(r.personalDailyCap, d).headline}
+                        contacts={r.personalDailyCap === null ? "" : personalCapLines(r.personalDailyCap, d).contacts}
+                        todayCredits={r.todayCredits}
+                        creditsPerContact={CREDITS_PER_CONTACT}
+                        dailyRail={limits.dailyCap}
+                        maxCap={MAX_PERSONAL_DAILY_CAP}
+                        labels={capLabels}
+                      />
                     </div>
                   </td>
                   <td>

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
-import { getRevealsDrilldown, setLushaEnabled } from "@/lib/lusha/adminDb";
+import { getRevealsDrilldown, setLushaEnabled, setLushaPersonalCap } from "@/lib/lusha/adminDb";
+import { parsePersonalDailyCap } from "@/lib/lusha/cap";
 import type { RevealDrilldownRow } from "@/lib/lusha/revealsDrilldown";
 import { parseReportPeriod, periodWindow } from "@/lib/lusha/usageReport";
 import { isUuid } from "@/lib/uuid";
@@ -19,6 +20,21 @@ export async function setLushaEnabledAction(bdId: string, enabled: boolean): Pro
   const result = await setLushaEnabled({ actor: admin, bdId, enabled });
   if (result.ok) revalidatePath("/admin/lusha");
   return { ok: result.ok };
+}
+
+/**
+ * Sets (a number) or clears (null) one BD's personal Lusha cap, in credits per Argentina day. requireAdmin runs FIRST, then the input is
+ * validated without touching the database: only null or an integer 0-999 passes, and null (no cap) is never confused with 0 (blocked).
+ * setLushaPersonalCap asserts the role again and writes the change and its audit row in one transaction. `changed` is false when the
+ * value was already that one: nothing was written or recorded, and the caller must not say otherwise.
+ */
+export async function setLushaPersonalCapAction(bdId: string, cap: number | null): Promise<{ ok: boolean; changed: boolean }> {
+  const admin = await requireAdmin();
+  const parsed = parsePersonalDailyCap(cap);
+  if (!isUuid(bdId) || !parsed.ok) return { ok: false, changed: false };
+  const result = await setLushaPersonalCap({ actor: admin, bdId, cap: parsed.cap });
+  if (result.ok) revalidatePath("/admin/lusha");
+  return { ok: result.ok, changed: result.ok ? result.changed : false };
 }
 
 /**

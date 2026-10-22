@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor del tope propio · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+/* Local additions. NOT in crm-hubspot-ux/mockups/styles.css.
+   All of them already EXIST in the app (src/app/design-system.css, shipped with
+   reports-bd-filter-drilldown and reports-kpi-drilldown); they are repeated here
+   only because the mockup stylesheet predates them. Nothing below is new CSS. */
+
+/* src/app/design-system.css:782-789 */
+.stat-clickable { display: block; width: 100%; text-align: left; font: inherit; cursor: pointer; color: var(--color-ink); }
+.stat-clickable:hover, .stat-clickable:focus-visible, .stat-clickable.is-hover { border-color: var(--color-accent-strong); }
+.stat-clickable { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }
+
+/* src/app/design-system.css (reports-kpi-drilldown): the wider drill-down dialog. */
+.dialog.xwide { width: min(960px, 94vw); }
+/* Mockup-only: lets a static dialog sit on a visible overlay. */
+
+/* Exists in the app (globals.css) but not in the mockup stylesheet. */
+.mb-md { margin-bottom: var(--space-md); }
+
+/* Mockup-only scaffolding: simulates the overlay behind a static dialog. */
+.stage { background: var(--color-overlay); border-radius: var(--radius-md); padding: var(--space-2xl); display: flex; justify-content: center; align-items: flex-start; }
+.stage .dialog { max-height: none; }
+.stage .dialog-body.scroll { max-height: 320px; overflow-y: auto; }
+.cell-sub { display: block; font-size: var(--text-sm); color: var(--color-ink-subtle); }
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+<a class="nav-item" href="../../follow-up-queue/mockups/follow-up-queue.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Seguimientos<span class="pill-count">10</span></a>
+<a class="nav-item" href="../../outreach-sequences/mockups/secuencias-lista.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>Secuencias<span class="pill-count">2</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item active" aria-current="page" href="#"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>Lusha por BD</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><a href="#">Administración</a><span class="sep">/</span><a href="#">Lusha por BD</a></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a5">CC</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Cristian Civita</strong><br><span class="meta">BD</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas</a>
+</div>
+</details>
+</div>
+</header>
+<main class="page">
+<div class="mock-note" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div><strong>Nota del mockup.</strong> Cambio <span class="mono">lusha-cap-editor</span>, pedido del dueño: editar el tope propio de una BD desde la pantalla, con un modal. Es el seguimiento que <a href="../../lusha-per-bd-cap/mockups/tope-por-bd.html">lusha-per-bd-cap</a> dejó explícitamente afuera porque necesita confirmación y auditoría. En dos horas el número de Macarena se cambió a mano dos veces (12, después 8) y <strong>no quedó registro de quién</strong>: eso es lo que esto arregla, además de la comodidad. Sin componentes nuevos y sin CSS nuevo: <span class="mono">.field</span>, <span class="mono">.input</span>, el <span class="mono">Dialog</span> y el lápiz <span class="mono">btn-ghost btn-icon btn-sm edit</span> ya existen. Correos inventados. Vista de escritorio únicamente.
+<p class="mt-md"><strong>Decisiones a aprobar</strong></p>
+<ol>
+<li><strong>El disparador vive en la celda «Lusha», al lado del tope.</strong> Con tope puesto, el lápiz de siempre. Sin tope, un botón discreto «Poner tope». No se agrega una columna de acciones para una sola acción.</li>
+<li><strong>Un solo diálogo, no dos.</strong> El modal <em>es</em> la confirmación. El interruptor pregunta aparte porque se acciona con un clic en la tabla; acá ya estás dentro de un formulario que dice qué va a pasar. Un confirm sobre un confirm enseña a clickear sin leer.</li>
+<li><strong>Un campo, tres resultados.</strong> Vacío = sin tope propio (solo los globales). Un número = ese techo. <strong>0 = bloqueada</strong>, que es un valor real y el diálogo lo dice con esas palabras. Y «Quitar el tope» como acción secundaria explícita, porque vaciar un campo para volver a «sin tope» no se le ocurre a nadie.</li>
+<li><strong>El campo es de texto con teclado numérico, no <span class="mono">type="number"</span>.</strong> Se dibujó con <span class="mono">number</span> y se cambió al implementarlo, con motivo: cuando el navegador no puede parsear lo tipeado (un <span class="mono">-</span> o una <span class="mono">e</span> sueltos) devuelve string vacío, y vacío acá significa «quitar el tope». Una BD bloqueada en 0 quedaba liberada por una tecla mal apoyada, con una fila de auditoría que decía «tope quitado». Con texto y parseo propio hay tres resultados que no se confunden —vacío, entero válido, inválido— y los tres se prueban sin DOM. Se pierde la flechita del spinner y nada más.</li>
+<li><strong>La equivalencia en contactos se actualiza mientras tipeás.</strong> Es la lección del día: 8 créditos no son 8 contactos, son 4. El campo pide créditos porque es la unidad de la factura, pero nadie piensa en créditos.</li>
+<li><strong>Queda auditado como el interruptor</strong>: administrador que lo cambió, valor anterior y valor nuevo, en la misma transacción que el cambio. Acciones nuevas <span class="mono">bd_lusha_cap_set</span> y <span class="mono">bd_lusha_cap_cleared</span>, al lado de las dos que ya existen.</li>
+<li><strong>Si el número supera el freno diario global, avisa que no hace nada.</strong> Un tope propio de 100 debajo de un freno global de 60 es un no-op que se descubre tarde. Es un aviso, no un bloqueo: el freno global puede subir mañana.</li>
+</ol>
+<a href="../../crm-hubspot-ux/mockups/index.html">Todas las pantallas del sistema aprobado</a></div><span class="tag tag-scope">En alcance: lusha-cap-editor</span></div>
+
+<h2 class="mb-lg">1 · El disparador, en la tabla</h2>
+<p class="meta mb-lg">Dos estados, los únicos que hay. Macarena tiene tope y lleva el lápiz; Mariel no tiene y lleva el botón. Nada más cambia en la fila.</p>
+<div class="table-wrap"><table class="data">
+<thead><tr><th>BD</th><th>Lusha</th><th class="sorted">Créditos cobrados <span class="sort">↓</span></th><th>Revelados</th></tr></thead>
+<tbody>
+<tr>
+<td><div class="owner-chip"><span class="avatar avatar-sm a3">MD</span><span class="strong">Macarena Dávila</span></div><div class="meta">macarena.davila@bd.example</div></td>
+<td><div class="stack-sm"><label class="check"><input type="checkbox" checked aria-label="Lusha habilitado para Macarena Dávila"> Habilitado</label>
+<div class="meta"><strong>Tope propio: 8 créditos por día</strong> · unos 4 contactos<button type="button" class="btn btn-ghost btn-icon btn-sm edit" aria-label="Editar el tope propio de Macarena Dávila"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg></button></div></div></td>
+<td><div class="nowrap"><span class="num strong">24</span> <span class="meta">créditos · 62 %</span></div></td>
+<td class="nowrap"><span class="num strong">11</span></td>
+</tr>
+<tr>
+<td><div class="owner-chip"><span class="avatar avatar-sm a1">MM</span><span class="strong">Mariel Meza</span></div><div class="meta">mariel.meza@bd.example</div></td>
+<td><div class="stack-sm"><label class="check"><input type="checkbox" checked aria-label="Lusha habilitado para Mariel Meza"> Habilitado</label>
+<div><button type="button" class="btn btn-ghost btn-sm">Poner tope propio</button></div></div></td>
+<td><div class="nowrap"><span class="num strong">13</span> <span class="meta">créditos · 33 %</span></div></td>
+<td class="nowrap"><span class="num strong">2</span></td>
+</tr>
+</tbody>
+</table></div>
+
+<h2 class="mt-2xl mb-lg">2 · Poner un tope donde no había</h2>
+<p class="meta mb-lg">Mariel no tiene tope. El campo arranca vacío y el texto de ayuda dice qué significa dejarlo así. La línea de contactos aparece recién cuando hay un número.</p>
+<div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-set">
+<div class="dialog-header"><h2 id="dlg-set">Tope propio de Lusha · Mariel Meza</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body">
+<div class="field" style="max-width:240px">
+<label class="label" for="cap-set">Créditos por día</label>
+<input class="input" id="cap-set" type="text" inputmode="numeric" placeholder="sin tope" value="10">
+</div>
+<p class="meta mt-md"><strong>10 créditos = unos 5 contactos por día.</strong> Revelar un contacto cuesta 2 créditos: la búsqueda y el revelado. La búsqueda se cobra aunque no encuentre nada.</p>
+<p class="meta mt-md">Dejalo vacío para que Mariel no tenga tope propio y le apliquen solo los límites del equipo. Poné <strong>0</strong> para bloquearla sin apagarle el interruptor.</p>
+<p class="meta">Queda registrado que Cristian Civita puso este tope.</p>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Guardar tope</button></div>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">3 · Cambiar o quitar uno que ya existe</h2>
+<p class="meta mb-lg">Macarena ya tiene 8. El diálogo muestra el valor actual y agrega «Quitar el tope» a la izquierda del pie, separado de las acciones de guardar, porque es la salida y no la acción principal.</p>
+<div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-edit">
+<div class="dialog-header"><h2 id="dlg-edit">Tope propio de Lusha · Macarena Dávila</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body">
+<div class="field" style="max-width:240px">
+<label class="label" for="cap-edit">Créditos por día</label>
+<input class="input" id="cap-edit" type="text" inputmode="numeric" value="8">
+</div>
+<p class="meta mt-md"><strong>8 créditos = unos 4 contactos por día.</strong> Hoy ya usó 4 créditos, así que le quedan 4.</p>
+<p class="meta mt-md">Dejalo vacío para quitarle el tope. Poné <strong>0</strong> para bloquearla sin apagarle el interruptor.</p>
+<p class="meta">Queda registrado que Cristian Civita cambió este tope de 8 a lo que guardes.</p>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-ghost left">Quitar el tope</button><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Guardar tope</button></div>
+</div></div>
+
+<h2 class="mt-2xl mb-lg">4 · Los dos avisos</h2>
+<p class="meta mb-lg">Arriba del freno global, y en cero. Ninguno bloquea el guardado: los dos son estados válidos que alguien puede querer a propósito.</p>
+<div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-warn">
+<div class="dialog-header"><h2 id="dlg-warn">Tope propio de Lusha · Macarena Dávila</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body">
+<div class="field" style="max-width:240px">
+<label class="label" for="cap-hi">Créditos por día</label>
+<input class="input" id="cap-hi" type="text" inputmode="numeric" value="100">
+</div>
+<p class="meta mt-md"><strong>100 créditos = unos 50 contactos por día.</strong></p>
+<div class="alert alert-warn mt-md" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg><div><div class="title">Este tope no va a hacer nada</div>El freno diario del equipo es de 60 créditos, así que va a cortar antes. Se puede guardar igual: si mañana sube el freno global, este tope empieza a valer.</div></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-ghost left">Quitar el tope</button><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Guardar tope</button></div>
+</div></div>
+<div class="mt-xl"></div>
+<div class="stage"><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-zero">
+<div class="dialog-header"><h2 id="dlg-zero">Tope propio de Lusha · Macarena Dávila</h2><button type="button" class="btn btn-ghost btn-icon btn-sm close" aria-label="Cerrar"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div class="dialog-body">
+<div class="field" style="max-width:240px">
+<label class="label" for="cap-zero">Créditos por día</label>
+<input class="input" id="cap-zero" type="text" inputmode="numeric" value="0">
+</div>
+<div class="alert alert-warn mt-md" role="note"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></svg><div><div class="title">En cero no va a poder gastar nada</div>Macarena va a ver que su tope está en cero y que te lo tiene que pedir a vos. Es distinto de apagarle el interruptor, que le dice que Lusha no está habilitado para su usuario. Lo ya revelado se conserva en las dos.</div></div>
+</div>
+<div class="dialog-footer"><button type="button" class="btn btn-ghost left">Quitar el tope</button><button type="button" class="btn btn-secondary">Cancelar</button><button type="button" class="btn btn-primary">Guardar tope</button></div>
+</div></div>
+<p class="meta mt-lg">Después de guardar, el aviso temporal de siempre:</p>
+<div class="toast inline" role="status"><svg class="icon ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg>Tope de Macarena Dávila: 8 créditos por día</div>
+</main>
+</div></div>
+</body>
+</html>

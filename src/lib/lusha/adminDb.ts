@@ -7,9 +7,11 @@ import { auditLog, bd } from "@/db/schema";
 import { assertAdminRole } from "@/lib/auth/adminRole";
 import { DRILLDOWN_ROW_LIMIT } from "@/lib/reports/drilldownLimit";
 import { buildRevealDrilldownRows, type RevealDrilldownRawRow, type RevealDrilldownRow } from "./revealsDrilldown";
+import { artDayWindow, parsePersonalDailyCap } from "./cap";
+import { CREDITS, inWindow } from "./spendSql";
 import { mapUsageRow, type RawUsageRow, type UsageRow } from "./usageReport";
 
-export const LUSHA_AUDIT_ACTIONS = { enable: "bd_lusha_enable", disable: "bd_lusha_disable" } as const;
+export const LUSHA_AUDIT_ACTIONS = { enable: "bd_lusha_enable", disable: "bd_lusha_disable", capSet: "bd_lusha_cap_set", capCleared: "bd_lusha_cap_cleared" } as const;
 
 /** Fail closed: an unknown BD id is not enabled. */
 export async function isLushaEnabled(bdId: string, reader: Pick<typeof db, "select"> = db): Promise<boolean> {
@@ -34,18 +36,43 @@ export async function setLushaEnabled(input: { actor: { id: string; role: string
   });
 }
 
+export type SetPersonalCapResult = { ok: true; changed: boolean } | { ok: false; reason: "not_found" | "invalid" };
+
+/**
+ * Sets (a number) or clears (null) one BD's personal daily credit cap. Admin-only HERE as well as in the action. null = no personal cap,
+ * 0 = blocked: different values, never converted into each other. The BD row is read under a row lock so the audit row's previous value is
+ * the value this very write replaced; an identical value records nothing. The change and its audit row (actor = the admin, target = the
+ * BD, metadata = { cap, previousCap }) are one transaction. Revert: set the column back to previousCap from the latest audit row.
+ */
+export async function setLushaPersonalCap(input: { actor: { id: string; role: string }; bdId: string; cap: number | null }): Promise<SetPersonalCapResult> {
+  assertAdminRole(input.actor);
+  const parsed = parsePersonalDailyCap(input.cap);
+  if (!parsed.ok) return { ok: false, reason: "invalid" };
+  const cap = parsed.cap;
+  return db.transaction(async (tx) => {
+    const [current] = await tx.select({ cap: bd.lushaPersonalDailyCreditCap }).from(bd).where(eq(bd.id, input.bdId)).for("update");
+    if (!current) return { ok: false, reason: "not_found" };
+    const previousCap = current.cap;
+    if (previousCap === cap) return { ok: true, changed: false };
+    await tx.update(bd).set({ lushaPersonalDailyCreditCap: cap }).where(eq(bd.id, input.bdId));
+    await tx.insert(auditLog).values({ actorBdId: input.actor.id, action: cap === null ? LUSHA_AUDIT_ACTIONS.capCleared : LUSHA_AUDIT_ACTIONS.capSet, targetBdId: input.bdId, metadata: { cap, previousCap } });
+    return { ok: true, changed: true };
+  });
+}
+
 /**
  * One query, one row per BD (disabled ones included). Each source is aggregated to one row per BD BEFORE it is joined, so no
  * sum is multiplied by another table's rows. Spend and reveals are by reservation time ("at", the cap's own clock);
- * rejections by rejected_at; last use is all-time. Charged = credits_charged only; pending = reserved and never charged.
+ * rejections by rejected_at; last use is all-time. ur_day is today's spend for the cap editor: the cap's own Argentina day and its own
+ * definition of a credit spent (spendSql.ts), a CTE of its own so ur_spend, which the reveals drill-down is compared against, is untouched. Charged = credits_charged only; pending = reserved and never charged.
  */
-export async function getLushaUsageReport(window: { start: Date; end: Date }): Promise<UsageRow[]> {
-  const rows = (await db.execute(buildUsageReportQuery(window))) as unknown as RawUsageRow[];
+export async function getLushaUsageReport(window: { start: Date; end: Date }, now: Date = new Date()): Promise<UsageRow[]> {
+  const rows = (await db.execute(buildUsageReportQuery(window, now))) as unknown as RawUsageRow[];
   return Array.from(rows, mapUsageRow);
 }
 
 /** Exported (not executed) so tests can compile it: the "Revelados" drill-down must keep the same filters as ur_spend below. */
-export function buildUsageReportQuery(window: { start: Date; end: Date }): SQL {
+export function buildUsageReportQuery(window: { start: Date; end: Date }, now: Date = new Date()): SQL {
   const start = window.start.toISOString();
   const end = window.end.toISOString();
   return sql`
@@ -70,9 +97,14 @@ export function buildUsageReportQuery(window: { start: Date; end: Date }): SQL {
       from audit_log a join bd who on who.id = a.actor_bd_id
       where a.action in (${LUSHA_AUDIT_ACTIONS.enable}, ${LUSHA_AUDIT_ACTIONS.disable}) and a.target_bd_id is not null
       order by a.target_bd_id, a.at desc
+    ), ur_day as (
+      select actor_bd_id as ur_bd, coalesce(sum(${CREDITS}), 0) as ur_day_credits
+      from lusha_reveal
+      where actor_bd_id is not null and ${inWindow(artDayWindow(now))}
+      group by actor_bd_id
     )
     select b.id::text as ur_bd_id, b.name as ur_name, b.email as ur_email, b.role as ur_role, b.lusha_enabled as ur_enabled,
-      b.created_at as ur_created_at, b.lusha_personal_daily_credit_cap as ur_personal_cap,
+      b.created_at as ur_created_at, b.lusha_personal_daily_credit_cap as ur_personal_cap, coalesce(d.ur_day_credits, 0) as ur_today_credits,
       coalesce(s.ur_charged, 0) as ur_charged, coalesce(s.ur_pending, 0) as ur_pending,
       coalesce(s.ur_emails, 0) as ur_emails, coalesce(s.ur_phones, 0) as ur_phones,
       coalesce(r.ur_n, 0) as ur_rejections, l.ur_at as ur_last_use, t.ur_who as ur_toggle_by, t.ur_at as ur_toggle_at
@@ -81,6 +113,7 @@ export function buildUsageReportQuery(window: { start: Date; end: Date }): SQL {
     left join ur_rej r on r.ur_bd = b.id
     left join ur_last l on l.ur_bd = b.id
     left join ur_toggle t on t.ur_bd = b.id
+    left join ur_day d on d.ur_bd = b.id
     order by coalesce(s.ur_charged, 0) desc, b.name
   `;
 }
