@@ -114,13 +114,13 @@ test("every new Spanish phrase is detected, accented and unaccented", () => {
     ["desuscribir", "Por favor desuscríbanme"],
     ["cancelar suscripcion", "Quiero cancelar mi suscripción"],
     ["cancelar suscripcion", "Quiero cancelar mi suscripcion"],
-    ["no me escribas mas", "No me escribas más"],
-    ["no me escribas mas", "no me escriban mas por favor"],
+    ["no me escribas", "No me escribas más"],
+    ["no me escribas", "no me escriban mas por favor"],
     ["no quiero recibir", "No quiero recibir más mensajes"],
-    ["quitame de", "Quítame de la lista"],
-    ["quitame de", "quitame de la lista"],
-    ["quitame de", "Sácame de su base"],
-    ["quitame de", "sacame de su base"],
+    ["quitame", "Quítame de la lista"],
+    ["quitame", "quitame de la lista"],
+    ["quitame", "Sácame de su base"],
+    ["quitame", "sacame de su base"],
     ["borrar mis datos", "Borren mis datos"],
     ["borrar mis datos", "Pueden eliminar mis datos?"],
   ];
@@ -136,9 +136,53 @@ test("a Spanish reply that only QUOTES our Spanish footer raises no prompt (it l
   const f = COMPLIANCE_CONFIG.mdp!.postalAddress;
   assert.equal(detectOptOutPhrase(`Gracias!\n\n${OPT_OUT_TEXT.es}\n${URL_OK}`), null);
   assert.equal(detectOptOutPhrase(`Gracias!\n\n${OPT_OUT_TEXT.es.replace(/ (usa|simplemente) /g, "\n$1 ")}`), null, "re-wrapped by a mail client");
-  assert.equal(detectOptOutPhrase(`Dale.\n\nEl lun escribió:\n> --\n> ${f}\n> ${OPT_OUT_TEXT.es}`), null);
+  // Not under a ">" and not under an attribution line, so ONLY the KNOWN_FOOTER_TEXT strip can silence it (the old
+  // "El lun escribió:\n> ..." variant was silenced by the ">" stripping and never exercised the strip).
+  assert.equal(detectOptOutPhrase(`Dale.\n\n--\n${f}\n\n${OPT_OUT_TEXT.es}`), null);
 });
 
 test("baja is deliberately noisy: the detector is advisory and leans toward a prompt (owner decision)", () => {
   assert.equal(detectOptOutPhrase("El proveedor es de baja calidad"), "baja");
+});
+
+test("a client that smart-quotes our own footer still cannot raise a prompt (curly quotes are folded)", () => {
+  const curly = (t: string) => t.replace(/"([^"]*)"/g, "\u201c$1\u201d").replace(/'/g, "\u2019");
+  for (const text of Object.values(OPT_OUT_TEXT)) {
+    assert.notEqual(curly(text), text, "the fixture really contains curly quotes");
+    assert.equal(detectOptOutPhrase(`Gracias.\n\n${curly(text)}`), null);
+  }
+});
+
+test("INVARIANT: the word each sentence tells people to reply with is detected on its own (derived from the config)", () => {
+  for (const [language, text] of Object.entries(OPT_OUT_TEXT)) {
+    const quoted = [...text.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
+    assert.equal(quoted.length, 1, `${language}: the sentence names exactly one reply word between double quotes`);
+    for (const word of quoted) {
+      assert.notEqual(detectOptOutPhrase(word), null, `${language}: replying "${word}" must be recognised, or the footer promises an opt-out that does not work`);
+      assert.notEqual(detectOptOutPhrase(word.toUpperCase()), null, `${language}: ${word} in capitals`);
+    }
+  }
+});
+
+test("recall: how people actually write an opt-out request (Spanish), accented or not, tu / usted / ustedes", () => {
+  const bodies = [
+    // "no me <verb>" with no trailing qualifier
+    "No me escribas", "no me escriban", "No me escriba", "no me contacte", "No me contacten", "no me contactes",
+    "No me llame", "no me llamen", "no me mande nada", "no me manden mails", "No me envie mas", "no me envien correos",
+    // stop doing it
+    "Dejen de escribirme", "deja de escribirme por favor", "Dejar de escribirme", "dejar de recibir sus correos", "Deje de enviarme correos",
+    // I do not want
+    "No quiero seguir recibiendo sus correos", "No quiero más correos", "no quiero mas mails", "No quiero recibir más", "No quiero recibir nada",
+    // enough
+    "Basta de correos", "basta de mails", "Basta de emails por favor",
+    // remove me, with and without "de"
+    "Quítenme", "quitenme por favor", "Sacarme", "Sáquenme", "saquenme", "Retírenme", "retirenme", "Elimínenme", "eliminenme", "Bórrenme", "borrenme",
+    // remove my address
+    "Elimine mi correo", "borre mi correo de su lista", "Eliminar mi email", "sacar mi correo de su base", "Borren mi mail", "Retiren mi correo",
+  ];
+  for (const body of bodies) assert.notEqual(detectOptOutPhrase(body), null, body);
+});
+
+test("recall stays broad on purpose: a harmless 'no me escribas a este mail' prompts (advisory, a BD dismisses it)", () => {
+  assert.notEqual(detectOptOutPhrase("No me escribas a este mail, escribime al otro"), null);
 });
