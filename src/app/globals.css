@@ -1325,6 +1325,17 @@ a:hover {
     animation: none;
   }
 }
+/* Inside a button that is not a design-system `.btn`, the ring above is invisible: those buttons keep a
+   filled background (`:where(button)` and `.filter-submit` fill with --color-accent, `button.danger` with
+   --color-danger, and the classed-disabled fallback only changes the ink), so an --color-accent top sits on
+   a near-identical red — #d5252f on #d5252f for the filter buttons. The button's own text colour is the one
+   thing guaranteed to contrast with its own fill, which is why `.btn .spinner` already uses it; this extends
+   the same recipe to the rest. It matters most on the saved-view delete "×", an icon-only button with no
+   gerund label to fall back on. */
+button:not(.btn) .spinner {
+  border-color: currentColor;
+  border-right-color: transparent;
+}
 
 /* =========================================================================
    Layout with sidebar (Phase 8 shell: src/app/contacts/Sidebar.tsx +
