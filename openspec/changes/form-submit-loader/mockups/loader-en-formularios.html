@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loader en los formularios del servidor · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); align-items: start; }
+  .demo-cell { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-lg); background: var(--color-surface-1); }
+  .label { font-size: var(--text-sm); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-ink-muted); margin-bottom: var(--space-md); }
+  .demo-cell.bad { border-color: var(--color-danger); }
+  .demo-cell.good { border-color: var(--color-success, var(--color-accent)); }
+  .label-table td:first-child { white-space: nowrap; }
+  .label-table .mono { font-size: var(--text-sm); }
+  .arrow { color: var(--color-ink-muted); padding: 0 var(--space-xs); }
+</style>
+</head>
+<body>
+<main class="page" style="max-width:1100px;margin:0 auto;padding:var(--space-2xl)">
+
+<div class="mock-note" role="note">
+  <div><strong>Nota del mockup.</strong> Cambio <span class="mono">form-submit-loader</span>. No es una pantalla nueva: es un <strong>estado que falta</strong> en 13 botones que ya existen. Todos viven dentro de un <span class="mono">&lt;form action={serverAction}&gt;</span> renderizado en el servidor, y por eso nunca recibieron el spinner que el resto del CRM ya usa en 14 lugares. El lenguaje visual NO cambia: es el mismo <span class="mono">.spinner</span> + <span class="mono">aria-busy</span> + cambio de texto de <span class="mono">SendNowButton.tsx</span> y del generador de borradores (#399). Vista de escritorio únicamente.</div>
+</div>
+
+<div class="page-header"><div class="titles">
+  <div class="eyebrow">Estado faltante</div>
+  <h1>loader en los formularios del servidor<span class="dot">.</span></h1>
+  <p class="meta">Reportado sobre <strong>Fusionar</strong> en Duplicados: la acción tarda, el botón no dice nada, parece colgado. Si esperás, funciona. El riesgo real no es la espera — es el <strong>segundo clic</strong>.</p>
+</div></div>
+
+<h2>1 · El problema, lado a lado</h2>
+<p class="meta mb-lg">Mismo botón, misma acción. A la izquierda lo que hay hoy. A la derecha lo que propongo. <strong>Los dos son clickeables</strong>: probalos.</p>
+
+<div class="demo-grid mb-lg">
+  <div class="demo-cell bad">
+    <div class="label">Hoy · sin estado</div>
+    <p class="soft" style="margin-top:0">Hacés clic y no pasa nada visible por ~2 segundos. El botón sigue habilitado, así que hacés clic otra vez.</p>
+    <button class="btn btn-primary" id="bad-btn">Fusionar en Roberto Gorchs</button>
+    <p class="meta mt-md" id="bad-log" aria-live="polite" style="min-height:2.5em">&nbsp;</p>
+  </div>
+  <div class="demo-cell good">
+    <div class="label">Propuesta · con estado</div>
+    <p class="soft" style="margin-top:0">Spinner, el texto pasa a «Fusionando…», el botón se deshabilita. El segundo clic es imposible, no solo desaconsejado.</p>
+    <button class="btn btn-primary" id="good-btn">Fusionar en Roberto Gorchs</button>
+    <p class="meta mt-md" id="good-log" aria-live="polite" style="min-height:2.5em">&nbsp;</p>
+  </div>
+</div>
+
+<h2>2 · Por qué faltaba justo acá</h2>
+<div class="card card-body mb-lg">
+  <p style="margin-top:0">No fue un descuido suelto, fue una <strong>clase entera</strong> que se quedó afuera. En React, el estado «este formulario está enviándose» lo da <span class="mono">useFormStatus()</span>, y ese hook <strong>solo corre en un componente cliente</strong>. Estos 13 botones están dentro de páginas de servidor, donde el hook no existe. Nadie se olvidó del spinner: no había dónde ponerlo.</p>
+  <p style="margin-bottom:0">La solución es <strong>un</strong> componente cliente chico — un <span class="mono">&lt;SubmitButton&gt;</span> que lee <span class="mono">useFormStatus()</span> y se pinta solo — y cambiar los 13 <span class="mono">&lt;button type="submit"&gt;</span> por él. El formulario y la acción del servidor no se tocan. Cero lógica nueva.</p>
+</div>
+
+<h2>3 · Los 13 botones y su texto mientras trabaja</h2>
+<p class="meta mb-lg">Esto es lo que te pido que apruebes: el texto de cada uno en gerundio. Si alguno no te cierra, decime cuál.</p>
+
+<div class="table-wrap mb-lg">
+<table class="data label-table">
+<thead><tr><th>Pantalla</th><th>Texto hoy</th><th></th><th>Mientras trabaja</th></tr></thead>
+<tbody>
+  <tr><td>Duplicados</td><td>Fusionar en <em>X</em></td><td class="arrow">→</td><td><strong>Fusionando…</strong></td></tr>
+  <tr><td>Duplicados</td><td>No es duplicado</td><td class="arrow">→</td><td><strong>Marcando…</strong></td></tr>
+  <tr><td>Duplicados</td><td>Deshacer fusión</td><td class="arrow">→</td><td><strong>Deshaciendo…</strong></td></tr>
+  <tr><td>Duplicados · panel de secuencia</td><td>Fusionar</td><td class="arrow">→</td><td><strong>Fusionando…</strong></td></tr>
+  <tr><td>Duplicados · panel de secuencia</td><td>Cancelar envío</td><td class="arrow">→</td><td><strong>Cancelando…</strong></td></tr>
+  <tr><td>Descubrimiento</td><td>Aprobar</td><td class="arrow">→</td><td><strong>Aprobando…</strong></td></tr>
+  <tr><td>Descubrimiento</td><td>Descartar</td><td class="arrow">→</td><td><strong>Descartando…</strong></td></tr>
+  <tr><td>Absorciones</td><td>Rechazar</td><td class="arrow">→</td><td><strong>Rechazando…</strong></td></tr>
+  <tr><td>Migración</td><td>Aprobar la corrida</td><td class="arrow">→</td><td><strong>Aprobando…</strong></td></tr>
+  <tr><td>Backfill RFC</td><td>Ejecutar</td><td class="arrow">→</td><td><strong>Ejecutando…</strong></td></tr>
+  <tr><td>Empresa nueva</td><td>Crear empresa</td><td class="arrow">→</td><td><strong>Creando…</strong></td></tr>
+  <tr><td>Contactos · vista guardada</td><td><span class="meta">(solo ícono de tacho)</span></td><td class="arrow">→</td><td><strong>el spinner reemplaza el ícono</strong>, el <span class="mono">aria-label</span> no cambia</td></tr>
+</tbody>
+</table>
+</div>
+<p class="meta mb-lg">Son 12 filas para 13 botones: «Fusionar» aparece en dos pantallas distintas con el mismo texto.</p>
+
+<h2>4 · Los tres detalles que hacen que esto sirva</h2>
+<div class="grid-3 mb-lg">
+  <div class="card card-body">
+    <div class="label">El segundo clic</div>
+    <p class="soft" style="margin:0">El botón se <strong>deshabilita</strong>, no solo se decora. En Fusionar eso importa de verdad: dos envíos podrían intentar fusionar el mismo par dos veces.</p>
+  </div>
+  <div class="card card-body">
+    <div class="label">Quien no ve el spinner</div>
+    <p class="soft" style="margin:0">El spinner lleva <span class="mono">aria-hidden</span> y el que informa es el <strong>texto</strong> más <span class="mono">aria-busy</span> en el formulario. Un lector de pantalla anuncia «Fusionando…», no un ícono girando.</p>
+  </div>
+  <div class="card card-body">
+    <div class="label">Movimiento reducido</div>
+    <p class="soft" style="margin:0">Con <span class="mono">prefers-reduced-motion</span> el anillo <strong>no gira</strong> — ya está en el CSS. El texto en gerundio sigue comunicando el estado igual.</p>
+  </div>
+</div>
+
+<h2>5 · Lo que NO entra en este cambio</h2>
+<div class="alert alert-info mb-lg" role="note">
+  <div>
+    <strong>Seis componentes cliente tampoco tienen estado de carga</strong>, pero son otra clase de problema: no envían un formulario, traen datos (los KPI de reportes y de Lusha, el drill-down de cohortes, el autocompletado de empresas, el contexto de secuencias). Ahí el patrón correcto es un <strong>skeleton</strong>, no un botón ocupado — y merece su propio mockup. Los dejo anotados, no los toco acá.
+  </div>
+</div>
+
+<script>
+(function () {
+  var badBtn = document.getElementById('bad-btn');
+  var badLog = document.getElementById('bad-log');
+  var badClicks = 0;
+  badBtn.addEventListener('click', function () {
+    badClicks += 1;
+    badLog.textContent = badClicks === 1
+      ? 'Clic registrado. El botón no cambió. ¿Funcionó? No hay forma de saberlo.'
+      : 'Clic número ' + badClicks + '. Nada impide volver a enviar la misma fusión.';
+    window.setTimeout(function () {
+      badLog.textContent = 'Listo, después de 2 segundos de silencio' + (badClicks > 1 ? ' — y ' + badClicks + ' envíos.' : '.');
+      badClicks = 0;
+    }, 2000);
+  });
+
+  var goodBtn = document.getElementById('good-btn');
+  var goodLog = document.getElementById('good-log');
+  var goodLabel = goodBtn.textContent;
+  goodBtn.addEventListener('click', function () {
+    goodBtn.disabled = true;
+    goodBtn.setAttribute('aria-busy', 'true');
+    goodBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Fusionando…';
+    goodLog.textContent = 'Spinner visible, texto en gerundio, botón deshabilitado. El segundo clic no existe.';
+    window.setTimeout(function () {
+      goodBtn.disabled = false;
+      goodBtn.removeAttribute('aria-busy');
+      goodBtn.textContent = goodLabel;
+      goodLog.textContent = 'Listo. En la app real la página se vuelve a renderizar acá.';
+    }, 2000);
+  });
+})();
+</script>
+
+</main>
+</body>
+</html>

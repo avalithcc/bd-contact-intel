@@ -19,12 +19,14 @@ import { useState } from "react";
 import { updateViewColumnsAction } from "./viewActions";
 import { DEFAULT_CONTACT_COLUMNS, type ContactColumnKey } from "@/lib/contacts/columns";
 import { buildColumnOrder, moveColumn, reorderColumn } from "@/lib/contacts/columnOrder";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export interface ColumnPickerLabels {
   pickerLabel: string;
   helpText: string;
   nameLabel: string;
   applyLabel: string;
+  applyPendingLabel: string;
   resetLabel: string;
   moveUpLabel: string;
   moveDownLabel: string;
@@ -115,9 +117,9 @@ export function ColumnPicker({ viewKey, allColumns, visibleColumns, columnLabels
           <button type="button" className="btn btn-ghost btn-sm" onClick={reset}>
             {l.resetLabel}
           </button>
-          <button type="submit" className="btn btn-primary btn-sm">
+          <SubmitButton className="btn btn-primary btn-sm" pendingLabel={l.applyPendingLabel}>
             {l.applyLabel}
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </details>

@@ -8,6 +8,7 @@ import { getLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/dictionaries";
 import { formatDateTime } from "@/lib/i18n/format";
 import { approveCandidate, rejectCandidate } from "./actions";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -133,15 +134,15 @@ export default async function DiscoveryPage() {
                       <div className="legacy-row legacy-row-xs">
                         <form action={approveCandidate}>
                           <input type="hidden" name="id" value={c.id} />
-                          <button type="submit" className="secondary-btn">
+                          <SubmitButton className="secondary-btn" pendingLabel={dict.discovery.approvePending}>
                             {dict.discovery.approve}
-                          </button>
+                          </SubmitButton>
                         </form>
                         <form action={rejectCandidate}>
                           <input type="hidden" name="id" value={c.id} />
-                          <button type="submit" className="secondary-btn">
+                          <SubmitButton className="secondary-btn" pendingLabel={dict.discovery.rejectPending}>
                             {dict.discovery.reject}
-                          </button>
+                          </SubmitButton>
                         </form>
                       </div>
                     </td>

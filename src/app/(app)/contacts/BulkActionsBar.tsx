@@ -29,6 +29,7 @@ import type { BulkActionsLabels } from "@/lib/contacts/labels";
 import type { ContactColumnKey } from "@/lib/contacts/columns";
 import type { Locale } from "@/lib/i18n/locales";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export interface BulkActionsBarProps {
   labels: BulkActionsLabels;
@@ -261,9 +262,9 @@ export function BulkActionsBar({
             <button type="button" className="btn btn-secondary" onClick={() => setPanel(null)}>
               {l.bulkCancel}
             </button>
-            <button type="submit" className="btn btn-primary">
+            <SubmitButton className="btn btn-primary" pendingLabel={l.bulkConfirmPending}>
               {l.bulkConfirm}
-            </button>
+            </SubmitButton>
           </>
         }
       >
@@ -294,9 +295,9 @@ export function BulkActionsBar({
             <button type="button" className="btn btn-secondary" onClick={() => setPanel(null)}>
               {l.bulkCancel}
             </button>
-            <button type="submit" formAction={bulkCreateTaskAction} className="btn btn-primary">
+            <SubmitButton formAction={bulkCreateTaskAction} className="btn btn-primary" pendingLabel={l.bulkConfirmPending}>
               {l.bulkConfirm}
-            </button>
+            </SubmitButton>
           </>
         }
       >

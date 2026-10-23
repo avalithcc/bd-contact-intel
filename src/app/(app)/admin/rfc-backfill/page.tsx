@@ -10,6 +10,7 @@ import {
 import { countPendingRfcBackfill } from "@/lib/gmail/rfcBackfillRun";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { runRfcBackfillAction } from "./actions";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export const dynamic = "force-dynamic";
 // One batch is ~100 sequential Gmail reads; the explicit ceiling keeps it
@@ -144,9 +145,9 @@ export default async function RfcBackfillAdminPage({
                 defaultValue={ADMIN_BACKFILL_DEFAULT_LIMIT}
               />
             </div>
-            <button type="submit" className="filter-submit">
+            <SubmitButton className="filter-submit" pendingLabel={dict.runPending}>
               {dict.runButton}
-            </button>
+            </SubmitButton>
           </form>
         </section>
       )}

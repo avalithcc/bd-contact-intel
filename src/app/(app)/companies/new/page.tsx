@@ -5,6 +5,7 @@ import { getCompanyByKey } from "@/lib/companies/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { createCompanyAction } from "../actions";
 import { normalizeCompanyKey } from "@/lib/companyCategories";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -112,9 +113,9 @@ export default async function NewCompanyPage({
           <Link href="/companies" className="btn btn-secondary">
             {dict.companyRecord.cancel}
           </Link>
-          <button type="submit" className="btn btn-primary">
+          <SubmitButton className="btn btn-primary" pendingLabel={l.submitPending}>
             {l.submit}
-          </button>
+          </SubmitButton>
         </div>
       </form>
     </main>

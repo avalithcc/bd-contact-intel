@@ -21,6 +21,7 @@ import { readLastRescanRun } from "@/lib/identity/duplicateRescanRun";
 import { MergeSequencePanel } from "./MergeSequencePanel";
 import { RescanPanel } from "./RescanPanel";
 import { mergeDuplicateCandidateAction, markNotDuplicateAction, unmergeDuplicateAction } from "./actions";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export const dynamic = "force-dynamic";
 // The manual re-scan runs from this page (one scan of every live person plus the write).
@@ -133,15 +134,15 @@ function ComparePanel({ detail, pairMeta, hasSequencePanel }: { detail: Duplicat
       <div className="legacy-row end mt-lg">
         <form action={markNotDuplicateAction}>
           <input type="hidden" name="candidateId" value={detail.id} />
-          <button type="submit" className="secondary">
+          <SubmitButton className="secondary" pendingLabel={dict.notDuplicatePending}>
             {dict.notDuplicateButton}
-          </button>
+          </SubmitButton>
         </form>
         {/* With a Sequence membership in play the merge button lives in the warning panel below. */}
         {!hasSequencePanel && (
           <form action={mergeDuplicateCandidateAction}>
             <input type="hidden" name="candidateId" value={detail.id} />
-            <button type="submit">{dict.mergeButton(survivorLabel)}</button>
+            <SubmitButton pendingLabel={dict.mergePending}>{dict.mergeButton(survivorLabel)}</SubmitButton>
           </form>
         )}
       </div>
@@ -165,9 +166,9 @@ function UnmergeConfirmPanel({ mergeEventId, survivorName }: { mergeEventId: str
         </Link>
         <form action={unmergeDuplicateAction}>
           <input type="hidden" name="mergeEventId" value={mergeEventId} />
-          <button type="submit" className="danger">
+          <SubmitButton className="danger" pendingLabel={dict.undoPending}>
             {dict.undoButton}
-          </button>
+          </SubmitButton>
         </form>
       </div>
     </section>

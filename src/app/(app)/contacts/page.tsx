@@ -77,6 +77,7 @@ import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
 import { generateOutreachMessage } from "../outreach/actions";
 import { TableIcon, BoardIcon, InfoIcon } from "@/components/icons";
 import styles from "./page.module.css";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -645,9 +646,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           </Link>
           <form action={deleteSavedViewAction} className="inline-block">
             <input type="hidden" name="id" value={savedId} />
-            <button type="submit" className={styles.deleteView} aria-label={l.deleteView}>
+            <SubmitButton className={styles.deleteView} ariaLabel={l.deleteView}>
               ×
-            </button>
+            </SubmitButton>
           </form>
         </span>
       );
@@ -916,6 +917,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                   helpText: l.columnsPickerHelp,
                   nameLabel: l.colName,
                   applyLabel: l.columnsApply,
+                  applyPendingLabel: l.columnsApplyPending,
                   resetLabel: l.columnsReset,
                   moveUpLabel: l.columnsMoveUp,
                   moveDownLabel: l.columnsMoveDown,
