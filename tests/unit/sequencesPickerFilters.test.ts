@@ -5,7 +5,7 @@ import {
 } from "@/lib/sequences/pickerFilters";
 
 test("every filter is off by default and blocked contacts are hidden", () => {
-  assert.deepEqual(DEFAULT_PICKER_QUERY, { search: "", florida: false, hiring: false, mine: false, showBlocked: false, offset: 0 });
+  assert.deepEqual(DEFAULT_PICKER_QUERY, { search: "", florida: false, hiring: false, mine: false, showBlocked: false, industries: [], noIndustry: false, offset: 0 });
   assert.deepEqual(normalizePickerQuery(undefined), DEFAULT_PICKER_QUERY);
   assert.deepEqual(normalizePickerQuery("nope"), DEFAULT_PICKER_QUERY);
 });

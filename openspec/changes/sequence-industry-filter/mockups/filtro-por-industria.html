@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filtrar la secuencia por industria · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  /* The mockup stylesheet has NO [aria-pressed] rule, so without this a selected chip would look identical to an
+     unselected one and the screen could not show what it is about. Copied verbatim from design-system.css:366. */
+  .chip[aria-pressed="true"] { border-color: var(--color-accent); }
+  .chip .n { opacity: .62; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .chip[aria-pressed="true"] .n { opacity: .85; }
+  .vals { columns: 2; column-gap: var(--space-xl); margin: 0; padding: 0; list-style: none; }
+  .vals li { display: flex; gap: var(--space-xs); align-items: baseline; padding: 2px 0; break-inside: avoid; font-size: var(--text-sm); }
+  .vals .n { margin-left: auto; color: var(--color-ink-muted); font-variant-numeric: tabular-nums; }
+  .gmap td:first-child { white-space: nowrap; font-weight: 600; }
+  .gmap td:last-child { color: var(--color-ink-soft); font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+<main class="page" style="max-width:1060px;margin:0 auto;padding:var(--space-2xl)">
+
+<div class="mock-note" role="note">
+  <div><strong>Nota del mockup.</strong> Cambio <span class="mono">sequence-industry-filter</span>. Extiende el selector de contactos de «Nueva secuencia» (<span class="mono">RosterPicker.tsx</span>), que ya tiene búsqueda y los chips <span class="mono">florida</span> / <span class="mono">hiring</span> / <span class="mono">mine</span> filtrando del lado del servidor. <strong>Todos los números son reales</strong>, medidos de producción, y el mapeo de grupos está verificado contra la base: suma 3.817 = total, cero valores sin grupo, cero valores en dos grupos. Vista de escritorio únicamente.</div>
+</div>
+
+<div class="page-header"><div class="titles">
+  <div class="eyebrow">Nueva secuencia · elegir contactos</div>
+  <h1>filtrar por industria<span class="dot">.</span></h1>
+  <p class="meta" style="color:var(--color-danger-text)"><strong>Los conteos son del POOL REAL del selector</strong>, no de «todos los que tienen correo»: la consulta excluye además <span class="mono">email_status</span> none/bounced, correos inferidos sin verificar, empresas que ya son clientes, y bajas en <span class="mono">email_suppression</span>. Son <strong>5.428</strong>: la elegibilidad vive en <span class="mono">blockedSql</span> e incluye una séptima exclusión que yo no había medido — contactos sin audiencia de compliance resoluble. Estos conteos salen del código real, no de SQL transcripto a mano.</p>
+  <p class="meta">«Me gustaría poder enviar correos orientados por categoría. Ejemplo, por industria.» Se puede con lo que ya hay cargado: <strong>3.817 de 5.428</strong> contactos elegibles tienen industria.</p>
+</div></div>
+
+<h2>1 · El selector, con la fila nueva</h2>
+
+<div class="card mb-lg">
+  <div class="card-body">
+    <div class="row wrap" style="gap:var(--space-sm);margin-bottom:var(--space-md)">
+      <label class="input" style="flex:1 1 280px;display:flex;align-items:center;gap:var(--space-xs)">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="search" placeholder="Buscar por nombre, empresa o correo" style="border:0;outline:0;background:transparent;flex:1">
+      </label>
+      <div class="row" role="group" aria-label="Filtros">
+        <button class="chip" aria-pressed="false">Florida</button>
+        <button class="chip" aria-pressed="false">Con vacantes</button>
+        <button class="chip" aria-pressed="false">Míos</button>
+      </div>
+    </div>
+
+    <div class="label" style="margin-bottom:var(--space-xs)">Industria</div>
+    <div class="row wrap" role="group" aria-label="Filtrar por industria" style="gap:var(--space-2xs)">
+      <button class="chip" aria-pressed="true" id="c-tec">Tecnología<span class="n">1299</span></button>
+      <button class="chip" aria-pressed="false">Energía y recursos<span class="n">681</span></button>
+      <button class="chip" aria-pressed="false">Finanzas<span class="n">520</span></button>
+      <button class="chip" aria-pressed="false">Salud<span class="n">395</span></button>
+      <button class="chip" aria-pressed="false">Educación y RH<span class="n">230</span></button>
+      <button class="chip" aria-pressed="false">Industria e ingeniería<span class="n">253</span></button>
+      <button class="chip" aria-pressed="false">Marketing y diseño<span class="n">123</span></button>
+      <button class="chip" aria-pressed="false">Consumo y retail<span class="n">147</span></button>
+      <button class="chip" aria-pressed="false">Logística y transporte<span class="n">62</span></button>
+      <button class="chip" aria-pressed="false">Otras<span class="n">107</span></button>
+    </div>
+    <button class="btn btn-ghost btn-sm mt-md" id="toggle-vals" aria-expanded="false" aria-controls="vals">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      <span id="vals-label">Elegir valores exactos (91)</span>
+    </button>
+
+    <div id="vals" hidden style="margin-top:var(--space-md);border-top:1px solid var(--color-border);padding-top:var(--space-md)">
+      <p class="meta" style="margin:0 0 var(--space-sm)">Los diez valores crudos de «Tecnología». Destildá los que no quieras: el chip del grupo pasa a parcial.</p>
+      <ul class="vals">
+        <li><input type="checkbox" checked> Software de ordenador <span class="n">1036</span></li>
+        <li><input type="checkbox" checked> Tecnología y servicios de la Información <span class="n">186</span></li>
+        <li><input type="checkbox" checked> Telecomunicaciones <span class="n">30</span></li>
+        <li><input type="checkbox" checked> Inalámbrico <span class="n">18</span></li>
+        <li><input type="checkbox" checked> Hardware de ordenador <span class="n">13</span></li>
+        <li><input type="checkbox" checked> Desarrollo del programas <span class="n">6</span></li>
+        <li><input type="checkbox" checked> Externalización/Offshoring <span class="n">4</span></li>
+        <li><input type="checkbox" checked> Seguridad informática y de red <span class="n">3</span></li>
+        <li><input type="checkbox" checked> Redes informáticas <span class="n">2</span></li>
+        <li><input type="checkbox" checked> Internet <span class="n">1</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="card-footer row">
+    <span class="meta"><strong>1299</strong> contactos coinciden · mostrando 50</span>
+    <span class="grow"></span>
+    <span class="meta">1.611 sin industria quedan fuera de este filtro</span>
+  </div>
+</div>
+
+<div class="alert alert-warn mb-lg" role="note">
+  <div><strong>El balde que no se esconde.</strong> <strong>1.611 contactos elegibles (30%) no tienen industria.</strong> Con cualquier chip prendido, esos contactos <em>no aparecen</em> — y eso tiene que estar a la vista, porque si no vas a creer que tu base es más chica de lo que es. Hay un chip propio, <span class="chip" aria-pressed="false" style="pointer-events:none">Sin industria<span class="n">1611</span></span>, para poder trabajarlos aparte.</div>
+</div>
+
+<h2>2 · Por qué grupos y no solo el valor crudo</h2>
+<div class="card card-body mb-lg">
+  <p style="margin-top:0">Los dos valores más grandes de tu base son <strong>«Software de ordenador» (1036)</strong> y <strong>«Tecnología y servicios de la Información» (186)</strong>. Para un correo en frío <strong>son el mismo segmento</strong>. Si filtrás por valor crudo y tildás solo el primero, te perdés <strong>263</strong> contactos de tecnología sin enterarte.</p>
+  <p style="margin-bottom:0">Lo mismo con finanzas (Servicios financieros + Banca + Mercados de capitales + Seguros), energía (Petróleo + Agua/luz/gas + Renovables) y diseño (Diseño + Diseño gráfico). <strong>La taxonomía parte lo que vos querés juntar</strong> — viene de LinkedIn, no de cómo vendés.</p>
+</div>
+
+<h2>3 · El mapeo, verificado contra la base</h2>
+<p class="meta mb-lg">Esto es lo que te pido que apruebes. Vive en código, a la vista, con un test que falla si un valor queda sin grupo o entra en dos. <strong>No es una heurística oculta.</strong></p>
+<div class="table-wrap mb-lg">
+<table class="data gmap">
+<thead><tr><th>Grupo</th><th>n</th><th>Junta</th></tr></thead>
+<tbody>
+  <tr><td>Tecnología</td><td>1299</td><td>Software de ordenador · Tecnología y servicios de la Información · Telecomunicaciones · Hardware · Inalámbrico · Desarrollo de programas · Offshoring · Redes · Seguridad informática · Internet</td></tr>
+  <tr><td>Energía y recursos</td><td>681</td><td>Petróleo y energía · Agua, luz, gas · Renovables · Minería y metales · Productos químicos</td></tr>
+  <tr><td>Finanzas</td><td>520</td><td>Servicios financieros · Banca · Mercados de capitales · Seguros · Contabilidad · Banca de inversión · Gestión de inversiones</td></tr>
+  <tr><td>Salud</td><td>395</td><td>Ámbito sanitario · Farmacéuticos · Bienestar · Biotecnología · Práctica médica · Dispositivos médicos</td></tr>
+  <tr><td>Educación y RH</td><td>230</td><td>Formación profesional · Recursos humanos · Administración de educación · Educación superior y primaria · Reclutamiento · E-Learning</td></tr>
+  <tr><td>Industria e ingeniería</td><td>253</td><td>Ingeniería civil · Ingeniería industrial · Construcción · Materiales · Maquinaria · Automoción · Nanotecnología · Defensa · Manufactura</td></tr>
+  <tr><td>Marketing y diseño</td><td>123</td><td>Diseño · Diseño gráfico · Marketing y publicidad · Entretenimiento · Impresión · PR · Publicación · Medios · Fotografía</td></tr>
+  <tr><td>Consumo y retail</td><td>147</td><td>Minoristas · Bienes de consumo · Alimentos y bebidas · Restaurantes · Supermercados · Textiles · Moda · Cosméticos · Mayorista</td></tr>
+  <tr><td>Logística y transporte</td><td>62</td><td>Transporte · Logística y cadena de suministros · Aerolíneas</td></tr>
+  <tr><td>Otras</td><td>107</td><td>Administración pública · Inmobiliario · Legal · Consultoría · Turismo · Hotelería · Casinos · Deportes</td></tr>
+</tbody>
+<tfoot><tr><td><strong>Total</strong></td><td><strong>3817</strong></td><td class="mono">= 3817 medido por el código · 0 sin grupo · 0 fuera del mapeo</td></tr></tfoot>
+</table>
+</div>
+
+<h2>4 · Lo que NO entra</h2>
+<div class="card card-body mb-lg">
+  <p style="margin-top:0"><strong>No se completa ninguna industria.</strong> Medí el relleno automático desde <span class="mono">company_category</span>: ganaba 192 contactos emailables (3%) y ~77 quedaban mal etiquetados. Un dato inventado se ve igual que uno curado, y no se puede distinguir después.</p>
+  <p style="margin-bottom:0"><strong>La resolución por alias queda igual que el país.</strong> El filtro sigue el patrón de dos caminos de <span class="mono">companyCountrySql</span> aunque hoy el alias aporte <strong>0</strong> contactos — medido. Cuesta nada y no se rompe en silencio cuando los alias crezcan.</p>
+</div>
+
+<script>
+(function () {
+  var b = document.getElementById('toggle-vals'), v = document.getElementById('vals'), l = document.getElementById('vals-label');
+  b.addEventListener('click', function () {
+    var open = b.getAttribute('aria-expanded') === 'true';
+    b.setAttribute('aria-expanded', String(!open));
+    v.hidden = open;
+    l.textContent = open ? 'Elegir valores exactos (91)' : 'Ocultar valores exactos';
+  });
+  document.querySelectorAll('.chip[aria-pressed]').forEach(function (c) {
+    c.addEventListener('click', function () {
+      c.setAttribute('aria-pressed', c.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    });
+  });
+})();
+</script>
+
+</main>
+</body>
+</html>
