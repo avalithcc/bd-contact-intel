@@ -17,6 +17,7 @@ import { mapMemberCard, type CardActionId, type CardKind, type CardView } from "
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
 import { clockLabel, whenLabel } from "@/lib/scheduledEmail/view";
 import type { OnAction } from "./actions";
+import { AudienceBlock } from "./AudienceBlock";
 import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
 
 /** The meta line as parts, joined by " · ". The state table decides WHICH kind; this only words it from the facts. */
@@ -69,7 +70,7 @@ function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels
   return parts;
 }
 
-function Actions({ card, m, l, onAction, generation, send, now, moment }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generation: GenerationLock; send: SequenceSendContext; now: Date; moment: ApprovedMoment | null }) {
+function Actions({ card, m, l, onAction, generation, send, now, moment, audienceHeld }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generation: GenerationLock; send: SequenceSendContext; now: Date; moment: ApprovedMoment | null; audienceHeld: boolean }) {
   const contactHref = `/contacts/${m.personId}`;
   const run = (type: CardActionId) => () => void onAction({ type, memberId: m.memberId } as Parameters<OnAction>[0]);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
@@ -84,7 +85,7 @@ function Actions({ card, m, l, onAction, generation, send, now, moment }: { card
     <div className="row wrap" style={{ justifyContent: "flex-end", flex: "none", marginLeft: "auto", alignItems: "flex-start" }}>
       {card.actions.map((a) => {
         if (a.id === "openConversation") return <Link key={a.id} className={`btn btn-${a.style} btn-sm`} href={contactHref}>{l.actions[a.id]}</Link>;
-        if (a.id === "generate") return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} disabled={gen.generateDisabled} title={waitTitle} aria-busy={gen.busyHere ? "true" : undefined} onClick={run(a.id)}>{gen.busyHere ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}{gen.busyHere ? l.generating : l.actions[a.id]}</button>;
+        if (a.id === "generate") return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} disabled={gen.generateDisabled || audienceHeld} title={audienceHeld ? l.audience.generateDisabledTitle : waitTitle} aria-busy={gen.busyHere ? "true" : undefined} onClick={run(a.id)}>{gen.busyHere ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}{gen.busyHere ? l.generating : l.actions[a.id]}</button>;
         // A draft card's "Aprobar" is the split button; the reminder's stays a plain button (a reminder has no choice of moment).
         if (a.id === "approve" && card.kind === "draft") {
           return (
@@ -157,6 +158,9 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
   const chips = card.kind === "draft" || card.kind === "approved" || card.kind === "scheduled"
     ? [m.openIt > 0 && fill(m.openIt === 1 ? l.chipPostingsOne : l.chipPostingsMany, { n: m.openIt }), m.leadership && l.chipLeadership, m.florida && l.chipMiami].filter((c): c is string => !!c)
     : [];
+  // Shown while a draft can still be generated or reviewed; a HOLD (no audience) also disables "Generar borrador".
+  const showAudience = card.kind === "noDraft" || card.kind === "draft";
+  const audienceHeld = showAudience && m.audience != null && m.audience.audience === null;
   return (
     <div className="card">
       <div className="card-body row row-lg" style={{ flexWrap: "wrap" }}>
@@ -173,9 +177,10 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
             {m.company && <> {l.headlineAt} {m.companyKey ? <Link href={`/companies/${encodeURIComponent(m.companyKey)}`}>{m.company}</Link> : m.company}</>}
           </p>
           <div className="meta">{parts.map((p, i) => <Fragment key={i}>{i > 0 && " · "}{p}</Fragment>)}</div>
+          {showAudience && <AudienceBlock m={m} name={name} l={l} />}
           {chips.length > 0 && <div className="row wrap row-xs">{chips.map((c) => <span key={c} className="chip">{c}</span>)}</div>}
         </div>
-        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} />
+        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} audienceHeld={audienceHeld} />
       </div>
       {!readOnly && showOptOutPrompt(card.kind, optOutPhrase) && (
         <div className="card-body">
