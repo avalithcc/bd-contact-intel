@@ -30,7 +30,7 @@ import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { resolveComplianceAudience } from "./complianceAudience";
 import { PICKER_PAGE_SIZE, searchTokens, type PickerQuery } from "./pickerFilters";
 import { phoneCallingCodes } from "./phoneMarket";
-import { canonicalCompanyJoinSql, companyNameColumnsSql, displayedCompanySql, firstFilledCountry } from "./rosterQuery";
+import { canonicalCompanyJoinSql, companyNameColumnsSql, displayedCompanySql, firstFilledCountry, firstFilledText } from "./rosterQuery";
 
 /**
  * Lower-cased, trimmed country strings. `unmapped` = the compliance audience holds them; `us` = classifyMarket says US.
@@ -152,6 +152,8 @@ const either = (col: string) => sql.raw(`(coalesce(d.${col}, false) or coalesce(
 const hireCount = sql`(coalesce(d.hire, 0) + coalesce(a.hire, 0))`;
 const postingFlorida = either("florida");
 const companyCountry = firstFilledCountry(sql`cn.country`, sql`cca.country`);
+/** The company's industry by the same two paths as its country: the person's own company row, then the alias target's. NULL = none. */
+const companyIndustry = firstFilledText(sql`cn.industry`, sql`cca.industry`);
 const clientStatus = sql`coalesce(cn.client_status, cca.client_status)`;
 /** The first country link of the audience that has data; NULL means the postings decide. */
 const effectiveCountry = sql`coalesce(nullif(btrim(p.country), ''), ${companyCountry})`;
@@ -214,8 +216,22 @@ function searchSql(search: string): SQL {
   return tokens.length ? sql`and ${sql.join(tokens, sql` and `)}` : sql``;
 }
 
-export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: CountryFacts): SQL {
-  const blocked = blockedSql(facts);
+/** The industry predicate: the listed raw values, and/or "no industry". Neither selected adds nothing. */
+function industryPredicates(q: PickerQuery): SQL[] {
+  const any = [
+    ...(q.industries.length ? [sql`${companyIndustry} = any(${textArray(q.industries)})`] : []),
+    ...(q.noIndustry ? [sql`${companyIndustry} is null`] : []),
+  ];
+  return any.length ? [sql`(${sql.join(any, sql` or `)})`] : [];
+}
+
+/**
+ * THE POOL: `from person p ... where <every predicate>`, the one text both the page and the industry counts are built
+ * from. Eligibility, the toggles, the search and the industry filter are all spelled in here and nowhere else, so a
+ * predicate changed or added here reaches the list and the chip counts together; neither statement has a WHERE of its own
+ * (a unit test fails if one grows one). Both must be preceded by `with ${jobFacts}` because the joins read `pk_jf`.
+ */
+export function buildPickerPoolSql(q: PickerQuery, meId: string, facts: CountryFacts): SQL {
   const predicates = [
     sql`p.merged_into_id is null`,
     sql`btrim(coalesce(p.email, '')) <> ''`,
@@ -224,10 +240,19 @@ export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: Countr
     // Florida / Miami: the company has an open fresh US IT posting flagged job_posting.is_miami (the old definition), or
     // the person's own city / region names Florida.
     ...(q.florida ? [sql`(${postingFlorida} or ${homeInFlorida(facts)})`] : []),
-    ...(q.showBlocked ? [] : [sql`not ${blocked}`]),
+    ...industryPredicates(q),
+    ...(q.showBlocked ? [] : [sql`not ${blockedSql(facts)}`]),
   ];
+  return sql`
+    from person p
+    ${canonicalCompanyJoinSql}
+    ${joins}
+    where ${sql.join(predicates, sql` and `)} ${searchSql(q.search)}`;
+}
+
+export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: CountryFacts): SQL {
   // Hidden blocked rows need no sort key; a constant would be read as an ORDER BY position.
-  const blockedFirst = q.showBlocked ? sql`${blocked}, ` : sql``;
+  const blockedFirst = q.showBlocked ? sql`${blockedSql(facts)}, ` : sql``;
   return sql`
     with ${jobFacts}
     select p.id::text as person_id, p.first_name, p.last_name, p.email, p.email_status, p.email_source, p.job_title, p.status,
@@ -235,10 +260,38 @@ export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: Countr
            ${hireCount}::int as open_it, (${postingFlorida} or ${homeInFlorida(facts)}) as is_florida,
            ${suppressedSql} as suppressed, p.country as person_country, p.mobile_phone, p.phone, ${companyCountry} as company_country,
            array_remove(array[case when ${either("posts_us")} then 'us' end, case when ${either("posts_latam")} then 'latam' end], null) as posting_markets
-    from person p
-    ${canonicalCompanyJoinSql}
-    ${joins}
-    where ${sql.join(predicates, sql` and `)} ${searchSql(q.search)}
+    ${buildPickerPoolSql(q, meId, facts)}
     order by ${blockedFirst}${displayedCompanySql}, p.last_name, p.first_name, p.id
     offset ${q.offset} limit ${PICKER_PAGE_SIZE + 1}`;
+}
+
+/** More rows than raw industry values can exist (91 mapped + unknown + null); a belt against a pathological column. */
+export const INDUSTRY_COUNTS_MAX_ROWS = 500;
+
+/**
+ * Contacts per raw company industry over the SAME pool as the list (buildPickerPoolSql), with ONLY the industry selection
+ * lifted: every other filter of `q` (search, Florida, hiring, mine, showBlocked) still narrows, so a chip shows what
+ * turning it on would give under the filters currently on. One grouped statement, whatever the number of chips; biggest
+ * first, so the row cap could only ever cut the smallest values. Only valid for the `q` the page was read with:
+ * buildPickerReads is the one place that pairs them.
+ */
+export function buildPickerIndustryCountsQuery(q: PickerQuery, meId: string, facts: CountryFacts): SQL {
+  const pool = buildPickerPoolSql({ ...q, industries: [], noIndustry: false }, meId, facts);
+  return sql`
+    with ${jobFacts}
+    select ${companyIndustry} as industry, count(*) as n
+    ${pool}
+    group by 1
+    order by n desc
+    limit ${INDUSTRY_COUNTS_MAX_ROWS}`;
+}
+
+/**
+ * THE call-level pairing: the statements one picker request runs, both built from the SAME `q`. The chip counts are
+ * recomputed whenever the query restarts the list (offset 0, which is exactly when `pickerQueryKey` changed or the first
+ * page loads) and skipped when only the page advances ("Cargar más"), because the pool the counts describe cannot change
+ * with the offset. `counts: null` means "unchanged, keep the ones you have".
+ */
+export function buildPickerReads(q: PickerQuery, meId: string, facts: CountryFacts): { page: SQL; counts: SQL | null } {
+  return { page: buildPickerPageQuery(q, meId, facts), counts: q.offset === 0 ? buildPickerIndustryCountsQuery(q, meId, facts) : null };
 }

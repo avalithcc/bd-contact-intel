@@ -48,7 +48,8 @@ export const clientStatusSql = sql`(
  * (by-id read) so they cannot disagree: the person's OWN company row first, then the canonical company its key is an alias
  * of, a blank value counting as missing. NULL means the postings decide.
  */
-export const firstFilledCountry = (own: SQL, canonical: SQL): SQL => sql`coalesce(nullif(btrim(${own}), ''), nullif(btrim(${canonical}), ''))`;
+export const firstFilledText = (own: SQL, canonical: SQL): SQL => sql`coalesce(nullif(btrim(${own}), ''), nullif(btrim(${canonical}), ''))`;
+export const firstFilledCountry = firstFilledText;
 
 /** `firstFilledCountry` for a `from person p` read with no company joins. */
 export const companyCountrySql = firstFilledCountry(

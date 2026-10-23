@@ -6,6 +6,8 @@
  * The picker lists EVERY live contact with an email. Location and hiring are FILTERS the BD turns on, never a
  * restriction of the pool; all of them are off by default.
  */
+import type { IndustryCounts } from "./industryCounts";
+import { KNOWN_INDUSTRY_VALUES } from "./industryGroups";
 import type { PickerContact } from "./pickerView";
 
 export const PICKER_PAGE_SIZE = 50;
@@ -13,6 +15,8 @@ export const PICKER_PAGE_SIZE = 50;
 export const PICKER_MAX_OFFSET = 50_000;
 export const PICKER_SEARCH_MAX_CHARS = 100;
 export const PICKER_SEARCH_MAX_TOKENS = 4;
+/** Entries of `industries` that are even looked at: a bound on what a client can make the server scan. */
+export const PICKER_INDUSTRY_MAX = 200;
 
 export type PickerQuery = {
   search: string;
@@ -24,12 +28,30 @@ export type PickerQuery = {
   mine: boolean;
   /** Include the contacts that cannot be added (shown last, with the reason). */
   showBlocked: boolean;
+  /**
+   * Raw company industry values (a subset of KNOWN_INDUSTRY_VALUES, sorted, no duplicates). A group chip is only a shortcut
+   * the UI expands into its values, so the query carries what it filters on. Empty means no industry filter.
+   */
+  industries: string[];
+  /** Also (or only) contacts whose company has no industry. Not the same as an empty `industries`, which filters nothing. */
+  noIndustry: boolean;
   offset: number;
 };
 
-export type PickerPage = { contacts: PickerContact[]; hasMore: boolean };
+/**
+ * `industryCounts` are the chip counts for THIS page's query, read together with it (pageQueries.listPickerPage). `null`
+ * means the query only advanced the page (offset > 0): the counts of the list already on screen still hold.
+ */
+export type PickerPage = { contacts: PickerContact[]; hasMore: boolean; industryCounts?: IndustryCounts | null };
 
-export const DEFAULT_PICKER_QUERY: PickerQuery = { search: "", florida: false, hiring: false, mine: false, showBlocked: false, offset: 0 };
+export const DEFAULT_PICKER_QUERY: PickerQuery = { search: "", florida: false, hiring: false, mine: false, showBlocked: false, industries: [], noIndustry: false, offset: 0 };
+
+/** Only known raw values, once each, in canonical order; reads at most PICKER_INDUSTRY_MAX entries. */
+function normalizeIndustries(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const known = raw.slice(0, PICKER_INDUSTRY_MAX).filter((v): v is string => typeof v === "string" && KNOWN_INDUSTRY_VALUES.has(v));
+  return [...new Set(known)].sort();
+}
 
 export function normalizePickerQuery(raw: unknown): PickerQuery {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -40,6 +62,8 @@ export function normalizePickerQuery(raw: unknown): PickerQuery {
     hiring: r.hiring === true,
     mine: r.mine === true,
     showBlocked: r.showBlocked === true,
+    industries: normalizeIndustries(r.industries),
+    noIndustry: r.noIndustry === true,
     offset,
   };
 }
@@ -50,7 +74,7 @@ export function searchTokens(search: string): string[] {
 
 /** Identity of a query ignoring paging: when it changes the list restarts at the first page. */
 export function pickerQueryKey(q: PickerQuery): string {
-  return JSON.stringify([q.search.trim(), q.florida, q.hiring, q.mine, q.showBlocked]);
+  return JSON.stringify([q.search.trim(), q.florida, q.hiring, q.mine, q.showBlocked, [...q.industries].sort(), q.noIndustry]);
 }
 
 /** A later page appended to the list, skipping anyone already in it (offset paging can repeat a row if the data moved). */

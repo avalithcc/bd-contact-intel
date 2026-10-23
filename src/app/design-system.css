@@ -364,6 +364,9 @@ button.cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
    text, just with a bigger hit target than the mockup's label-only `.k`. */
 /* A preset toggle (envio-programado.html "Lunes 9:00 en Miami") shows its pressed state with the accent border. */
 .chip[aria-pressed="true"] { border-color: var(--color-accent); }
+/* A group chip whose values are only PARTLY selected. Without this it renders identical to an unpressed chip, so the
+   filter stays active while the control says it is off. Dashed is already this file's "not solid" idiom (.chip-add). */
+.chip[aria-pressed="mixed"] { border-color: var(--color-accent); border-style: dashed; }
 .chip-target { display: inline-flex; align-items: center; gap: 0.2rem; border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
 /* `.k` is the label span inside `.chip-target` — kept as its own class so
    it still gets the mockup's subtler label color while the value text

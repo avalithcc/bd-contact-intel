@@ -47,5 +47,5 @@ export function NewSequenceScreen({ firstPage, account, labels: l, statusLabels 
     }
   }
 
-  return <SequenceCreateForm contacts={firstPage.contacts} hasMore={firstPage.hasMore} loadPage={loadPickerPage} account={account} labels={l} statusLabels={statusLabels} onSubmit={submit} busy={busy} error={error} />;
+  return <SequenceCreateForm contacts={firstPage.contacts} hasMore={firstPage.hasMore} loadPage={loadPickerPage} industryCounts={firstPage.industryCounts} account={account} labels={l} statusLabels={statusLabels} onSubmit={submit} busy={busy} error={error} />;
 }

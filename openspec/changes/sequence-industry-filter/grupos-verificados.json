@@ -1,0 +1,12 @@
+{
+  "tecnologia": ["Software de ordenador","Tecnología y servicios  de la Información","Telecomunicaciones","Hardware de ordenador","Inalámbrico","Desarrollo del programas","Redes informáticas","Seguridad informática y de red","Internet","Externalización/Offshoring"],
+  "energia": ["Petróleo y energía","Agua, luz, gas","Renovables y medio ambiente","Minería y metales","Productos químicos"],
+  "finanzas": ["Servicios financieros","Banca","Mercados de capitales","Seguros","Contabilidad","Banca de inversión","Gestión de inversiones"],
+  "salud": ["Ámbito sanitario y hospitalario","Productos farmacéuticos","Salud, bienestar y fitness","Biotecnología","Práctica médica","Dispositivos médicos"],
+  "educacion_rh": ["Formación profesional y coaching","Recursos humanos","Administración de educación","Educación superior","Educación primaria/secundaria","Dotación de personal y reclutamiento","E-Learning"],
+  "industria_ingenieria": ["Ingeniería civil","Ingeniería industrial o mecánica","Construcción","Materiales de construcción","Maquinaria","Automoción","Nanotecnología","Defensa y espacio","Manufactura eléctrica/electrónica"],
+  "marketing_diseno": ["Diseño","Diseño gráfico","Marketing y publicidad","Entretenimiento","Impresión","Relaciones públicas y comunicaciones","Publicación","Medios de difusión","Periódicos","Fotografía","Medios en línea","Producción de medios","Investigación de mercado"],
+  "consumo_retail": ["Minoristas","Bienes de consumo","Alimentos y bebidas","Producción de alimentos","Servicio al consumidor","Restaurantes","Vino y licores","Supermercados","Textiles","Ropa y moda","Productos cosméticos","Electrónica de consumo","Artículos deportivos","Venta al por mayor","Envases y contenedores","Productos de papel y forestales","Tabaco"],
+  "logistica": ["Transporte/camiones/ferrocarril","Logística y cadena de suministros","Aerolíneas/aviación"],
+  "otras": ["Administración pública","Bienes inmuebles","Bienes inmuebles comerciales","Consultoría de gestión","Práctica de derecho","Servicios jurídicos","Seguridad e Investigaciones","Ocio, viajes y turismo","Sector hotelero","Artículos y equipamiento de oficina","Juegos de apuestas y casinos","Servicios individuales y familiares","Comercio internacional y desarrollo","Deportes"]
+}
