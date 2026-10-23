@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
@@ -150,6 +151,52 @@ function ComparePanel({ detail, pairMeta, hasSequencePanel }: { detail: Duplicat
   );
 }
 
+/** Loading state for the detail pane only, from the design system's `.skeleton` (same pattern as sequences/contacts loading.tsx). */
+function DetailSkeleton() {
+  return (
+    <section className="panel" aria-busy="true">
+      <div className="skeleton" style={{ width: 160, height: 20, marginBottom: 12 }} />
+      <div className="skeleton" style={{ width: "100%", height: 12, marginBottom: 16 }} />
+      {Array.from({ length: 6 }, (_, i) => (
+        <div key={i} className="skeleton" style={{ width: "100%", height: 20, marginBottom: 12 }} />
+      ))}
+    </section>
+  );
+}
+
+async function DetailPane({ selectedId, pairMeta, sequenceCancelled }: { selectedId: string | null; pairMeta: string; sequenceCancelled: boolean }) {
+  const detail = selectedId ? await getDuplicateCandidateDetail(selectedId) : null;
+  if (!detail) {
+    return (
+      <section className="panel">
+        <p className="muted">{dict.emptyQueue}</p>
+      </section>
+    );
+  }
+  // Same survivor rule as mergeDuplicateCandidateAction, so the panel describes exactly what Fusionar will do.
+  const survivor = detail.recommendedSurvivor === "a" ? detail.personA : detail.personB;
+  const mergedPerson = detail.recommendedSurvivor === "a" ? detail.personB : detail.personA;
+  const sequencePanel = buildMergePanel({
+    plan: await planSequenceMergeFor(db, survivor.id, mergedPerson.id),
+    survivor: { id: survivor.id, name: survivor.name },
+    merged: { id: mergedPerson.id, name: mergedPerson.name },
+    justCancelled: sequenceCancelled,
+  });
+  return (
+    <div>
+      <ComparePanel detail={detail} pairMeta={pairMeta} hasSequencePanel={!!sequencePanel} />
+      {sequencePanel && (
+        <MergeSequencePanel
+          panel={sequencePanel}
+          candidateId={detail.id}
+          title={dict.mergePanel.titleJoin(survivor.name, mergedPerson.name)}
+          survivorName={survivor.name}
+        />
+      )}
+    </div>
+  );
+}
+
 function UnmergeConfirmPanel({ mergeEventId, survivorName }: { mergeEventId: string; survivorName: string }) {
   return (
     <section className="panel duplicates-unmerge-confirm mt-md">
@@ -211,21 +258,7 @@ export default async function DuplicatesAdminPage({
       ? (history.find((h) => h.mergeEventId === confirmUnmergeParam && !h.undoneAt) ?? null)
       : null;
   const selectedId = candidateParam ?? list.items[0]?.id ?? null;
-  const detail = selectedId ? await getDuplicateCandidateDetail(selectedId) : null;
-  // Same survivor rule as mergeDuplicateCandidateAction, so the panel describes exactly what Fusionar will do.
-  const survivor = detail ? (detail.recommendedSurvivor === "a" ? detail.personA : detail.personB) : null;
-  const mergedPerson = detail ? (detail.recommendedSurvivor === "a" ? detail.personB : detail.personA) : null;
-  const sequencePanel =
-    detail && survivor && mergedPerson
-      ? buildMergePanel({
-          plan: await planSequenceMergeFor(db, survivor.id, mergedPerson.id),
-          survivor: { id: survivor.id, name: survivor.name },
-          merged: { id: mergedPerson.id, name: mergedPerson.name },
-          justCancelled: sendCancelled === "1",
-        })
-      : null;
-  const selectedIndex = detail ? list.items.findIndex((i) => i.id === detail.id) : -1;
-  const pairMeta = detail && selectedIndex >= 0 ? dict.pairMeta(list.startIndex + selectedIndex + 1, list.total) : "";
+  const selectedIndex = selectedId ? list.items.findIndex((i) => i.id === selectedId) : -1;
 
   return (
     <main>
@@ -259,6 +292,7 @@ export default async function DuplicatesAdminPage({
             <Link
               key={item.id}
               href={`/admin/duplicates?candidate=${item.id}`}
+              scroll={false}
               className={`duplicates-queue-item${item.id === selectedId ? " active" : ""}`}
             >
               <div className="n">{item.personAName}</div>
@@ -287,23 +321,14 @@ export default async function DuplicatesAdminPage({
           )}
         </section>
 
-        {detail ? (
-          <div>
-            <ComparePanel detail={detail} pairMeta={pairMeta} hasSequencePanel={!!sequencePanel} />
-            {sequencePanel && survivor && mergedPerson && (
-              <MergeSequencePanel
-                panel={sequencePanel}
-                candidateId={detail.id}
-                title={dict.mergePanel.titleJoin(survivor.name, mergedPerson.name)}
-                survivorName={survivor.name}
-              />
-            )}
-          </div>
-        ) : (
-          <section className="panel">
-            <p className="muted">{dict.emptyQueue}</p>
-          </section>
-        )}
+        {/* `key` makes the boundary re-suspend on every selection change; the queue above renders without waiting for the detail. */}
+        <Suspense key={selectedId ?? "none"} fallback={<DetailSkeleton />}>
+          <DetailPane
+            selectedId={selectedId}
+            pairMeta={selectedIndex >= 0 ? dict.pairMeta(list.startIndex + selectedIndex + 1, list.total) : ""}
+            sequenceCancelled={sendCancelled === "1"}
+          />
+        </Suspense>
       </div>
 
       <h2 className="mt-3xl">
