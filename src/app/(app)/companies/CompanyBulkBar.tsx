@@ -18,6 +18,7 @@ import { endsFilterWideMode, resolveSelectAllChecked, SELECT_ALL_COMPANIES_CHECK
 import type { CompanyBulkLabels } from "@/lib/companies/labels";
 import type { Locale } from "@/lib/i18n/locales";
 import { bulkClientStatusAction } from "./bulkActions";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export interface CompanyBulkBarProps {
   labels: CompanyBulkLabels;
@@ -117,9 +118,9 @@ export function CompanyBulkBar({ labels: l, statusLabels, locale, total, returnQ
             <button type="button" className="btn btn-secondary" onClick={closeDialog}>
               {l.cancel}
             </button>
-            <button type="submit" className="btn btn-primary" disabled={confirmDisabled}>
+            <SubmitButton className="btn btn-primary" disabled={confirmDisabled} pendingLabel={l.confirmPending}>
               {l.confirmPrefix} {companies(count)}
-            </button>
+            </SubmitButton>
           </>
         }
       >

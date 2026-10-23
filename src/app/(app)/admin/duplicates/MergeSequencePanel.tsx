@@ -6,6 +6,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import { formatArgentinaDayMonthTime, relativeTime } from "@/lib/i18n/format";
 import type { MergePanel, PanelAlert, PanelNote, PanelRow, PanelStatus } from "@/lib/sequences/mergePanel";
 import { cancelScheduledSendAction, mergeDuplicateCandidateAction } from "./actions";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 const t = es.duplicates.mergePanel;
 
@@ -79,9 +80,9 @@ function Row({ row, candidateId }: { row: PanelRow; candidateId: string }) {
         <form action={cancelScheduledSendAction}>
           <input type="hidden" name="memberId" value={row.cancelMemberId} />
           <input type="hidden" name="candidateId" value={candidateId} />
-          <button type="submit" className="btn btn-danger btn-sm">
+          <SubmitButton className="btn btn-danger btn-sm" pendingLabel={t.cancelSendPending}>
             {t.cancelSend}
-          </button>
+          </SubmitButton>
         </form>
       )}
     </div>
@@ -137,9 +138,9 @@ export function MergeSequencePanel({
           <form action={mergeDuplicateCandidateAction}>
             <input type="hidden" name="candidateId" value={candidateId} />
             <input type="hidden" name="acknowledgeSequences" value="on" />
-            <button type="submit" className="btn btn-primary btn-sm" disabled={!panel.canMerge}>
+            <SubmitButton className="btn btn-primary btn-sm" disabled={!panel.canMerge} pendingLabel={t.mergePending}>
               {t[panel.mergeLabel]}
-            </button>
+            </SubmitButton>
           </form>
         </span>
       </div>

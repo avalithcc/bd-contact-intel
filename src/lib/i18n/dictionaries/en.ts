@@ -413,6 +413,8 @@ export const en = {
     teamContactCount: (n: number) => `${n} team contact${n === 1 ? "" : "s"}`,
     approve: "Approve",
     reject: "Reject",
+    approvePending: "Approving…",
+    rejectPending: "Discarding…",
   },
 
   outreach: {
@@ -2294,6 +2296,7 @@ export const en = {
     revenueLabel: "Revenue potential",
     notesLabel: "Notes",
     submit: "Create company",
+    submitPending: "Creating…",
     errorMissingName: "Enter a company name first.",
     errorDuplicate: "A company with that name already exists.",
   },
@@ -2351,6 +2354,7 @@ export const en = {
     statusExecuted: "Executed",
     notExecutedWarning: "Not executed. No production data was changed.",
     approveButton: "Approve dry run",
+    approvePending: "Approving…",
     approvedBy: (name: string, date: string) => `Approved by ${name} on ${date}`,
     executedAt: (date: string) => `Executed on ${date}`,
     backupPath: (path: string) => `Backup: ${path}`,
@@ -2601,6 +2605,7 @@ export const en = {
       capLabel: "Cap per run",
       dryRunLabel: "Dry run only (creates nothing)",
       button: "Re-scan",
+      buttonPending: "Scanning…",
       capHelp: (max: number) =>
         `Creates at most this many new pairs per run, manual and daily (up to ${max}). If there are more, the rest waits for the next run; nothing is discarded. With "Dry run only" ticked you see how many pairs would be created, without creating any.`,
       lastRunRemaining: (n: number) =>
@@ -2664,6 +2669,9 @@ export const en = {
     historyWhen: "When",
     historyUndone: "Undone",
     undoButton: "Undo merge",
+    mergePending: "Merging…",
+    notDuplicatePending: "Marking…",
+    undoPending: "Undoing…",
     cancelButton: "Cancel",
     unmergeConfirmTitle: (name: string) => `Undo the merge of ${name}?`,
     unmergeConfirmBody:
@@ -2730,6 +2738,8 @@ export const en = {
       backToDuplicates: "Back to duplicates",
       merge: "Merge",
       mergeAndDiscard: "Merge and discard the duplicate",
+      cancelSendPending: "Cancelling…",
+      mergePending: "Merging…",
     },
     actionErrors: {
       not_found: "The pair or merge could not be found.",
@@ -2768,6 +2778,7 @@ export const en = {
     remaining: (n: number) => `${n} remain`,
     noValue: "—",
     rejectButton: "Reject",
+    rejectPending: "Rejecting…",
     applyButton: "Apply the merge",
     dialogTitle: "Apply the merge",
     dialogBody: (absorbed: string, survivor: string, contacts: number) =>
@@ -3116,6 +3127,7 @@ export const en = {
       `Reads the newest pending messages from Gmail (read-only, up to ${max} per run) and fills their Message-ID. Safe to repeat: filled messages are never touched again. If a run stops making progress, raise the limit.`,
     limitLabel: "Messages per run",
     runButton: "Run one batch",
+    runPending: "Running…",
     resultTitle: "Last run",
     resultCandidates: "Messages selected",
     resultUpdated: "Updated",
@@ -3178,6 +3190,7 @@ export const en = {
     columnsPickerLabel: "Columns",
     columnsPickerHelp: "Visible columns",
     columnsApply: "Apply",
+    columnsApplyPending: "Applying…",
     columnsReset: "Reset",
     columnsMoveUp: "Move up",
     columnsMoveDown: "Move down",
@@ -3251,6 +3264,7 @@ export const en = {
     bulkOwnerLabel: "Owner",
     bulkOwnerUnassign: "Unassigned",
     bulkConfirm: "Apply",
+    bulkConfirmPending: "Applying…",
     bulkCancel: "Cancel",
     bulkTaskTitleLabel: "Task title",
     bulkTaskDescriptionLabel: "Description",
@@ -3411,6 +3425,7 @@ export const en = {
     historyNote: "Every change is recorded in the company history, with who made it.",
     cancel: "Cancel",
     confirmPrefix: "Mark",
+    confirmPending: "Marking…",
     guardTitle: "You are about to mark {n} companies.",
     guardBody:
       "Client status asserts that the company is a client. If it is set on all of them, the filter stops being useful for finding the real ones. Filter first.",

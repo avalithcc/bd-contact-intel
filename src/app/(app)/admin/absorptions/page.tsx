@@ -14,6 +14,7 @@ import { formatDate, relativeTime } from "@/lib/i18n/format";
 import { isUuid } from "@/lib/uuid";
 import { ApplyDialog } from "./ApplyDialog";
 import { applyAbsorptionAction, rejectAbsorptionAction } from "./actions";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -131,10 +132,10 @@ export default async function AbsorptionsAdminPage({
             <div className="card-footer row">
               <form action={rejectAbsorptionAction}>
                 <input type="hidden" name="proposalId" value={selected.id} />
-                <button type="submit" className="btn btn-secondary">
+                <SubmitButton className="btn btn-secondary" pendingLabel={dict.rejectPending}>
                   <CloseIcon className="icon" />
                   {dict.rejectButton}
-                </button>
+                </SubmitButton>
               </form>
               <span className="grow" />
               <ApplyDialog

@@ -400,6 +400,8 @@ export const es: typeof en = {
     teamContactCount: (n) => `${n} contacto${n === 1 ? "" : "s"} del equipo`,
     approve: "Aprobar",
     reject: "Rechazar",
+    approvePending: "Aprobando…",
+    rejectPending: "Descartando…",
   },
 
   outreach: {
@@ -2268,6 +2270,7 @@ export const es: typeof en = {
     revenueLabel: "Potencial de ingresos",
     notesLabel: "Notas",
     submit: "Crear empresa",
+    submitPending: "Creando…",
     errorMissingName: "Ingresá un nombre de empresa primero.",
     errorDuplicate: "Ya existe una empresa con ese nombre.",
   },
@@ -2320,6 +2323,7 @@ export const es: typeof en = {
     statusExecuted: "Ejecutada",
     notExecutedWarning: "No ejecutado. No se modificaron datos de producción.",
     approveButton: "Aprobar simulación",
+    approvePending: "Aprobando…",
     approvedBy: (name, date) => `Aprobada por ${name} el ${date}`,
     executedAt: (date) => `Ejecutada el ${date}`,
     backupPath: (path) => `Copia de seguridad: ${path}`,
@@ -2583,6 +2587,7 @@ export const es: typeof en = {
       capLabel: "Tope por corrida",
       dryRunLabel: "Solo simular (no crea nada)",
       button: "Re-escanear",
+      buttonPending: "Escaneando…",
       capHelp: (max: number) =>
         `Crea como máximo ese número de pares nuevos por corrida, la manual y la diaria (hasta ${max}). Si hay más, el resto queda para la corrida siguiente; nada se descarta. Con «Solo simular» tildado ves cuántos pares se crearían, sin crear ninguno.`,
       lastRunRemaining: (n: number) =>
@@ -2646,6 +2651,9 @@ export const es: typeof en = {
     historyWhen: "Cuándo",
     historyUndone: "Deshecha",
     undoButton: "Deshacer fusión",
+    mergePending: "Fusionando…",
+    notDuplicatePending: "Marcando…",
+    undoPending: "Deshaciendo…",
     cancelButton: "Cancelar",
     unmergeConfirmTitle: (name: string) => `¿Deshacer la fusión de ${name}?`,
     unmergeConfirmBody:
@@ -2712,6 +2720,8 @@ export const es: typeof en = {
       backToDuplicates: "Volver a duplicados",
       merge: "Fusionar",
       mergeAndDiscard: "Fusionar y descartar la duplicada",
+      cancelSendPending: "Cancelando…",
+      mergePending: "Fusionando…",
     },
     actionErrors: {
       not_found: "No se encontró el par o la fusión indicada.",
@@ -2754,6 +2764,7 @@ export const es: typeof en = {
     remaining: (n: number) => `quedan ${n}`,
     noValue: "—",
     rejectButton: "Rechazar",
+    rejectPending: "Rechazando…",
     applyButton: "Aplicar la fusión",
     dialogTitle: "Aplicar la fusión",
     dialogBody: (absorbed: string, survivor: string, contacts: number) =>
@@ -3107,6 +3118,7 @@ export const es: typeof en = {
       `Lee desde Gmail (solo lectura) los mensajes pendientes más recientes, hasta ${max} por ejecución, y completa su Message-ID. Se puede repetir sin riesgo: los mensajes ya completados no se vuelven a tocar. Si una ejecución deja de avanzar, aumentar el límite.`,
     limitLabel: "Mensajes por ejecución",
     runButton: "Ejecutar un lote",
+    runPending: "Ejecutando…",
     resultTitle: "Última ejecución",
     resultCandidates: "Mensajes seleccionados",
     resultUpdated: "Actualizados",
@@ -3165,6 +3177,7 @@ export const es: typeof en = {
     columnsPickerLabel: "Columnas",
     columnsPickerHelp: "Columnas visibles",
     columnsApply: "Aplicar",
+    columnsApplyPending: "Aplicando…",
     columnsReset: "Restablecer",
     columnsMoveUp: "Subir",
     columnsMoveDown: "Bajar",
@@ -3237,6 +3250,7 @@ export const es: typeof en = {
     bulkOwnerLabel: "Responsable",
     bulkOwnerUnassign: "Sin asignar",
     bulkConfirm: "Aplicar",
+    bulkConfirmPending: "Aplicando…",
     bulkCancel: "Cancelar",
     bulkTaskTitleLabel: "Título de la tarea",
     bulkTaskDescriptionLabel: "Descripción",
@@ -3397,6 +3411,7 @@ export const es: typeof en = {
     historyNote: "Cada cambio queda en el historial de la empresa, con quién lo hizo.",
     cancel: "Cancelar",
     confirmPrefix: "Marcar",
+    confirmPending: "Marcando…",
     guardTitle: "Vas a marcar {n} empresas.",
     guardBody:
       "El estado de cliente afirma que la empresa es cliente. Si se pone en todas, el filtro deja de servir para encontrar a las que sí lo son. Filtra primero.",

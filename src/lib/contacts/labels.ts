@@ -37,6 +37,7 @@ export type BulkActionsLabels = ClientStrings<
     | "bulkOwnerLabel"
     | "bulkOwnerUnassign"
     | "bulkConfirm"
+    | "bulkConfirmPending"
     | "bulkCancel"
     | "bulkTaskTitleLabel"
     | "bulkTaskDescriptionLabel"
@@ -61,6 +62,7 @@ export function pickBulkActionsLabels(dict: Dictionary): BulkActionsLabels {
     bulkOwnerLabel: l.bulkOwnerLabel,
     bulkOwnerUnassign: l.bulkOwnerUnassign,
     bulkConfirm: l.bulkConfirm,
+    bulkConfirmPending: l.bulkConfirmPending,
     bulkCancel: l.bulkCancel,
     bulkTaskTitleLabel: l.bulkTaskTitleLabel,
     bulkTaskDescriptionLabel: l.bulkTaskDescriptionLabel,

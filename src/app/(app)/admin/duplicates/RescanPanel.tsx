@@ -3,6 +3,7 @@ import type { RescanLastRun } from "@/lib/identity/duplicateRescanRun";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { formatDateTime } from "@/lib/i18n/format";
 import { runDuplicateRescanAction } from "./actions";
+import { SubmitButton } from "@/components/forms/SubmitButton";
 
 // Spanish-only regardless of `locale`, same as the rest of this admin screen.
 const dict = es.duplicates.rescan;
@@ -114,9 +115,9 @@ export function RescanPanel({ lastRun, report }: { lastRun: RescanLastRun | null
               <input type="checkbox" name="dryRun" defaultChecked /> {dict.dryRunLabel}
             </label>
             <span className="grow"></span>
-            <button type="submit" className="btn btn-primary">
+            <SubmitButton className="btn btn-primary" pendingLabel={dict.buttonPending}>
               {dict.button}
-            </button>
+            </SubmitButton>
           </form>
           <p className="help mt-md" id="cap-help">
             {dict.capHelp(RESCAN_MAX_CAP)}
