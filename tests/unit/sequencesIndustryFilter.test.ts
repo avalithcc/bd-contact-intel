@@ -6,7 +6,7 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { INDUSTRY_GROUPS, KNOWN_INDUSTRY_VALUES } from "@/lib/sequences/industryGroups";
 import { DEFAULT_PICKER_QUERY, PICKER_INDUSTRY_MAX, normalizePickerQuery, pickerQueryKey, type PickerQuery } from "@/lib/sequences/pickerFilters";
-import { buildPickerIndustryCountsQuery, buildPickerPageQuery, buildPickerPoolSql, buildPickerReads } from "@/lib/sequences/pickerQuery";
+import { buildPickerCountsQuery, buildPickerPageQuery, buildPickerPoolSql, buildPickerReads } from "@/lib/sequences/pickerQuery";
 import { industryCountsFromRows, groupCount, type IndustryCounts } from "@/lib/sequences/industryCounts";
 
 const ME = "00000000-0000-4000-8000-000000000001";
@@ -16,8 +16,10 @@ const dialect = new PgDialect();
 const flat = (s: string) => s.replace(/\s+/g, " ").replace(/\$\d+/g, "?");
 const rendered = (s: SQL) => { const q = dialect.sqlToQuery(s); return { text: flat(q.sql), params: q.params }; };
 const list = (over: Partial<PickerQuery> = {}) => rendered(buildPickerPageQuery({ ...DEFAULT_PICKER_QUERY, ...over }, ME, facts));
-const counts = (over: Partial<PickerQuery> = {}) => rendered(buildPickerIndustryCountsQuery({ ...DEFAULT_PICKER_QUERY, ...over }, ME, facts));
-const region = (text: string, from: string, to: string) => text.slice(text.indexOf(from), text.indexOf(to, text.indexOf(from)));
+const counts = (over: Partial<PickerQuery> = {}) => rendered(buildPickerCountsQuery({ ...DEFAULT_PICKER_QUERY, ...over }, ME, facts));
+/** End of the pool inside the counts statement: the CTE that holds it closes right before the grouping CTE. */
+const POOL_END = "), pk_grp as";
+const region = (text: string, from: string, to: string) => text.slice(text.indexOf(from), text.indexOf(to, text.indexOf(from))).trim();
 
 // ---- normalizePickerQuery ----
 
@@ -103,7 +105,7 @@ const nonDefault = (key: string, v: unknown): unknown => {
   if (typeof v === "boolean") return !v;
   if (typeof v === "string") return "ana perez";
   if (typeof v === "number") return 100;
-  if (Array.isArray(v)) return [TECH[0]];
+  if (Array.isArray(v)) return key === "countries" ? ["Argentina"] : [TECH[0]];
   throw new Error(`PickerQuery.${key} has a type the matrix cannot vary: teach it here and decide how the counts treat it`);
 };
 const KEYS = Object.keys(DEFAULT_PICKER_QUERY) as (keyof PickerQuery)[];
@@ -115,6 +117,9 @@ const MATRIX: Partial<PickerQuery>[] = [
 ];
 const INDUSTRY_KEYS = new Set<string>(["industries", "noIndustry"]);
 const withoutIndustry = (over: Partial<PickerQuery>): Partial<PickerQuery> => ({ ...over, industries: [], noIndustry: false });
+/** The pool the counts scan: BOTH dimensions lifted (each marginal re-applies the other one as a flag). */
+const COUNTRY_KEYS = new Set<string>(["countries", "noCountry"]);
+const withoutDimensions = (over: Partial<PickerQuery>): Partial<PickerQuery> => ({ ...over, industries: [], noIndustry: false, countries: [], noCountry: false });
 
 test("the matrix covers every PickerQuery key", () => {
   assert.deepEqual([...exercised].sort(), Object.keys(DEFAULT_PICKER_QUERY).sort());
@@ -125,20 +130,21 @@ test("the counts query reads the list's pool character for character, for every 
   for (const over of MATRIX) {
     const l = list(over);
     const c = counts(over);
-    assert.equal(region(c.text, " from person p", " group by"), region(list(withoutIndustry(over)).text, " from person p", " order by"), JSON.stringify(over));
+    assert.equal(region(c.text, " from person p", POOL_END), region(list(withoutDimensions(over)).text, " from person p", " order by"), JSON.stringify(over));
     assert.ok(c.text.includes("with pk_jf as") && l.text.includes("with pk_jf as"), "same CTE");
-    const pool = rendered(buildPickerPoolSql({ ...DEFAULT_PICKER_QUERY, ...over, industries: [], noIndustry: false }, ME, facts));
+    const pool = rendered(buildPickerPoolSql({ ...DEFAULT_PICKER_QUERY, ...over, industries: [], noIndustry: false, countries: [], noCountry: false }, ME, facts));
     assert.ok(c.text.includes(pool.text), "the counts are built from the pool fragment");
     const sub = (all: readonly unknown[]) => all.join("\u0001").includes(pool.params.join("\u0001"));
     assert.ok(sub(c.params), "and bind the same parameters");
-    if (!Object.keys(over).some((k) => INDUSTRY_KEYS.has(k))) assert.ok(l.text.includes(pool.text), "the list is built from the pool fragment");
+    if (!Object.keys(over).some((k) => INDUSTRY_KEYS.has(k) || COUNTRY_KEYS.has(k))) assert.ok(l.text.includes(pool.text), "the list is built from the pool fragment");
   }
 });
 
-test("a selection narrows the list but never the chip counts: the counts ignore the industry, the list obeys it", () => {
+test("a selection narrows the list but never the pool the chip counts scan: the counts ignore the industry, the list obeys it", () => {
   for (const over of MATRIX) {
     const picked = { industries: [TECH[0]], noIndustry: true };
-    assert.deepEqual(counts({ ...over, ...picked }), counts(withoutIndustry(over)), "the counts are the same with or without an industry selection");
+    assert.equal(region(counts({ ...over, ...picked }).text, " from person p", POOL_END), region(counts(withoutIndustry(over)).text, " from person p", POOL_END), "the scanned pool is the same with or without an industry selection");
+    assert.equal(region(counts({ ...over, ...picked }).text, " select ", " from person p").includes("as ci_ind_ok"), true, "the selection only travels as the flag the COUNTRY marginal obeys");
     assert.notEqual(list({ ...over, ...picked }).text, list(withoutIndustry(over)).text, "the list does obey it");
   }
 });
@@ -154,14 +160,14 @@ test("one request builds the page AND the counts from the same query: the counts
   for (const over of MATRIX.filter((o) => !("offset" in o))) {
     const r = reads(over);
     assert.ok(r.counts, JSON.stringify(over));
-    assert.equal(region(r.counts.text, " from person p", " group by"), region(reads(withoutIndustry(over)).page.text, " from person p", " order by"), JSON.stringify(over));
+    assert.equal(region(r.counts.text, " from person p", POOL_END), region(reads(withoutDimensions(over)).page.text, " from person p", " order by"), JSON.stringify(over));
     assert.deepEqual(r.counts, counts(over), "and it is exactly the counts statement for that query");
   }
 });
 
 test("counts built for the DEFAULT query while the list follows another are caught (the static-prop bug)", () => {
-  for (const over of MATRIX.filter((o) => !("offset" in o) && !Object.keys(o).every((k) => INDUSTRY_KEYS.has(k)))) {
-    assert.notEqual(region(reads({}).counts!.text, " from person p", " group by"), region(reads(withoutIndustry(over)).page.text, " from person p", " order by"), `a default-query count would not match ${JSON.stringify(over)}`);
+  for (const over of MATRIX.filter((o) => !("offset" in o) && !Object.keys(o).every((k) => INDUSTRY_KEYS.has(k) || COUNTRY_KEYS.has(k)))) {
+    assert.notEqual(region(reads({}).counts!.text, " from person p", POOL_END), region(reads(withoutDimensions(over)).page.text, " from person p", " order by"), `a default-query count would not match ${JSON.stringify(over)}`);
   }
 });
 
@@ -177,15 +183,15 @@ test("only advancing the page skips the counts; any restart of the list recomput
 
 test("the page reads the counts through listPickerPage only: no second entry point with its own query", () => {
   const page = readFileSync(join(process.cwd(), "src/app/(app)/sequences/new/page.tsx"), "utf8");
-  assert.doesNotMatch(page, /IndustryCounts|buildPickerIndustryCountsQuery/);
+  assert.doesNotMatch(page, /IndustryCounts|CountryCounts|buildPickerCountsQuery/);
   const queries = readFileSync(join(process.cwd(), "src/lib/sequences/pageQueries.ts"), "utf8");
   assert.equal((queries.match(/buildPickerReads\(/g) ?? []).length, 1);
-  assert.doesNotMatch(queries, /buildPickerIndustryCountsQuery|buildPickerPageQuery/, "pageQueries cannot pair a page with counts of another query");
+  assert.doesNotMatch(queries, /buildPickerCountsQuery|buildPickerPageQuery/, "pageQueries cannot pair a page with counts of another query");
 });
 
 test("a predicate added to the list alone would be caught: every WHERE predicate sits in the shared pool fragment", () => {
   const l = list().text;
-  assert.equal(region(l, " from person p", " order by"), region(counts().text, " from person p", " group by"));
+  assert.equal(region(l, " from person p", " order by"), region(counts().text, " from person p", POOL_END));
   assert.ok(l.indexOf(" order by") > l.indexOf(" where "), "nothing filters after the pool");
   assert.doesNotMatch(l.slice(l.indexOf(" order by")), /\bwhere\b|\band\b/);
 });
@@ -193,9 +199,9 @@ test("a predicate added to the list alone would be caught: every WHERE predicate
 test("the counts are one bounded grouped statement over the same industry expression", () => {
   const c = counts().text;
   assert.equal((c.match(/\bselect\b[^()]*\bcount\(\*\)/g) ?? []).length >= 1, true);
-  assert.match(c, /group by 1 order by n desc limit \?\s*$/, "biggest first, so a cap could only cut the smallest");
+  assert.match(c, /order by n desc limit \?\s*$/, "biggest first, so a cap could only cut the smallest");
   assert.doesNotMatch(c, /offset/);
-  assert.match(c, /coalesce\(nullif\(btrim\(cn\.industry\), ''\), nullif\(btrim\(cca\.industry\), ''\)\) as industry/);
+  assert.match(c, /coalesce\(nullif\(btrim\(cn\.industry\), ''\), nullif\(btrim\(cca\.industry\), ''\)\) as ci_ind,/);
 });
 
 // ---- the counts' shape ----

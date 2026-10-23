@@ -19,8 +19,9 @@ import type { ContactMembership } from "./contactContext";
 import type { SequenceListRow } from "./listView";
 import { groupListRows, replyPhrases, toMembership, toPickerContact, type ListDbRow, type MembershipDbRow, type PickerDbRow } from "./pageReads";
 import { PICKER_PAGE_SIZE, type PickerPage, type PickerQuery } from "./pickerFilters";
-import { industryCountsFromRows, type IndustryCountRow } from "./industryCounts";
+import { pickerCountsFromRows, type CountsRow } from "./pickerCounts";
 import { buildPickerReads, countryFacts, distinctCountriesSql, type CountryFacts } from "./pickerQuery";
+import { countryLabelsEs } from "./countryDisplay";
 import { resolveComplianceAudience } from "./complianceAudience";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { companyNameColumnsSql, canonicalCompanyJoinSql } from "./rosterQuery";
@@ -106,16 +107,16 @@ async function pickerCountryFacts(): Promise<CountryFacts> {
  * KEEPS them when `showBlocked` is on: the picker shows them last with the reason, and the reason comes from
  * `staticBlock` (pageReads.toPickerContact), the same admission the server re-runs on add.
  *
- * Round trips: 1 (the page), plus 1 for the industry chip counts when `query.offset` is 0 (a restarted list: they are read
+ * Round trips: 1 (the page), plus 1 for the chip counts (industry AND country, one grouping-sets statement) when `query.offset` is 0 (a restarted list: they are read
  * from the SAME `query` through buildPickerReads, so they describe exactly the set the list now shows; a "Cargar más"
- * page returns `industryCounts: null` and the client keeps the ones it has), plus 1 for the country facts when none are cached.
+ * page returns `industryCounts: null, countryCounts: null` and the client keeps the ones it has), plus 1 for the country facts when none are cached.
  */
 export async function listPickerPage(query: PickerQuery, meId: string, unnamed: string): Promise<PickerPage> {
   const reads = buildPickerReads(query, meId, await pickerCountryFacts());
   const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null; suppressed: boolean; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }>(
     await db.execute(reads.page),
   );
-  const industryCounts = reads.counts ? industryCountsFromRows(rowsOf<IndustryCountRow>(await db.execute(reads.counts))) : null;
+  const counts = reads.counts ? pickerCountsFromRows(rowsOf<CountsRow>(await db.execute(reads.counts))) : null;
   const named = withResolvedCompanyName(rows).slice(0, PICKER_PAGE_SIZE);
   const contacts = named.map((r) => {
     const mapped = resolveComplianceAudience({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }) !== null;
@@ -123,7 +124,7 @@ export async function listPickerPage(query: PickerQuery, meId: string, unnamed: 
     const rules: SuppressionRule[] = r.suppressed && r.email ? [{ ruleKind: "address", value: normalizeSuppressionValue("address", r.email) }] : [];
     return toPickerContact({ ...r, market_mapped: mapped }, rules, unnamed);
   });
-  return { contacts, hasMore: rows.length > PICKER_PAGE_SIZE, industryCounts };
+  return { contacts, hasMore: rows.length > PICKER_PAGE_SIZE, industryCounts: counts?.industry ?? null, countryCounts: counts ? { ...counts.country, labels: countryLabelsEs(Object.keys(counts.country.byValue)) } : null, signalCounts: counts?.signals ?? null };
 }
 
 /** Newest history first, live and opted-out first, so a bound could only ever cut old discarded history. */

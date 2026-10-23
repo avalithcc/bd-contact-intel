@@ -90,8 +90,8 @@ test("form: settings first, one cadence option, default cap, no warning, button 
   assert.ok(form.includes("Predeterminado 5 · máximo 15") && form.includes("bd@avalith.example") && form.includes("Conectada"));
   assert.ok(!form.includes("alert-warn") && !form.includes("subdominio"));
   assert.match(form, /<button[^>]*class="btn btn-primary"[^>]*disabled=""[^>]*>Elegí al menos un contacto para crear</);
-  // The location is a set of independent filters (chips), not a US restriction: none is pressed by default.
-  for (const chip of ["Florida / Miami", "Contratando IT en EE. UU.", "Mis contactos"]) assert.ok(new RegExp(`<button[^>]*class="chip"[^>]*aria-pressed="false"[^>]*>${chip}</button>`).test(form), chip);
+  // Mine, Florida and hiring are independent signals (checkboxes below the chip rows), not a US restriction: none is ticked by default.
+  for (const box of ["Florida / Miami", "Con vacante IT abierta en EE. UU.", "Solo mis contactos"]) assert.ok(new RegExp(`<label class="check"><input type="checkbox"(?![^>]*checked)[^>]*/> ${box}</label>`).test(form), box);
   assert.ok(!form.includes("Todo EE. UU.") && !form.includes("segmented"));
 });
 

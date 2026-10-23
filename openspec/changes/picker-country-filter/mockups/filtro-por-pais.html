@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filtro por país y señales como casillas · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  /* Copiadas de design-system.css: el stylesheet de mockups no tiene el estado presionado
+     ni el parcial, así que sin esto un chip seleccionado se vería igual que uno apagado. */
+  .chip[aria-pressed="true"] { border-color: var(--color-accent); }
+  .chip[aria-pressed="mixed"] { border-color: var(--color-accent); border-style: dashed; }
+  .chip .n { opacity: .62; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .sig { display: flex; flex-direction: column; gap: var(--space-2xs); border-top: 1px solid var(--color-border); margin-top: var(--space-md); padding-top: var(--space-md); }
+  .sig label { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--text-sm); cursor: pointer; }
+  .sig .n { margin-left: auto; color: var(--color-ink-muted); font-variant-numeric: tabular-nums; }
+  .antes td:first-child, .despues td:first-child { white-space: nowrap; }
+  .tiny { font-size: var(--text-sm); color: var(--color-ink-muted); }
+</style>
+</head>
+<body>
+<main class="page" style="max-width:1020px;margin:0 auto;padding:var(--space-2xl)">
+
+<div class="mock-note" role="note">
+  <div><strong>Nota del mockup.</strong> Cambio <span class="mono">picker-country-filter</span>. Reordena el área de filtros del selector de «Nueva secuencia». La fila de <strong>Industria</strong> ya está en producción (#409). <strong>Los números de país son APROXIMADOS</strong> — ver la sección 4. Vista de escritorio únicamente.</div>
+</div>
+
+<div class="page-header"><div class="titles">
+  <div class="eyebrow">Nueva secuencia · elegir contactos</div>
+  <h1>país como dimensión, señales como casillas<span class="dot">.</span></h1>
+  <p class="meta">«Mis contactos debería ser un checkbox que aplica sumado a los filtros. Florida y US debería ser otro filtro aparte… o sea, por país.»</p>
+</div></div>
+
+<h2>1 · Por qué la jerarquía estaba al revés</h2>
+<div class="table-wrap mb-lg">
+<table class="data antes">
+<thead><tr><th>Chip de hoy</th><th>A cuántos contactos aplica</th></tr></thead>
+<tbody>
+  <tr><td>Contratando IT en EE. UU.</td><td><strong>16</strong></td></tr>
+  <tr><td>Florida / Miami</td><td><strong>43</strong> por ciudad/región</td></tr>
+  <tr><td>Mis contactos</td><td>depende de quién mire</td></tr>
+  <tr><td class="tiny">(no existe) País</td><td><strong>5.528</strong> con país efectivo</td></tr>
+</tbody>
+</table>
+</div>
+<div class="alert alert-warn mb-lg" role="note"><div>Dos chips con el mismo peso visual que una dimensión <strong>345 veces más grande</strong>. No es desorden: es una jerarquía invertida. Las dimensiones grandes van arriba como chips; las señales chicas, abajo como casillas.</div></div>
+
+<h2>2 · El área de filtros, reordenada</h2>
+<div class="card mb-lg">
+  <div class="card-body">
+    <div class="row wrap" style="gap:var(--space-sm);margin-bottom:var(--space-md)">
+      <label class="input" style="flex:1 1 280px;display:flex;align-items:center;gap:var(--space-xs)">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="search" placeholder="Buscar por nombre, empresa o correo" style="border:0;outline:0;background:transparent;flex:1">
+      </label>
+    </div>
+
+    <div class="label" style="margin-bottom:var(--space-xs)">Industria</div>
+    <div class="row wrap" role="group" aria-label="Industria" style="gap:var(--space-2xs);margin-bottom:var(--space-md)">
+      <button class="chip" aria-pressed="true">Tecnología<span class="n">1299</span></button>
+      <button class="chip" aria-pressed="false">Energía y recursos<span class="n">681</span></button>
+      <button class="chip" aria-pressed="false">Finanzas<span class="n">520</span></button>
+      <button class="chip" aria-pressed="false">Salud<span class="n">395</span></button>
+      <span class="tiny" style="align-self:center">+ 6 más</span>
+    </div>
+
+    <div class="label" style="margin-bottom:var(--space-xs)">País</div>
+    <div class="row wrap" role="group" aria-label="País" style="gap:var(--space-2xs)">
+      <button class="chip" aria-pressed="false">Argentina<span class="n">2597</span></button>
+      <button class="chip" aria-pressed="false">Estados Unidos<span class="n">842</span></button>
+      <button class="chip" aria-pressed="false">México<span class="n">574</span></button>
+      <button class="chip" aria-pressed="false">Colombia<span class="n">385</span></button>
+      <button class="chip" aria-pressed="false">Chile<span class="n">222</span></button>
+      <button class="chip" aria-pressed="false">Uruguay<span class="n">205</span></button>
+      <button class="chip" aria-pressed="false">España<span class="n">133</span></button>
+      <button class="chip" aria-pressed="false">Sin país<span class="n">2051</span></button>
+    </div>
+    <button class="btn btn-ghost btn-sm mt-md" id="mas" aria-expanded="false" aria-controls="cola">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      <span id="mas-label">Ver los 58 países</span>
+    </button>
+    <div id="cola" hidden class="tiny" style="margin-top:var(--space-sm)">
+      Ecuador 116 · Costa Rica 77 · Irlanda 61 · Italia 45 · Brasil 34 · Reino Unido 30 · Alemania 29 · … y 44 más, todos con menos de 30 contactos.
+    </div>
+
+    <div class="sig" role="group" aria-label="Señales">
+      <label><input type="checkbox"> Solo mis contactos</label>
+      <label><input type="checkbox"> Florida / Miami <span class="n">43</span></label>
+      <label><input type="checkbox"> Con vacante IT abierta en EE. UU. <span class="n">16</span></label>
+    </div>
+  </div>
+  <div class="card-footer row">
+    <span class="meta"><strong>1299</strong> contactos coinciden · mostrando 50</span>
+    <span class="grow"></span>
+    <span class="meta">las casillas se suman a cualquier combinación de arriba</span>
+  </div>
+</div>
+
+<h2>3 · Las dos decisiones</h2>
+<div class="grid-2 mb-lg">
+  <div class="card card-body">
+    <div class="label">País va SIN grupos</div>
+    <p class="soft" style="margin:var(--space-sm) 0 0">Fui a buscar la clasificación <span class="mono">us</span>/<span class="mono">latam</span> que creía que existía. El tipo real es <span class="mono">{ unmapped, us }</span>: <strong>no hay lista de Latam.</strong> Armarla sería inventar una taxonomía y presentarla como si existiera.</p>
+    <p class="soft" style="margin:var(--space-sm) 0 0">Y país no la necesita como la necesitaba industria: «Argentina» no se parte en cuatro etiquetas como «Software de ordenador» / «Tecnología y servicios». Siete valores dan el 90%.</p>
+    <p class="soft" style="margin:var(--space-sm) 0 0">Si después querés «toda Latam» en un clic, esa es una decisión tuya y <span class="mono">classifyMarket</span> ya está para derivarla.</p>
+  </div>
+  <div class="card card-body">
+    <div class="label">Las señales no son geografía</div>
+    <p class="soft" style="margin:var(--space-sm) 0 0"><strong>«Con vacante IT en EE. UU.» no es un país</strong>: es una señal de la empresa. Y <strong>Florida es sub-nacional</strong>: ningún filtro por país lo puede expresar.</p>
+    <p class="soft" style="margin:var(--space-sm) 0 0">Por eso bajan a casillas en vez de desaparecer: con 16 y 43 contactos no merecen el peso de un chip, pero tampoco se tiran — la señal de «esta empresa está contratando ahora» no se recupera de otra forma.</p>
+  </div>
+</div>
+
+<h2>4 · Los números de país son aproximados, y lo digo a propósito</h2>
+<div class="alert alert-warn mb-lg" role="note">
+  <div>
+    Están medidos sobre <strong>contactos con correo</strong>, <strong>no</strong> sobre el pool real del selector. El pool tiene <strong>siete</strong> condiciones de elegibilidad que viven en <span class="mono">blockedSql</span>, incluida una exclusión por audiencia de compliance no resoluble.
+    <br><br>
+    Lo sé porque <strong>me equivoqué cuatro veces hoy</strong> midiendo exactamente esto: dije 7.577 cuando eran 5.997, y después 5.997 cuando eran 5.428. Para industria, los números que terminaron en producción salieron de <strong>llamar al código</strong>, no de transcribir su SQL.
+    <br><br>
+    <strong>Esperá que los de país bajen igual.</strong> Los conteos que se construyan salen del mismo mecanismo emparejado que los de industria (<span class="mono">buildPickerReads</span>), así que no pueden discrepar de la lista — y van a ser los verdaderos.
+  </div>
+</div>
+
+<script>
+(function(){
+  var b=document.getElementById('mas'), c=document.getElementById('cola'), l=document.getElementById('mas-label');
+  b.addEventListener('click',function(){
+    var open=b.getAttribute('aria-expanded')==='true';
+    b.setAttribute('aria-expanded',String(!open)); c.hidden=open;
+    l.textContent=open?'Ver los 58 países':'Ocultar la cola';
+  });
+  document.querySelectorAll('.chip[aria-pressed]').forEach(function(ch){
+    ch.addEventListener('click',function(){ ch.setAttribute('aria-pressed', ch.getAttribute('aria-pressed')==='true'?'false':'true'); });
+  });
+})();
+</script>
+
+</main>
+</body>
+</html>

@@ -7,6 +7,7 @@ import { initialsFromName } from "@/components/initials";
 import { SearchIcon } from "@/components/icons";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { groupCounts, type IndustryCounts } from "@/lib/sequences/industryCounts";
+import { splitCountries, type CountryCounts, type SignalCounts } from "@/lib/sequences/pickerCounts";
 import { INDUSTRY_GROUP_KEYS, KNOWN_INDUSTRY_VALUES, industryValuesOf, type IndustryGroupKey } from "@/lib/sequences/industryGroups";
 import { groupState, toggleGroup, toggleValue } from "@/lib/sequences/industrySelection";
 import { COMPANY_MEMBER_LIMIT } from "@/lib/sequences/rosterGuards";
@@ -74,6 +75,7 @@ function Row({ r, l, statusLabels, onToggle }: { r: PickerRow; l: SequenceLabels
 
 type Toggles = Pick<PickerQuery, "florida" | "hiring" | "mine" | "showBlocked">;
 type IndustrySelection = Pick<PickerQuery, "industries" | "noIndustry">;
+type CountrySelection = Pick<PickerQuery, "countries" | "noCountry">;
 const SEARCH_DEBOUNCE_MS = 300;
 
 /**
@@ -112,17 +114,54 @@ function IndustryFilter({ counts, value, onChange, l }: { counts: IndustryCounts
 }
 
 /**
+ * The country chips: the biggest few, "Sin país", and the long tail behind a toggle (the tail chips filter too). No grouping:
+ * the values are the stored country texts, shown in Spanish when they name a country. A chosen country stays on the top row.
+ */
+function CountryFilter({ counts, value, onChange, l }: { counts: CountryCounts; value: CountrySelection; onChange: (next: CountrySelection) => void; l: SequenceLabels }) {
+  const [expanded, setExpanded] = useState(false);
+  const { top, tail } = splitCountries(counts, value.countries);
+  const flip = (c: string) => onChange({ ...value, countries: value.countries.includes(c) ? value.countries.filter((v) => v !== c) : [...value.countries, c] });
+  const chip = (e: { value: string; n: number }) => <button key={e.value} type="button" className="chip" aria-pressed={value.countries.includes(e.value)} onClick={() => flip(e.value)}>{counts.labels[e.value] ?? e.value} <span className="meta">{e.n}</span></button>;
+  return (
+    <div className="mb-lg">
+      <div className="label">{l.pickCountry}</div>
+      <div className="row wrap" role="group" aria-label={l.pickCountryFilters}>
+        {top.map(chip)}
+        <button type="button" className="chip" aria-pressed={value.noCountry} onClick={() => onChange({ ...value, noCountry: !value.noCountry })}>{l.pickCountryNone} <span className="meta">{counts.none}</span></button>
+      </div>
+      {tail.length > 0 && (
+        <>
+          <button type="button" className="btn btn-ghost btn-sm" aria-expanded={expanded} aria-controls="pick-country-tail" onClick={() => setExpanded((e) => !e)}>{expanded ? l.pickCountryTailHide : fill(l.pickCountryTail, { n: top.length + tail.length })}</button>
+          <div id="pick-country-tail" className="row wrap" hidden={!expanded}>{tail.map(chip)}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Small signals, not dimensions: checkboxes that add to whatever the chips above select. Mine has no count (it depends on the viewer). */
+function SignalChecks({ toggles, counts, flip, l }: { toggles: Toggles; counts: SignalCounts | null; flip: (k: keyof Toggles) => void; l: SequenceLabels }) {
+  const rows: [keyof Toggles, string, number | null][] = [["mine", l.pickFilterMine, null], ["florida", l.pickFilterFlorida, counts?.florida ?? null], ["hiring", l.pickFilterHiring, counts?.hiring ?? null]];
+  return (
+    <div className="row wrap mb-lg" role="group" aria-label={l.pickFilters}>
+      {rows.map(([k, label, n]) => <label key={k} className="check"><input type="checkbox" checked={toggles[k]} onChange={() => flip(k)} /> {label}{n !== null && <> <span className="meta">{n}</span></>}</label>)}
+    </div>
+  );
+}
+
+/**
  * The contact picker of the create form. The list is the server's: every live contact with an email, searched and
  * filtered there and loaded PICKER_PAGE_SIZE at a time ("Cargar más"). `selection` belongs to the form: every counter here
  * is computed from it, so a new search or filter changes which rows are loaded, never what was chosen.
  * `initialShowBlocked` only seeds the toggle (the form never passes it): the first page must have been read with the same value.
  */
-export function RosterPicker({ contacts: initial, hasMore: initialMore, loadPage, industryCounts: initialCounts = null, initialShowBlocked = false, selection, onChange, labels: l, statusLabels }: { contacts: readonly PickerContact[]; hasMore: boolean; loadPage: (query: PickerQuery) => Promise<PickerPage>; industryCounts?: IndustryCounts | null; initialShowBlocked?: boolean; selection: Selection; onChange: (next: Selection) => void; labels: SequenceLabels; statusLabels: Dictionary["leadStatuses"] }) {
+export function RosterPicker({ contacts: initial, hasMore: initialMore, loadPage, industryCounts: initialIndustry = null, countryCounts: initialCountry = null, signalCounts: initialSignals = null, initialShowBlocked = false, selection, onChange, labels: l, statusLabels }: { contacts: readonly PickerContact[]; hasMore: boolean; loadPage: (query: PickerQuery) => Promise<PickerPage>; industryCounts?: IndustryCounts | null; countryCounts?: CountryCounts | null; signalCounts?: SignalCounts | null; initialShowBlocked?: boolean; selection: Selection; onChange: (next: Selection) => void; labels: SequenceLabels; statusLabels: Dictionary["leadStatuses"] }) {
   const [search, setSearch] = useState("");
   const [applied, setApplied] = useState("");
   const [toggles, setToggles] = useState<Toggles>({ florida: false, hiring: false, mine: false, showBlocked: initialShowBlocked });
   const [industry, setIndustry] = useState<IndustrySelection>({ industries: [], noIndustry: false });
-  const [list, setList] = useState({ contacts: initial as readonly PickerContact[], hasMore: initialMore, offset: initial.length, counts: initialCounts });
+  const [country, setCountry] = useState<CountrySelection>({ countries: [], noCountry: false });
+  const [list, setList] = useState({ contacts: initial as readonly PickerContact[], hasMore: initialMore, offset: initial.length, counts: { industry: initialIndustry, country: initialCountry, signals: initialSignals } });
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const latest = useRef(0);
   const shownKey = useRef(pickerQueryKey({ ...DEFAULT_PICKER_QUERY, showBlocked: initialShowBlocked }));
@@ -135,7 +174,7 @@ export function RosterPicker({ contacts: initial, hasMore: initialMore, loadPage
     try {
       const page = await loadPage(query);
       if (mine !== latest.current) return;
-      setList((cur) => ({ contacts: query.offset > 0 ? appendPage(cur.contacts, page.contacts) : page.contacts, hasMore: page.hasMore, offset: query.offset + page.contacts.length, counts: page.industryCounts ?? cur.counts }));
+      setList((cur) => ({ contacts: query.offset > 0 ? appendPage(cur.contacts, page.contacts) : page.contacts, hasMore: page.hasMore, offset: query.offset + page.contacts.length, counts: { industry: page.industryCounts ?? cur.counts.industry, country: page.countryCounts ?? cur.counts.country, signals: page.signalCounts ?? cur.counts.signals } }));
       setStatus("idle");
     } catch {
       if (mine === latest.current) setStatus("error");
@@ -148,14 +187,14 @@ export function RosterPicker({ contacts: initial, hasMore: initialMore, loadPage
   }, [search]);
 
   useEffect(() => {
-    const query: PickerQuery = { search: applied, ...toggles, ...industry, offset: 0 };
+    const query: PickerQuery = { search: applied, ...toggles, ...industry, ...country, offset: 0 };
     const key = pickerQueryKey(query);
     if (key === shownKey.current) return;
     shownKey.current = key;
     void fetchPage(query);
     // fetchPage closes over loadPage only, which is stable for the life of the form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applied, toggles, industry]);
+  }, [applied, toggles, industry, country]);
 
   const v = pickerView(list.contacts, selection, { showBlocked: toggles.showBlocked });
   const open = v.rows.filter((r) => r.kind !== "blocked");
@@ -163,18 +202,16 @@ export function RosterPicker({ contacts: initial, hasMore: initialMore, loadPage
   const quota = v.full.map((f) => fill(l.pickQuotaEntry, { company: f.company, n: f.count, max: MAX })).join(", ");
   const toggle = (c: PickerContact) => onChange(toggleOne(selection, c));
   const flip = (k: keyof Toggles) => setToggles((t) => ({ ...t, [k]: !t[k] }));
-  const chips: [keyof Toggles, string][] = [["florida", l.pickFilterFlorida], ["hiring", l.pickFilterHiring], ["mine", l.pickFilterMine]];
   return (
     <>
       <div className="toolbar">
         <label className="search"><span className="sr-only">{l.pickSearchLabel}</span><SearchIcon className="icon" /><input type="search" placeholder={l.pickSearchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} /></label>
-        <div className="row" role="group" aria-label={l.pickFilters}>
-          {chips.map(([k, label]) => <button key={k} type="button" className="chip" aria-pressed={toggles[k]} onClick={() => flip(k)}>{label}</button>)}
-        </div>
         <span className="spacer"></span>
         <label className="check"><input type="checkbox" checked={toggles.showBlocked} onChange={() => flip("showBlocked")} /> {l.pickShowBlocked}</label>
       </div>
-      {list.counts && <IndustryFilter counts={list.counts} value={industry} onChange={setIndustry} l={l} />}
+      {list.counts.industry && <IndustryFilter counts={list.counts.industry} value={industry} onChange={setIndustry} l={l} />}
+      {list.counts.country && <CountryFilter counts={list.counts.country} value={country} onChange={setCountry} l={l} />}
+      <SignalChecks toggles={toggles} counts={list.counts.signals} flip={flip} l={l} />
       <div className="bulk-bar" role="region" aria-label={l.pickBarAria}>
         <span className="count">{fill(plural(v.selectedCount, l.pickChosenOne, l.pickChosen), { n: v.selectedCount })}</span><span className="sep"></span>
         <span className="small">{v.companyCount} {plural(v.companyCount, l.unitCompanyOne, l.unitCompanyMany)}{quota && ` · ${fill(l.pickQuota, { list: quota })}`}</span><span className="grow"></span>
@@ -199,7 +236,7 @@ export function RosterPicker({ contacts: initial, hasMore: initialMore, loadPage
       </table>
       <div className="table-footer">
         <span role="status">{[fill(plural(v.availableShown, l.pickFooterAvailableOne, l.pickFooterAvailable), { n: v.availableShown }), v.blockedShown > 0 && fill(plural(v.blockedShown, l.pickFooterBlockedOne, l.pickFooterBlocked), { n: v.blockedShown })].filter(Boolean).join(" · ")}</span>
-        {list.hasMore && <button type="button" className="btn btn-ghost btn-sm" disabled={status === "loading"} onClick={() => void fetchPage({ search: applied, ...toggles, ...industry, offset: list.offset })}>{status === "loading" ? l.pickLoading : l.pickLoadMore}</button>}
+        {list.hasMore && <button type="button" className="btn btn-ghost btn-sm" disabled={status === "loading"} onClick={() => void fetchPage({ search: applied, ...toggles, ...industry, ...country, offset: list.offset })}>{status === "loading" ? l.pickLoading : l.pickLoadMore}</button>}
         <span>{fill(l.pickFooterQuota, { max: MAX })}</span>
       </div></div>
     </>
