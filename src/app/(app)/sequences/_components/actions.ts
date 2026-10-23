@@ -12,6 +12,8 @@ export type DetailAction =
   | { type: "approveWith"; memberId: string; when: SendChoice }
   /** "Cambiar" (a chosen time) or "Enviar ahora" on an approved card. */
   | { type: "reschedule"; memberId: string; when: SendChoice }
+  /** The card's "idioma" menu: open the language dialog for this member, or clear the stored choice. */
+  | { type: "chooseLanguage" | "resetLanguage"; memberId: string }
   /** Only asks to start: the confirmation is `OptOutDialog`, which states the scope before anything is recorded. */
   | { type: "optOut"; memberId: string };
 /** May answer with a promise of `true` once the server accepted it: a popover that asked for it then closes. */

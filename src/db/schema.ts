@@ -1835,6 +1835,11 @@ export const sequenceMember = pgTable(
     discardReason: text("discard_reason"),
     discardedByBdId: uuid("discarded_by_bd_id").references(() => bd.id),
     discardedAt: timestamp("discarded_at", { withTimezone: true }),
+    // A person's choice of the draft's language ("es" | "en"), with who and when. NULL = nobody chose: the audience's language
+    // applies. The three are written and cleared together (languageChoice.ts, draftInput.ts).
+    draftLanguage: text("draft_language"),
+    draftLanguageByBdId: uuid("draft_language_by_bd_id").references(() => bd.id),
+    draftLanguageAt: timestamp("draft_language_at", { withTimezone: true }),
     holdReason: text("hold_reason"),
     holdAt: timestamp("hold_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

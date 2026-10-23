@@ -29,9 +29,12 @@ import {
   regenerateReminderDraft,
   regenerateDrafts,
   saveDraftEdit,
+  setMemberDraftLanguage,
   type DraftBatchResult,
   type SaveEditResult,
+  type SetLanguageResult,
 } from "@/lib/sequences/draftQueries";
+import { parseLanguageChoice } from "@/lib/sequences/languageChoice";
 import { validConfirmations } from "@/lib/sequences/draftCompose";
 import { recordOptOutForMember, type OptOutResult } from "@/lib/sequences/optOutQueries";
 import {
@@ -94,6 +97,25 @@ export async function updateSequenceSettings(sequenceId: string, patch: { name?:
 export async function generateMemberDraft(sequenceId: string, memberId: string): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
   return withoutReasons(await generateMemberDraftRow(me.id, sequenceId, memberId));
+}
+
+/**
+ * Records the language a person chose for ONE member's draft (who and when come from the signed-in BD, never the client). Only
+ * "es" or "en" is accepted, validated here, so a forged "pt" or a typo cannot be stored. The postal address is not part of it.
+ * Anything else, including a missing value, is refused: clearing the choice is its own action.
+ */
+export async function chooseDraftLanguage(memberId: string, language: unknown): Promise<SetLanguageResult | { ok: false; error: "invalid_language" }> {
+  const chosen = parseLanguageChoice(language);
+  if (!chosen || !isUuid(memberId)) return { ok: false, error: !chosen ? "invalid_language" : "not_found" };
+  const me = await getCurrentBd();
+  return setMemberDraftLanguage(me.id, memberId, chosen);
+}
+
+/** "Volver al idioma resuelto": clears the choice, so the audience's language applies again. */
+export async function clearDraftLanguage(memberId: string): Promise<SetLanguageResult> {
+  if (!isUuid(memberId)) return { ok: false, error: "not_found" };
+  const me = await getCurrentBd();
+  return setMemberDraftLanguage(me.id, memberId, null);
 }
 
 /** "Regenerar" (single or bulk): explicit replacement, clears review and approval. */

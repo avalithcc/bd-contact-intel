@@ -17,6 +17,8 @@ import { isUuid } from "@/lib/uuid";
 import type { MemberState } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { canonicalCompanyJoinSql, companyCountrySql, companyNameColumnsSql, postingMarketsSql, sameCompanyAs } from "./rosterQuery";
+import type { AudienceLanguage } from "./complianceAudience";
+import { parseLanguageChoice } from "./languageChoice";
 import { buildMemberAudience, type ColleagueCountry, type MemberAudience } from "./audienceView";
 import type { RecipientPlace } from "@/lib/sendSchedule/zones";
 import { miamiCalendarDate } from "./miamiTime";
@@ -61,6 +63,8 @@ export type DetailMember = {
   place?: RecipientPlace;
   /** Language and legal address the draft will use, and why (the same chain as the draft itself). */
   audience?: MemberAudience;
+  /** The language a person chose for this member's draft (languageChoice.ts); null when nobody did. `byName` is null if that BD is gone. */
+  languageChoice?: { language: AudienceLanguage; byName: string | null; at: Date | null } | null;
 };
 
 /** `sentToday`: sends recorded today (Miami day) from this Sequence's sending account, pending claims included: what the daily cap has already used. */
@@ -75,13 +79,18 @@ function draftOf(r: Row, p: "d1" | "d2"): DetailDraft | null {
   return { subject: String(r[`${p}_subject`]), body: String(r[`${p}_body`]), editedAt: ts(r[`${p}_edited_at`]), edited: r[`${p}_edited_at`] != null, reviewedAt: ts(r[`${p}_reviewed_at`]), approvedAt: ts(r[`${p}_approved_at`]), scheduledFor: ts(r[`${p}_scheduled_for`]) };
 }
 
+function languageChoiceOf(r: Row): DetailMember["languageChoice"] {
+  const language = parseLanguageChoice(r.draft_language);
+  return language ? { language, byName: (r.draft_language_by_name ?? null) as string | null, at: ts(r.draft_language_at) } : null;
+}
+
 async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string | null): Promise<SequenceDetail | null> {
   const owned = onlyOwnedBy ? sql`and s.owner_bd_id = ${onlyOwnedBy}::uuid` : sql``;
   const day = miamiCalendarDate(new Date());
   const rows = (await ex.execute(sql`
     select s.id::text as sid, s.name, s.owner_bd_id::text as owner_id, ob.name as owner_name, s.schedule, s.daily_send_cap, ea.email_address, used.n as sent_today,
            sm.id::text as member_id, sm.person_id::text as person_id, sm.state, sm.hold_reason, sm.sent_at, sm.replied_at, sm.reminder_due_at,
-           sm.discarded_at, sm.discard_reason,
+           sm.discarded_at, sm.discard_reason, sm.draft_language, sm.draft_language_at, lb.name as draft_language_by_name,
            p.first_name, p.last_name, p.job_title, ${companyNameColumnsSql}, p.company_key, p.email, p.email_status = 'verified' as verified, p.role_group, p.city, p.region, p.country, cn.country as company_country,
            p.mobile_phone, p.phone, ${companyCountrySql} as audience_company_country, ${postingMarketsSql} as posting_markets,
            col.decides as company_decides, col.countries as colleague_countries,
@@ -100,6 +109,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
     ) used
     left join sequence_member sm on sm.sequence_id = s.id
     left join person p on p.id = sm.person_id
+    left join bd lb on lb.id = sm.draft_language_by_bd_id
     ${canonicalCompanyJoinSql}
     left join lateral (
       select count(*) as open_it, bool_or(jp.is_miami) as is_florida from job_posting jp
@@ -162,6 +172,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
       draft: draftOf(r, "d1"),
       reminderDraft: draftOf(r, "d2"),
       place: { city: (r.city ?? null) as string | null, region: (r.region ?? null) as string | null, country: ((r.country || r.company_country) || null) as string | null },
+      languageChoice: languageChoiceOf(r),
       audience: buildMemberAudience({
         mobilePhone: (r.mobile_phone ?? null) as string | null,
         phone: (r.phone ?? null) as string | null,

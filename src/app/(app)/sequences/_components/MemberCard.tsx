@@ -177,7 +177,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
             {m.company && <> {l.headlineAt} {m.companyKey ? <Link href={`/companies/${encodeURIComponent(m.companyKey)}`}>{m.company}</Link> : m.company}</>}
           </p>
           <div className="meta">{parts.map((p, i) => <Fragment key={i}>{i > 0 && " · "}{p}</Fragment>)}</div>
-          {showAudience && <AudienceBlock m={m} name={name} l={l} />}
+          {showAudience && <AudienceBlock m={m} name={name} l={l} onAction={readOnly ? undefined : onAction} lockTitle={generation.active ? fill(l.generateWaitTitle, { name: generation.generatingName ?? "" }) : undefined} />}
           {chips.length > 0 && <div className="row wrap row-xs">{chips.map((c) => <span key={c} className="chip">{c}</span>)}</div>}
         </div>
         <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} audienceHeld={audienceHeld} />
