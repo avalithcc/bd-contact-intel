@@ -63,7 +63,7 @@ before(async () => {
 after(async () => {
   const { db } = await import("@/db");
   const { auditLog, bd, person } = await import("@/db/schema");
-  const { inArray, eq } = await import("drizzle-orm");
+  const { inArray } = await import("drizzle-orm");
   await db.delete(auditLog).where(inArray(auditLog.personId, personIds));
   await db.delete(person).where(inArray(person.id, personIds)); // cascades ledger, activity, history, candidates, merge events
   await db.delete(bd).where(inArray(bd.id, [bdId, ...extraBdIds]));

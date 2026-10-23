@@ -93,7 +93,7 @@ async function main() {
       return unflagged;
     };
 
-    const unflaggedKey = report("A) matcher's key as-is (company_key, no alias step):", byKey);
+    report("A) matcher's key as-is (company_key, no alias step):", byKey);
     const unflaggedCanon = report("B) same key, company resolved through company_alias first:", byCanon);
     console.log(`\n  extra groups that ONLY the alias step finds: ${byCanon.length - byKey.length}`);
 
