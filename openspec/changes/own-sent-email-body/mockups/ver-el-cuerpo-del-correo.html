@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ver el cuerpo de un correo propio · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  /* Copied from the app: the mockup stylesheet has no .dir-in/.dir-out, no .mt-2xs, and scopes
+     .snippet under .thread-msg — which this screen deliberately does NOT have (see section 4). */
+  .tl-icon.dir-out { color: var(--color-ink-muted); background: var(--color-surface-sunken); border-color: var(--color-border); }
+  .tl-icon.dir-in { color: var(--color-success-text); background: var(--color-success-bg); border-color: transparent; }
+  .mt-2xs { margin-top: var(--space-2xs); }
+  .tl-body .snippet { color: var(--color-ink-soft); margin-top: var(--space-2xs); white-space: pre-wrap; }
+  .pincer td:first-child { white-space: nowrap; font-family: var(--font-mono), monospace; font-size: var(--text-sm); }
+  .ghosted { opacity: .55; }
+</style>
+</head>
+<body>
+<main class="page" style="max-width:1020px;margin:0 auto;padding:var(--space-2xl)">
+
+<div class="mock-note" role="note">
+  <div><strong>Nota del mockup.</strong> Cambio <span class="mono">own-sent-email-body</span>. Datos reales de producción: el correo a Federico Biskupovich del 23-10 16:38, <span class="mono">body_text</span> de <strong>1290 caracteres</strong>, <span class="mono">body_truncated: false</span>. El cuerpo está guardado; la interfaz no tiene por dónde mostrarlo. Vista de escritorio únicamente.</div>
+</div>
+
+<div class="page-header"><div class="titles">
+  <div class="eyebrow">Ficha del contacto · Correos</div>
+  <h1>ver el cuerpo de un correo propio<span class="dot">.</span></h1>
+  <p class="meta">«¿Por qué no veo todo el cuerpo del mail?» Porque tu propio correo suelto cae en el hueco exacto entre tres decisiones que, por separado, son correctas.</p>
+</div></div>
+
+<h2>1 · Hoy</h2>
+<div class="tl-item mb-lg ghosted">
+  <div class="tl-icon dir-out" title="Saliente"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></div>
+  <div class="tl-card">
+    <div class="tl-head">
+      <span class="what">Correo enviado a federicobiskupovich@gmail.com · Capacidad senior de ingeniería para Avalith</span>
+      <span class="when">hoy 16:38</span>
+    </div>
+    <div class="tl-body"><span class="soft">Fin de la fila. No hay nada más que clickear.</span></div>
+  </div>
+</div>
+
+<h2>2 · La propuesta</h2>
+<p class="meta mb-lg">El mismo renglón —<strong>no se toca el texto</strong>, que dice a quién y el asunto— más el botón «Ver mensaje», idéntico al que la tarjeta de hilo ya usa. El cuerpo se pide al abrir, nunca al cargar la página.</p>
+
+<div class="tl-item mb-lg">
+  <div class="tl-icon dir-out" title="Saliente"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></div>
+  <div class="tl-card">
+    <div class="tl-head">
+      <span class="what">Correo enviado a federicobiskupovich@gmail.com · Capacidad senior de ingeniería para Avalith</span>
+      <span class="when">hoy 16:38</span>
+    </div>
+    <div class="tl-body">
+      <button class="btn btn-ghost btn-sm" id="toggle" aria-expanded="false" aria-controls="cuerpo">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        <span id="toggle-label">Ver mensaje</span>
+      </button>
+      <div id="cuerpo" hidden>
+        <div class="snippet">Hola Federico,
+
+Vi que Lemon Cash viene creciendo el equipo de ingeniería y quería presentarme. En Avalith armamos equipos senior de desarrollo para fintech de la región, con gente que ya trabajó en productos de pagos y core bancario.
+
+¿Tendrás 15 minutos la semana próxima para conversar si podemos ayudarlos en alguna oportunidad?
+
+Saludos,</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card card-body mb-lg">
+  <div class="label">Lo que ya existe y se reusa tal cual</div>
+  <p class="soft" style="margin:var(--space-sm) 0 0"><span class="mono">getThreadBodiesAction(personId, threadId)</span> — la misma acción del servidor que usa la tarjeta de hilo. <strong>No tiene ningún requisito de cantidad de mensajes</strong>: un hilo de uno le funciona igual. La activity ya trae <span class="mono">metadata.gmailThreadId</span> y <span class="mono">metadata.emailMessageId</span>, así que no hace falta ninguna consulta nueva.</p>
+</div>
+
+<h2>3 · La pinza de tres</h2>
+<p class="meta mb-lg">Esto no es un bug que alguien dejó pasar. Son tres decisiones deliberadas, cada una correcta, y tu propio correo suelto cae justo en el hueco entre las tres.</p>
+<div class="table-wrap mb-lg">
+<table class="data pincer">
+<thead><tr><th>Mecanismo</th><th>Qué hace</th><th>Por qué está bien</th></tr></thead>
+<tbody>
+  <tr><td>el cargador de la página</td><td><span class="mono">ne(bdId, viewer.id)</span> — excluye los tuyos</td><td>trae solo los de otros BDs, para que un admin los lea sin un viaje extra</td></tr>
+  <tr><td>renderForeignMailBody</td><td><span class="mono">actorBdId === meId → null</span></td><td>está pensado justo para el caso ajeno</td></tr>
+  <tr><td>la tarjeta de hilo</td><td>nunca se crea con 1 mensaje</td><td>un hilo de uno no es un hilo; hay un test que lo fija: «no badge for 1 message»</td></tr>
+</tbody>
+</table>
+</div>
+<div class="alert alert-info mb-lg" role="note"><div><strong>Lo irónico:</strong> siendo admin ya podés leer el cuerpo del correo suelto de <em>otro</em> BD. El único que no podés leer es el tuyo. <strong>1080 de ~1500 hilos tienen un solo mensaje</strong>, así que esto es el 72% de tus correos, no un borde.</div></div>
+
+<h2>4 · Lo que NO cambia</h2>
+<div class="card card-body mb-lg">
+  <p style="margin:0"><strong>El agrupado de hilos se queda igual.</strong> No le muevo el umbral: está fijado por un test con su razón escrita, y tocarlo convertiría cada correo suelto en «Hilo de correo · asunto» con un badge de «1 correo», perdiendo el «Correo enviado a quién» que es más claro. Tampoco se precarga ningún cuerpo: la página sigue sin pagar ese viaje.</p>
+</div>
+
+<h2>5 · Un arreglo preexistente que entra de paso</h2>
+<div class="alert alert-warn mb-lg" role="note">
+  <div><span class="mono">.snippet</span> existe <strong>solo</strong> como <span class="mono">.thread-msg .snippet</span>, y <span class="mono">renderForeignMailBody</span> lo usa dentro de <span class="mono">.tl-item &gt; .tl-card &gt; .tl-body</span>, <strong>sin ese ancestro</strong>: el cuerpo que un admin ya ve hoy viene <strong>sin estilo</strong> en producción. Este mockup lo compensa con <span class="mono">.tl-body .snippet</span>, que es la regla que hay que agregar. <strong>Tercera vez hoy</strong> que aparece el mismo patrón: <span class="mono">.headline</span> en dos pantallas, <span class="mono">.snippet</span> acá. Una clase cuya única regla está anidada, usada como si fuera suelta.</div>
+</div>
+
+<script>
+(function () {
+  var b = document.getElementById('toggle'), c = document.getElementById('cuerpo'), lbl = document.getElementById('toggle-label');
+  b.addEventListener('click', function () {
+    var open = b.getAttribute('aria-expanded') === 'true';
+    if (open) { b.setAttribute('aria-expanded', 'false'); c.hidden = true; lbl.textContent = 'Ver mensaje'; return; }
+    b.setAttribute('aria-expanded', 'true');
+    lbl.textContent = 'Cargando…';
+    b.insertAdjacentHTML('beforeend', '<span class="spinner" aria-hidden="true"></span>');
+    window.setTimeout(function () {
+      var s = b.querySelector('.spinner'); if (s) s.remove();
+      lbl.textContent = 'Ocultar mensaje';
+      c.hidden = false;
+    }, 700);
+  });
+})();
+</script>
+</main></body></html>

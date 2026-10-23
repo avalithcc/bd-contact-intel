@@ -80,6 +80,8 @@ import type { ReplyView } from "@/lib/gmail/replyThread";
 import { replyUnavailableCopyKey } from "@/lib/gmail/replyCopy";
 import { getThreadBodiesAction } from "./threadActions";
 import type { ThreadMessageBody } from "@/lib/gmail/threadMessages";
+import { loneEmailThreadId } from "@/lib/contacts/loneEmailBody";
+import { LoneEmailBody, MailBodyText } from "./MailBody";
 import styles from "./page.module.css";
 
 export interface TimelineTask {
@@ -911,14 +913,7 @@ export function Timeline({
     if (typeof threadId !== "string" || typeof messageId !== "string") return null;
     const body = inlineEmailBody(inlineConversations.emailBodies, threadId, messageId);
     if (!body?.bodyText) return null;
-    return (
-      <>
-        <div className="snippet" style={{ whiteSpace: "pre-wrap" }}>
-          {body.bodyText}
-        </div>
-        {body.bodyTruncated && <p className="meta mt-2xs">{l.timelineBodyTruncatedNote}</p>}
-      </>
-    );
+    return <MailBodyText text={body.bodyText} truncated={body.bodyTruncated} truncatedNote={l.timelineBodyTruncatedNote} />;
   }
 
   /**
@@ -1503,6 +1498,20 @@ export function Timeline({
                             <>
                               {entryBody(timelineEntry, l)}
                               {renderForeignMailBody(timelineEntry)}
+                              <LoneEmailBody
+                                row={timelineEntry}
+                                viewer={{ id: meId }}
+                                expanded={expandedThreadId === loneEmailThreadId(timelineEntry)}
+                                loading={loadingThreadId === loneEmailThreadId(timelineEntry)}
+                                bodies={threadBodies[loneEmailThreadId(timelineEntry) ?? ""]}
+                                labels={{
+                                  show: l.timelineShowMessage,
+                                  hide: l.timelineHideMessage,
+                                  truncatedNote: l.timelineBodyTruncatedNote,
+                                  empty: l.timelineLoneBodyEmpty,
+                                }}
+                                onToggle={() => toggleThread(loneEmailThreadId(timelineEntry) ?? "")}
+                              />
                               {timelineEntry.type === "email_sent" && renderSentEmailExtras(timelineEntry.metadata)}
                             </>
                           )
