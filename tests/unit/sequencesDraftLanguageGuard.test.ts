@@ -20,6 +20,14 @@ const INPUT_BUILDER_FILE = join("src", "lib", "sequences", "draftInput.ts");
 
 const CALLS_GENERATOR = /\brunGenerateOutreachMessage\b/;
 const USES_BUILDER = /import\s*\{[^}]*\bbuildSequenceDraftInput\b[^}]*\}\s*from\s*["']@\/lib\/sequences\/draftInput["']/;
+/**
+ * `buildOutreachEmailPrompt` is listed on purpose even though nothing defines it any more: it was a second, never-called
+ * email-prompt builder (`src/lib/outreach/emailPrompt.ts`, deleted 2026-10-23) that still carried the register and the
+ * call length the owner had already replaced in the live prompt. Keeping the name here costs one alternative and catches
+ * the resurrection: this is a word-boundary match on the SOURCE TEXT under the guarded roots, so sequence code that
+ * references the name fails the test whether or not anything defines it. Do not "clean it up" because the symbol
+ * resolves to nothing — that is exactly the state the guard is for.
+ */
 const BYPASSES_BUILDER = /\b(buildPersonMessageInput|buildOutreachMessagePrompt|buildOutreachEmailPrompt)\b/;
 
 function files(root: string): string[] {
