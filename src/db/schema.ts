@@ -1021,6 +1021,9 @@ export const auditLog = pgTable(
     // recomputed person owners under the last-worked rule; also run nightly by
     // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
     // (the last two: scripts/merge-duplicates.ts's owner-run summary rows)
+    // 'duplicates_rescan' (/api/duplicates/rescan cron or the admin "Re-escanear"
+    // created duplicate_candidate rows for existing name+company collisions;
+    // metadata.trigger 'cron' | 'manual', metadata.createdIds lists the inserted rows)
     // 'import_contactos_comerciales_2026_10' (scripts/import-contactos-comerciales-2026-10.ts
     // created contacts and filled empty phones from the CEO's PDF)
     // 'revert_contactos_comerciales_2026_10' (scripts/revert-contactos-comerciales-2026-10.ts

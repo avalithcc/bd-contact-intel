@@ -16,10 +16,15 @@ import { formatDateTime } from "@/lib/i18n/format";
 import { db } from "@/db";
 import { buildMergePanel } from "@/lib/sequences/mergePanel";
 import { planSequenceMergeFor } from "@/lib/sequences/mergeQueries";
+import { parseRescanParams } from "@/lib/identity/duplicateRescan";
+import { readLastRescanRun } from "@/lib/identity/duplicateRescanRun";
 import { MergeSequencePanel } from "./MergeSequencePanel";
+import { RescanPanel } from "./RescanPanel";
 import { mergeDuplicateCandidateAction, markNotDuplicateAction, unmergeDuplicateAction } from "./actions";
 
 export const dynamic = "force-dynamic";
+// The manual re-scan runs from this page (one scan of every live person plus the write).
+export const maxDuration = 300;
 
 // Spanish-only regardless of `locale`, same rationale as /admin/migration
 // (design D10, R11 — the `en` half only exists to satisfy `Dictionary`).
@@ -172,7 +177,7 @@ function UnmergeConfirmPanel({ mergeEventId, survivorName }: { mergeEventId: str
 export default async function DuplicatesAdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ candidate?: string; page?: string; actionError?: string; confirmUnmerge?: string; sendCancelled?: string }>;
+  searchParams: Promise<{ candidate?: string; page?: string; actionError?: string; confirmUnmerge?: string; sendCancelled?: string } & Record<string, string | string[] | undefined>>;
 }) {
   try {
     await requireAdmin();
@@ -183,16 +188,18 @@ export default async function DuplicatesAdminPage({
     throw err;
   }
 
+  const params = await searchParams;
+  const rescanReport = parseRescanParams(params);
   const {
     candidate: candidateParam,
     page: pageParam,
     actionError,
     confirmUnmerge: confirmUnmergeParam,
     sendCancelled,
-  } = await searchParams;
+  } = params;
   const page = Math.max(1, Number(pageParam) || 1);
 
-  const [list, history] = await Promise.all([listOpenDuplicateCandidates(page), listRecentMergeEvents()]);
+  const [list, history, lastRescan] = await Promise.all([listOpenDuplicateCandidates(page), listRecentMergeEvents(), readLastRescanRun(db)]);
 
   // "Deshacer fusión" links here with `?confirmUnmerge=<mergeEventId>` (mockup's
   // overlay, ported server-rendered/no-JS). Only whitelisted, not-yet-undone
@@ -240,6 +247,8 @@ export default async function DuplicatesAdminPage({
           <strong>{dict.actionErrors[actionError]}</strong>
         </section>
       )}
+
+      <RescanPanel lastRun={lastRescan} report={rescanReport} />
 
       <div className="duplicates-split">
         <section className="panel">

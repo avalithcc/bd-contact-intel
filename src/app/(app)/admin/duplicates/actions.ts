@@ -6,6 +6,8 @@ import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { db } from "@/db";
 import { mergeContacts, unmergeContact, markNotDuplicate } from "@/lib/identity/mergeDb";
 import { getDuplicateCandidateDetail } from "@/lib/identity/duplicateReviewQueries";
+import { clampRescanCap, rescanReportToParams } from "@/lib/identity/duplicateRescan";
+import { runDuplicateRescan } from "@/lib/identity/duplicateRescanRun";
 import { cancelScheduledSend, SequenceMergeBlockedError } from "@/lib/sequences/mergeQueries";
 
 type ActionError = "not_found" | "already_resolved" | "unexpected" | "sequence_blocked";
@@ -92,4 +94,21 @@ export async function unmergeDuplicateAction(formData: FormData): Promise<void> 
     redirectWithError("unexpected");
   }
   revalidatePath("/admin/duplicates");
+}
+
+/**
+ * "Re-escanear": the manual twin of /api/duplicates/rescan (same code path). The cap is clamped here,
+ * server-side; `dryRun` defaults to ON unless the checkbox was cleared. The audit row (real runs only)
+ * is written by `runDuplicateRescan` with `trigger: "manual"` and this admin as actor.
+ */
+export async function runDuplicateRescanAction(formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const report = await runDuplicateRescan(db, {
+    dryRun: formData.get("dryRun") === "on",
+    trigger: "manual",
+    actorBdId: admin.id,
+    cap: clampRescanCap(formData.get("cap")),
+  });
+  revalidatePath("/admin/duplicates");
+  redirect(`/admin/duplicates?${rescanReportToParams(report).toString()}`);
 }
