@@ -20,6 +20,16 @@ import type { OnAction } from "./actions";
 import { AudienceBlock } from "./AudienceBlock";
 import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
 
+/**
+ * The kinds that carry the reviewed flag. Only "draft": it is the one state where "did I read this?" is still a live
+ * question. NOT because approval implies a review — single-card "Aprobar" is deliberately UNGATED
+ * (approvalQueries.ts:120, "approving one visible message is deliberate"), so an approved card can genuinely have
+ * `reviewedAt` null — but because once a BD has approved, the flag no longer answers anything they are asking, and
+ * "Sin revisar" beside "Aprobado" would read as alarming noise. `bulkApprovalGate` is what ENFORCES the review; this
+ * flag only makes its state visible while it still matters.
+ */
+export const showsReviewFlag = (kind: CardKind) => kind === "draft";
+
 /** The meta line as parts, joined by " · ". The state table decides WHICH kind; this only words it from the facts. */
 function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels, ownView: boolean, moment: ApprovedMoment | null): ReactNode[] {
   const ago = (d: Date) => agoText(d, now, l);
@@ -67,6 +77,7 @@ function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels
   }
   // A hand-edited draft says so on the card: the state badge cannot, and the two cards are otherwise identical.
   if (m.draft?.edited && m.draft.editedAt && (kind === "draft" || kind === "approved" || kind === "scheduled")) parts.push(<strong>{fill(ownView ? l.editedBy : l.editedByOther, { ago: ago(m.draft.editedAt) })}</strong>);
+  if (m.draft?.reviewedAt && showsReviewFlag(kind)) parts.push(<strong>{fill(ownView ? l.reviewedBy : l.reviewedByOther, { ago: ago(m.draft.reviewedAt) })}</strong>);
   return parts;
 }
 
@@ -170,6 +181,9 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
           <div className="row wrap">
             <Link className="strong" href={`/contacts/${m.personId}`}>{name}</Link>
             <span className={`badge badge-${card.tone}`}>{l.badges[card.kind]}</span>
+            {m.draft && showsReviewFlag(card.kind) && (m.draft.reviewedAt
+              ? <span className="badge badge-success">{l.badgeReviewed}</span>
+              : <span className="badge badge-warn">{l.badgeUnreviewed}</span>)}
             {card.florida && <span className="badge badge-outline">{l.florida}</span>}
           </div>
           <p className="headline">

@@ -3552,6 +3552,11 @@ export const es: typeof en = {
     // Card meta part for a hand-edited draft. Same rule as approvedBy: "por vos" only to the owner.
     editedBy: "editado por vos hace {ago}",
     editedByOther: "editado hace {ago}",
+    // Review flag on a draft card: the badge, and the meta part (same own-view/other-view split as editedBy).
+    badgeUnreviewed: "Sin revisar",
+    badgeReviewed: "Revisado",
+    reviewedBy: "revisado por vos hace {ago}",
+    reviewedByOther: "revisado hace {ago}",
     emailSent: "Correo enviado hace {ago}",
     noReply: "sin respuesta",
     reminderOn: "recordatorio el {date}",
@@ -3745,8 +3750,11 @@ export const es: typeof en = {
     bulkApproveOne: "Aprobar y programar el borrador",
     bulkAriaAll: "Acciones masivas, todos revisados",
     bulkAriaPartial: "Acciones masivas, revisión incompleta",
-    bulkBlocked: "El botón queda bloqueado hasta que los {n} hayan sido abiertos. Aprobar a ciegas en bloque es exactamente lo que este gate evita.",
-    bulkBlockedOne: "El botón queda bloqueado hasta que el borrador haya sido abierto. Aprobar a ciegas en bloque es exactamente lo que este gate evita.",
+    // The review-gate reason, in the bar and as the disabled button's title: "<missing> <pending>" ("Faltan 3 borradores por abrir").
+    bulkMissing: "Faltan {n} borradores",
+    bulkMissingOne: "Falta 1 borrador",
+    bulkMissingPending: "por abrir",
+    bulkBlockedWhy: "Aprobar a ciegas en bloque es exactamente lo que este bloqueo evita.",
     bulkRemoveBody: "Elegí un motivo: se aplica a los {n} contactos seleccionados.",
     bulkRemoveBodyOne: "Elegí un motivo para quitar al contacto seleccionado.",
     bulkRemoveReason: "Motivo",

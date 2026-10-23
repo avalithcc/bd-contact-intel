@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marca de revisado en los borradores · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+  /* Copied verbatim from the app's design-system.css: the mockup stylesheet scopes these under other
+     ancestors (.view-tab .count, .breadcrumbs .sep, .record-identity .headline), so without this the
+     bar and the cards would render unstyled here and the mockup would lie about the real screen. */
+  .bulk-bar .count { font-weight: 600; font-size: var(--text-base); margin-right: var(--space-sm); }
+  .bulk-bar .sep { width: 1px; height: 18px; background: var(--color-on-dark-sep, rgba(255,255,255,.24)); }
+  .card .headline { color: var(--color-ink-soft); font-size: var(--text-base); margin: 0; }
+  .bar-note { color: var(--color-on-dark, #fff); opacity: .82; font-size: var(--text-sm); flex: 1 1 100%; margin: 0; }
+  .ok { color: var(--color-success-text, #15803d); }
+  .no { color: var(--color-danger-text, #b91c1c); }
+  .flow { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); }
+  .flow .card-body { font-size: var(--text-sm); }
+  .step { font-family: var(--font-mono), monospace; font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+<main class="page" style="max-width:1080px;margin:0 auto;padding:var(--space-2xl)">
+
+<div class="mock-note" role="note">
+  <div><strong>Nota del mockup.</strong> Cambio <span class="mono">draft-reviewed-flag</span>. Dos problemas reportados sobre la misma pantalla. <strong>Datos reales</strong> de la secuencia «Latam Banca · #1» leídos de producción: 4 borradores, 3 nunca abiertos, y el de Nicolas Peralta editado hoy 16:41 con <span class="mono">reviewed_at = NULL</span>. Vista de escritorio únicamente.</div>
+</div>
+
+<div class="page-header"><div class="titles">
+  <div class="eyebrow">Secuencias · ficha</div>
+  <h1>marca de revisado en los borradores<span class="dot">.</span></h1>
+  <p class="meta">«No tengo forma de saber si ya lo revisé o no». La barra dice <em>1 de 4 revisados</em> pero no dice <strong>cuál</strong>, y la tarjeta de cada contacto no lo muestra en ningún lado.</p>
+</div></div>
+
+<h2>1 · La tarjeta, con la marca</h2>
+<p class="meta mb-lg">Un badge al lado del de estado, en el renglón que ya existe. <strong>Sin revisar</strong> en ámbar porque es lo que te falta hacer; <strong>Revisado</strong> en verde con el cuándo en la línea de metadatos, igual que ya se muestra «editado por vos».</p>
+
+<div class="bulk-bar mb-lg" role="region" aria-label="4 seleccionados, 1 de 4 revisados">
+  <span class="count">4 seleccionados</span><span class="sep"></span>
+  <span>1 de 4 borradores revisados</span>
+  <span class="grow"></span>
+  <button class="btn btn-secondary btn-sm">Quitar</button>
+  <button class="btn btn-primary btn-sm is-disabled" title="Faltan 3 borradores por abrir">Aprobar y enviar ahora los 4</button>
+  <p class="bar-note">Faltan <strong>3 borradores</strong> por abrir. Aprobar a ciegas en bloque es exactamente lo que este bloqueo evita.</p>
+</div>
+
+<div class="stack-sm mb-lg">
+  <div class="card"><div class="card-body row row-lg" style="flex-wrap:wrap">
+    <input type="checkbox" checked aria-label="Seleccionar Nicolas Peralta">
+    <span class="avatar a3">NP</span>
+    <div class="stack-sm" style="flex:1 1 320px;min-width:0">
+      <div class="row wrap">
+        <a class="strong" href="#">Nicolas Peralta</a>
+        <span class="badge badge-info">Borrador</span>
+        <span class="badge badge-warn">Sin revisar</span>
+      </div>
+      <p class="headline">Head of Digital Banking en Banco Galicia</p>
+      <div class="meta">Correo <span class="badge badge-verified">verificado</span> · <strong>editado por vos hace 12 min</strong></div>
+    </div>
+    <button class="btn btn-secondary btn-sm">Abrir borrador</button>
+  </div></div>
+
+  <div class="card"><div class="card-body row row-lg" style="flex-wrap:wrap">
+    <input type="checkbox" checked aria-label="Seleccionar Daniel Castrillon">
+    <span class="avatar a1">DC</span>
+    <div class="stack-sm" style="flex:1 1 320px;min-width:0">
+      <div class="row wrap">
+        <a class="strong" href="#">Daniel Castrillon</a>
+        <span class="badge badge-info">Borrador</span>
+        <span class="badge badge-success">Revisado</span>
+      </div>
+      <p class="headline">CTO en Bancolombia</p>
+      <div class="meta">Correo <span class="badge badge-verified">verificado</span> · <strong>revisado por vos ayer 21:50</strong></div>
+    </div>
+    <button class="btn btn-secondary btn-sm">Abrir borrador</button>
+  </div></div>
+
+  <div class="card"><div class="card-body row row-lg" style="flex-wrap:wrap">
+    <input type="checkbox" checked aria-label="Seleccionar Enrique Perera">
+    <span class="avatar a5">EP</span>
+    <div class="stack-sm" style="flex:1 1 320px;min-width:0">
+      <div class="row wrap">
+        <a class="strong" href="#">Enrique Perera</a>
+        <span class="badge badge-info">Borrador</span>
+        <span class="badge badge-warn">Sin revisar</span>
+      </div>
+      <p class="headline">Head of Innovation en Banco de Crédito</p>
+      <div class="meta">Correo <span class="badge badge-verified">verificado</span></div>
+    </div>
+    <button class="btn btn-secondary btn-sm">Abrir borrador</button>
+  </div></div>
+
+  <div class="card"><div class="card-body row row-lg" style="flex-wrap:wrap">
+    <input type="checkbox" checked aria-label="Seleccionar Benites Inti">
+    <span class="avatar a2">BI</span>
+    <div class="stack-sm" style="flex:1 1 320px;min-width:0">
+      <div class="row wrap">
+        <a class="strong" href="#">Benites Inti</a>
+        <span class="badge badge-info">Borrador</span>
+        <span class="badge badge-warn">Sin revisar</span>
+      </div>
+      <p class="headline">Gerente de Transformación en Interbank</p>
+      <div class="meta">Correo <span class="badge badge-verified">verificado</span></div>
+    </div>
+    <button class="btn btn-secondary btn-sm">Abrir borrador</button>
+  </div></div>
+</div>
+
+<h2>2 · Lo que se arregla en la barra</h2>
+<p class="meta mb-lg">La barra es <span class="mono">position: sticky</span>: se pega al tope y se lleva el botón gris. Pero la explicación era un <span class="mono">&lt;p class="help"&gt;</span> <strong>afuera</strong> del elemento sticky, así que al scrollear se quedaba atrás en la página. Y el <span class="mono">title</span> del botón solo cubría el caso del lock de generación: pasar el mouse por el gate de revisión <strong>no decía nada</strong>.</p>
+<div class="card card-body mb-lg">
+  <div class="row wrap" style="gap:var(--space-lg)">
+    <div><div class="label">Antes</div><p class="soft" style="margin:0">Botón gris clavado arriba. El motivo, scrolleado abajo. Mouse encima: silencio.</p></div>
+    <div><div class="label">Ahora</div><p class="soft" style="margin:0">El motivo viaja <strong>dentro</strong> de la barra, y el botón tiene <span class="mono">title</span> en los dos casos de bloqueo.</p></div>
+  </div>
+</div>
+
+<h2>3 · Editar y revisar (la decisión que tomaste)</h2>
+<p class="meta mb-lg">Hoy guardar cualquier edición pone <span class="mono">reviewed_at = NULL</span>, incluso la tuya. Eso es lo que te pasó con Nicolas Peralta: lo abriste, lo editaste, lo guardaste, y la revisión se borró sin avisar.</p>
+
+<div class="flow mb-lg">
+  <div class="card"><div class="card-body">
+    <div class="label">Tu propia edición</div>
+    <p class="step">abrís → editás → guardás</p>
+    <p class="step ok">reviewed_at = ahora · reviewed_by = vos</p>
+    <p style="margin:var(--space-sm) 0 0"><span class="badge badge-success">Revisado</span> <span class="meta">podés aprobar</span></p>
+    <p class="soft" style="margin-top:var(--space-sm)">Escribiste ese texto. Pedirte que reabras tu propia edición para marcarla leída es un paso sin sentido.</p>
+  </div></div>
+  <div class="card"><div class="card-body">
+    <div class="label">La edición de otro BD</div>
+    <p class="step">Mariel revisa → Macarena edita y guarda</p>
+    <p class="step no">reviewed_at = NULL</p>
+    <p style="margin:var(--space-sm) 0 0"><span class="badge badge-warn">Sin revisar</span> <span class="meta">hay que volver a leerlo</span></p>
+    <p class="soft" style="margin-top:var(--space-sm)">La revisión de Mariel era de otro texto. Acá borrarla es correcto.</p>
+  </div></div>
+</div>
+
+<div class="alert alert-info mb-lg" role="note"><div><strong>El bloqueo no se toca.</strong> Nada sale sin que una persona haya leído <em>ese</em> texto. Lo único que cambia es que escribir el texto cuenta como haberlo leído — porque lo es.</div></div>
+
+<h2>4 · Un hallazgo aparte, no incluido acá</h2>
+<div class="alert alert-warn mb-lg" role="note">
+  <div><span class="mono">.headline</span> solo está definido como <span class="mono">.record-identity .headline</span>, y <span class="mono">MemberCard.tsx:175</span> y <span class="mono">follow-ups/page.tsx:98</span> lo usan <strong>sin ese ancestro</strong>: esos dos renglones (cargo y empresa) vienen renderizando un <span class="mono">&lt;p&gt;</span> sin estilo en producción. Son las otras dos pantallas, <span class="mono">contacts</span> y <span class="mono">companies</span>, las que sí lo tienen. En este mockup lo compensé con una regla local para no mentir sobre cómo se ve hoy. <strong>Lo dejo anotado como cambio aparte</strong>, no lo mezclo con esto.</div>
+</div>
+
+</main>
+</body>
+</html>
