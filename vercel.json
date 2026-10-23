@@ -34,6 +34,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/duplicates/rescan",
+      "schedule": "30 6 * * *"
+    },
+    {
       "path": "/api/sequences/run",
       "schedule": "0 13 * * *"
     },
