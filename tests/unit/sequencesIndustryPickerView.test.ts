@@ -20,7 +20,7 @@ test("one chip per group with its count, plus 'Sin industria' with the bucket th
   assert.match(out, /Tecnología <span class="meta">1304<\/span>/);
   assert.match(out, /Salud <span class="meta">395<\/span>/);
   assert.match(out, /Sin industria <span class="meta">2169<\/span>/);
-  assert.equal((out.match(/class="chip" aria-pressed="false"/g) ?? []).length, 3 + INDUSTRY_GROUP_KEYS.length + 1, "the three existing chips are still there, all unpressed");
+  assert.equal((out.match(/class="chip" aria-pressed="false"/g) ?? []).length, INDUSTRY_GROUP_KEYS.length + 1, "only the industry chips are chips now: Florida, hiring and mine are checkboxes");
 });
 
 test("the exact-value list is collapsed by default and its toggle says how many values it holds", () => {

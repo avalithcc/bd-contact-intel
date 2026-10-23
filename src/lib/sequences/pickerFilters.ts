@@ -7,6 +7,7 @@
  * restriction of the pool; all of them are off by default.
  */
 import type { IndustryCounts } from "./industryCounts";
+import type { CountryCounts, SignalCounts } from "./pickerCounts";
 import { KNOWN_INDUSTRY_VALUES } from "./industryGroups";
 import type { PickerContact } from "./pickerView";
 
@@ -17,6 +18,9 @@ export const PICKER_SEARCH_MAX_CHARS = 100;
 export const PICKER_SEARCH_MAX_TOKENS = 4;
 /** Entries of `industries` that are even looked at: a bound on what a client can make the server scan. */
 export const PICKER_INDUSTRY_MAX = 200;
+/** Entries of `countries` that are even looked at, and the longest country text kept (the data holds ~60 values of <30 chars). */
+export const PICKER_COUNTRY_MAX = 200;
+export const PICKER_COUNTRY_MAX_CHARS = 100;
 
 export type PickerQuery = {
   search: string;
@@ -35,6 +39,13 @@ export type PickerQuery = {
   industries: string[];
   /** Also (or only) contacts whose company has no industry. Not the same as an empty `industries`, which filters nothing. */
   noIndustry: boolean;
+  /**
+   * Effective countries to keep, as the counts return them (the person's own, else the company's; trimmed, case as stored; sorted, no
+   * duplicates). No list of "known" countries: they come from the data. Empty means no country filter.
+   */
+  countries: string[];
+  /** Also (or only) contacts with no effective country. Not the same as an empty `countries`, which filters nothing. */
+  noCountry: boolean;
   offset: number;
 };
 
@@ -42,15 +53,22 @@ export type PickerQuery = {
  * `industryCounts` are the chip counts for THIS page's query, read together with it (pageQueries.listPickerPage). `null`
  * means the query only advanced the page (offset > 0): the counts of the list already on screen still hold.
  */
-export type PickerPage = { contacts: PickerContact[]; hasMore: boolean; industryCounts?: IndustryCounts | null };
+export type PickerPage = { contacts: PickerContact[]; hasMore: boolean; industryCounts?: IndustryCounts | null; countryCounts?: CountryCounts | null; signalCounts?: SignalCounts | null };
 
-export const DEFAULT_PICKER_QUERY: PickerQuery = { search: "", florida: false, hiring: false, mine: false, showBlocked: false, industries: [], noIndustry: false, offset: 0 };
+export const DEFAULT_PICKER_QUERY: PickerQuery = { search: "", florida: false, hiring: false, mine: false, showBlocked: false, industries: [], noIndustry: false, countries: [], noCountry: false, offset: 0 };
 
 /** Only known raw values, once each, in canonical order; reads at most PICKER_INDUSTRY_MAX entries. */
 function normalizeIndustries(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const known = raw.slice(0, PICKER_INDUSTRY_MAX).filter((v): v is string => typeof v === "string" && KNOWN_INDUSTRY_VALUES.has(v));
   return [...new Set(known)].sort();
+}
+
+/** Strings only, trimmed, non-empty, once each, canonical order; reads at most PICKER_COUNTRY_MAX entries. */
+function normalizeCountries(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const kept = raw.slice(0, PICKER_COUNTRY_MAX).flatMap((v) => (typeof v === "string" && v.trim() && v.trim().length <= PICKER_COUNTRY_MAX_CHARS ? [v.trim()] : []));
+  return [...new Set(kept)].sort();
 }
 
 export function normalizePickerQuery(raw: unknown): PickerQuery {
@@ -64,6 +82,8 @@ export function normalizePickerQuery(raw: unknown): PickerQuery {
     showBlocked: r.showBlocked === true,
     industries: normalizeIndustries(r.industries),
     noIndustry: r.noIndustry === true,
+    countries: normalizeCountries(r.countries),
+    noCountry: r.noCountry === true,
     offset,
   };
 }
@@ -74,7 +94,7 @@ export function searchTokens(search: string): string[] {
 
 /** Identity of a query ignoring paging: when it changes the list restarts at the first page. */
 export function pickerQueryKey(q: PickerQuery): string {
-  return JSON.stringify([q.search.trim(), q.florida, q.hiring, q.mine, q.showBlocked, [...q.industries].sort(), q.noIndustry]);
+  return JSON.stringify([q.search.trim(), q.florida, q.hiring, q.mine, q.showBlocked, [...q.industries].sort(), q.noIndustry, [...q.countries].sort(), q.noCountry]);
 }
 
 /** A later page appended to the list, skipping anyone already in it (offset paging can repeat a row if the data moved). */

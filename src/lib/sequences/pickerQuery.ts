@@ -156,7 +156,7 @@ const companyCountry = firstFilledCountry(sql`cn.country`, sql`cca.country`);
 const companyIndustry = firstFilledText(sql`cn.industry`, sql`cca.industry`);
 const clientStatus = sql`coalesce(cn.client_status, cca.client_status)`;
 /** The first country link of the audience that has data; NULL means the postings decide. */
-const effectiveCountry = sql`coalesce(nullif(btrim(p.country), ''), ${companyCountry})`;
+export const effectiveCountry = sql`coalesce(nullif(btrim(p.country), ''), ${companyCountry})`;
 
 /** Same rule as the roster query: the address, or its exact domain, is on the company-wide opt-out list. */
 const suppressedSql = sql`(lower(btrim(p.email)) in (select s.value from email_suppression s where s.kind = 'address')
@@ -225,8 +225,17 @@ function industryPredicates(q: PickerQuery): SQL[] {
   return any.length ? [sql`(${sql.join(any, sql` or `)})`] : [];
 }
 
+/** The country predicate: the listed values, and/or "no country", on the EFFECTIVE country. Neither selected adds nothing. */
+function countryPredicates(q: PickerQuery): SQL[] {
+  const any = [
+    ...(q.countries.length ? [sql`${effectiveCountry} = any(${textArray(q.countries)})`] : []),
+    ...(q.noCountry ? [sql`${effectiveCountry} is null`] : []),
+  ];
+  return any.length ? [sql`(${sql.join(any, sql` or `)})`] : [];
+}
+
 /**
- * THE POOL: `from person p ... where <every predicate>`, the one text both the page and the industry counts are built
+ * THE POOL: `from person p ... where <every predicate>`, the one text both the page and the chip counts are built
  * from. Eligibility, the toggles, the search and the industry filter are all spelled in here and nowhere else, so a
  * predicate changed or added here reaches the list and the chip counts together; neither statement has a WHERE of its own
  * (a unit test fails if one grows one). Both must be preceded by `with ${jobFacts}` because the joins read `pk_jf`.
@@ -241,6 +250,7 @@ export function buildPickerPoolSql(q: PickerQuery, meId: string, facts: CountryF
     // the person's own city / region names Florida.
     ...(q.florida ? [sql`(${postingFlorida} or ${homeInFlorida(facts)})`] : []),
     ...industryPredicates(q),
+    ...countryPredicates(q),
     ...(q.showBlocked ? [] : [sql`not ${blockedSql(facts)}`]),
   ];
   return sql`
@@ -265,25 +275,46 @@ export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: Countr
     offset ${q.offset} limit ${PICKER_PAGE_SIZE + 1}`;
 }
 
-/** More rows than raw industry values can exist (91 mapped + unknown + null); a belt against a pathological column. */
-export const INDUSTRY_COUNTS_MAX_ROWS = 500;
+/** Industry values (91 mapped + unknown + null) plus countries (~60): a belt against a pathological column, not a working limit. */
+export const PICKER_COUNTS_MAX_ROWS = 1000;
+
+const allOf = (preds: SQL[]): SQL => (preds.length ? preds[0] : sql`true`);
 
 /**
- * Contacts per raw company industry over the SAME pool as the list (buildPickerPoolSql), with ONLY the industry selection
- * lifted: every other filter of `q` (search, Florida, hiring, mine, showBlocked) still narrows, so a chip shows what
- * turning it on would give under the filters currently on. One grouped statement, whatever the number of chips; biggest
- * first, so the row cap could only ever cut the smallest values. Only valid for the `q` the page was read with:
- * buildPickerReads is the one place that pairs them.
+ * Contacts per raw company industry AND per effective country over the SAME pool as the list (buildPickerPoolSql), in ONE
+ * pass: `grouping sets` computes both marginals together. The `()` set adds the two checkbox counts (Florida, hiring): how many contacts carry the signal under BOTH selections, which is what ticking the box would leave. Each marginal is its dimension's chip count, so it must have ITS
+ * OWN selection lifted and the OTHER one applied: the pool is read with both selections lifted, and each selection comes back as
+ * a boolean flag (`ci_ind_ok`, `ci_pais_ok`, built from the very predicates the pool uses). The industry rows count the
+ * contacts that pass the country flag, the country rows those that pass the industry flag. Every other filter (search,
+ * Florida, hiring, mine, showBlocked) narrows both, inside the pool. Zero-count rows are dropped (absent = 0). Only valid for
+ * the `q` the page was read with: buildPickerReads is the one place that pairs them.
  */
-export function buildPickerIndustryCountsQuery(q: PickerQuery, meId: string, facts: CountryFacts): SQL {
-  const pool = buildPickerPoolSql({ ...q, industries: [], noIndustry: false }, meId, facts);
+export function buildPickerCountsQuery(q: PickerQuery, meId: string, facts: CountryFacts): SQL {
+  const pool = buildPickerPoolSql({ ...q, industries: [], noIndustry: false, countries: [], noCountry: false }, meId, facts);
   return sql`
-    with ${jobFacts}
-    select ${companyIndustry} as industry, count(*) as n
-    ${pool}
-    group by 1
+    with ${jobFacts},
+    pk_cnt as (
+      select ${companyIndustry} as ci_ind, ${effectiveCountry} as ci_pais, ${allOf(industryPredicates(q))} as ci_ind_ok, ${allOf(countryPredicates(q))} as ci_pais_ok,
+             (${postingFlorida} or ${homeInFlorida(facts)}) as ci_florida, ${hireCount} > 0 as ci_hire
+      ${pool}
+    ),
+    pk_grp as (
+      select ci_ind, ci_pais, grouping(ci_ind, ci_pais) as ci_g,
+             count(*) filter (where ci_pais_ok) as ci_n_ind, count(*) filter (where ci_ind_ok) as ci_n_pais,
+             count(*) filter (where ci_florida and ci_ind_ok and ci_pais_ok) as ci_n_florida, count(*) filter (where ci_hire and ci_ind_ok and ci_pais_ok) as ci_n_hire
+      from pk_cnt
+      group by grouping sets ((ci_ind), (ci_pais), ())
+    )
+    select dim, val, n from (
+      select case when ci_g = 1 then 'industry' else 'country' end as dim, case when ci_g = 1 then ci_ind else ci_pais end as val,
+             case when ci_g = 1 then ci_n_ind else ci_n_pais end as n
+      from pk_grp where ci_g in (1, 2)
+      union all select 'signal', 'florida', ci_n_florida from pk_grp where ci_g = 3
+      union all select 'signal', 'hiring', ci_n_hire from pk_grp where ci_g = 3
+    ) ci_rows
+    where n > 0
     order by n desc
-    limit ${INDUSTRY_COUNTS_MAX_ROWS}`;
+    limit ${PICKER_COUNTS_MAX_ROWS}`;
 }
 
 /**
@@ -293,5 +324,5 @@ export function buildPickerIndustryCountsQuery(q: PickerQuery, meId: string, fac
  * with the offset. `counts: null` means "unchanged, keep the ones you have".
  */
 export function buildPickerReads(q: PickerQuery, meId: string, facts: CountryFacts): { page: SQL; counts: SQL | null } {
-  return { page: buildPickerPageQuery(q, meId, facts), counts: q.offset === 0 ? buildPickerIndustryCountsQuery(q, meId, facts) : null };
+  return { page: buildPickerPageQuery(q, meId, facts), counts: q.offset === 0 ? buildPickerCountsQuery(q, meId, facts) : null };
 }

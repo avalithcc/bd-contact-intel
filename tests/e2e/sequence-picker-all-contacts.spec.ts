@@ -7,7 +7,7 @@ skipWithoutCredentials();
 skipUnlessWritesAllowed();
 
 /**
- * The create-Sequence picker lists EVERY live contact with an email. Florida / Miami and "Contratando IT en EE. UU."
+ * The create-Sequence picker lists EVERY live contact with an email. Florida / Miami and "Con vacante IT abierta en EE. UU."
  * are filters the BD turns on, never the pool. A contact the compliance audience cannot place (no location, or an embargoed country) is
  * listed as blocked, hidden until "Mostrar los que no se pueden agregar", and cannot be chosen.
  *
@@ -78,8 +78,8 @@ for (const width of [1024, 1440]) {
     const row = (name: string) => page.getByRole('row').filter({ has: page.getByText(name, { exact: true }) });
 
     // Default: no filter is pressed, and a contact outside the US (no posting at all) is in the list.
-    for (const chip of ['Florida / Miami', 'Contratando IT en EE. UU.', 'Mis contactos']) {
-      await expect(page.getByRole('button', { name: chip, pressed: false })).toBeVisible();
+    for (const box of ['Florida / Miami', 'Con vacante IT abierta en EE. UU.', 'Solo mis contactos']) {
+      await expect(page.getByRole('checkbox', { name: new RegExp(box) })).not.toBeChecked();
     }
     await expect(row(NAME.ar)).toBeVisible();
     await expect(row(NAME.fl)).toBeVisible();
@@ -90,19 +90,19 @@ for (const width of [1024, 1440]) {
     await expect(row(NAME.es)).toHaveCount(0);
 
     // Florida narrows: the Miami posting stays, the Argentine and the Austin ones go.
-    await page.getByRole('button', { name: 'Florida / Miami' }).click();
-    await expect(page.getByRole('button', { name: 'Florida / Miami', pressed: true })).toBeVisible();
+    await page.getByRole('checkbox', { name: /Florida \/ Miami/ }).check();
+    await expect(page.getByRole('checkbox', { name: /Florida \/ Miami/ })).toBeChecked();
     await expect(row(NAME.fl)).toBeVisible();
     await expect(row(NAME.ar)).toHaveCount(0);
     await expect(row(NAME.tx)).toHaveCount(0);
 
     // Hiring keeps the two companies with an open US IT posting; with Florida off again the Austin one is back.
-    await page.getByRole('button', { name: 'Florida / Miami' }).click();
-    await page.getByRole('button', { name: 'Contratando IT en EE. UU.' }).click();
+    await page.getByRole('checkbox', { name: /Florida \/ Miami/ }).uncheck();
+    await page.getByRole('checkbox', { name: /Con vacante IT abierta en EE\. UU\./ }).check();
     await expect(row(NAME.tx)).toBeVisible();
     await expect(row(NAME.fl)).toBeVisible();
     await expect(row(NAME.ar)).toHaveCount(0);
-    await page.getByRole('button', { name: 'Contratando IT en EE. UU.' }).click();
+    await page.getByRole('checkbox', { name: /Con vacante IT abierta en EE\. UU\./ }).uncheck();
     await expect(row(NAME.ar)).toBeVisible();
 
     // The blocked contact appears with its reason and cannot be chosen.
