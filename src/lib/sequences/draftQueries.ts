@@ -24,6 +24,7 @@ import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
 import { resolveComplianceAudience, type ComplianceAudience } from "./complianceAudience";
 import { companyCountrySql, sameCompanyAs } from "./rosterQuery";
+import { reviewAfterEdit } from "./editReview";
 import { issueUnsubscribeToken } from "./unsubscribeQueries";
 import { buildUnsubscribeUrl } from "./unsubscribeToken";
 import { openPostingSql } from "@/lib/hiring/openPosting";
@@ -256,7 +257,7 @@ export async function setMemberDraftLanguage(bdId: string, memberId: string, lan
 export type SaveEditResult = { ok: true; footerWarning: boolean } | { ok: false; error: "empty" | "not_found" | "not_editable" };
 
 /**
- * "Guardar sin aprobar": persists the BD's text, marks it BD-owned, withdraws review and approval. Never approves.
+ * "Guardar sin aprobar": persists the BD's text, marks it BD-owned, withdraws approval and any review by someone else (see reviewAfterEdit). Never approves.
  * `step` 2 edits the reminder of a `sent` member: it never moves the member (an approval of step 1 implies nothing about
  * it), and only a member whose reminder has not been released can be edited.
  */
@@ -270,7 +271,13 @@ export async function saveDraftEdit(bdId: string, memberId: string, input: { sub
   const saved = await db.transaction(async (tx) => {
     const [m] = await tx.select({ state: sequenceMember.state }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");
     if (!m || !editable.includes(m.state)) return false;
-    await tx.update(sequenceDraft).set({ subject, body: input.body, editedAt: new Date(), editedByBdId: bdId, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null }).where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, step)));
+    const draftKey = and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, step));
+    // Read the reviewer inside the transaction and lock the draft row: markDraftReviewed does not take the member lock, so
+    // without this a review landing between the read and the write would be decided on stale data.
+    const [current] = await tx.select({ reviewedAt: sequenceDraft.reviewedAt, reviewedByBdId: sequenceDraft.reviewedByBdId }).from(sequenceDraft).where(draftKey).for("update");
+    if (!current) return false;
+    const now = new Date();
+    await tx.update(sequenceDraft).set({ subject, body: input.body, editedAt: now, editedByBdId: bdId, ...reviewAfterEdit(current, bdId, now) }).where(draftKey);
     if (step === STEP && m.state === "approved") {
       assertTransition("approved", "drafted", "edit");
       await tx.update(sequenceMember).set({ state: "drafted" }).where(eq(sequenceMember.id, memberId));
