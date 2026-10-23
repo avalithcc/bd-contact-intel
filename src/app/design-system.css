@@ -607,7 +607,7 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .record-right > * + * { margin-top: var(--space-md); }
 .record-identity { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); padding-bottom: var(--space-lg); border-bottom: 1px solid var(--color-border); }
 .record-identity h1 { font-size: var(--text-xl); }
-.record-identity .headline { color: var(--color-ink-soft); font-size: var(--text-base); }
+.headline { color: var(--color-ink-soft); font-size: var(--text-base); }
 .quick-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-2xs); padding: var(--space-lg) 0; border-bottom: 1px solid var(--color-border); }
 /* Record page (mockup-port r02): "Pegar señal" is a 6th quick action not in
    the approved mockup's 5-action row (contact-record.html:66-72) — kept as
