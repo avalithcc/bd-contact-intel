@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { COMPLIANCE_CONFIG, OPT_OUT_TEXT } from "../../src/lib/sequences/config";
+import { OPT_OUT_TEXT } from "../../src/lib/sequences/config";
 import { detectOptOutPhrase } from "../../src/lib/sequences/optOutPhrases";
 
 test("the four advisory phrases are detected, case-insensitively and inside a sentence", () => {

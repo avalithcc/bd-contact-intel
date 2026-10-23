@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { groupListRows, replyPhrases, toMembership, toPickerContact, type ListDbRow, type PickerDbRow } from "@/lib/sequences/pageReads";
 import { listView } from "@/lib/sequences/listView";
 import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
-import { COMPLIANCE_CONFIG, OPT_OUT_TEXT } from "@/lib/sequences/config";
+import { OPT_OUT_TEXT } from "@/lib/sequences/config";
 import { pickerView, toggleOne } from "@/lib/sequences/pickerView";
 import { t } from "@/lib/i18n/dictionaries";
 
