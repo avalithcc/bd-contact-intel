@@ -5,19 +5,15 @@
  * the pure pieces it wires (chooseDefaultSurvivor/previewMergeOutcome) are
  * covered by tests/unit/duplicateReviewView.test.ts.
  */
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, duplicateCandidate, mergeEvent, person, personBdConnection } from "@/db/schema";
 import { duplicateQueueHasActivity, duplicateQueueOrderBy } from "@/lib/identity/duplicateQueueOrder";
-import { toMergeConnection, toMergeFields } from "@/lib/identity/mergeDb";
-import { chooseDefaultSurvivor, previewMergeOutcome, type DuplicateReviewSide } from "@/lib/identity/duplicateReviewView";
+import { assembleDuplicateDetail, personDisplayName } from "@/lib/identity/duplicateDetailRows";
+import type { DuplicateReviewSide } from "@/lib/identity/duplicateReviewView";
 import type { MergePlan } from "@/lib/identity/merge";
 
 const PAGE_SIZE = 20;
-
-function personDisplayName(row: { firstName: string | null; lastName: string | null }): string {
-  return [row.firstName, row.lastName].filter(Boolean).join(" ") || "(sin nombre)";
-}
 
 export interface DuplicateCandidateListItem {
   id: string;
@@ -117,39 +113,14 @@ export interface DuplicateCandidateDetail {
   preview: MergePlan;
 }
 
-async function readSidePerson(personId: string): Promise<DuplicateCandidateSidePerson> {
-  const [row] = await db.select().from(person).where(eq(person.id, personId));
-  if (!row) throw new Error(`Duplicate candidate refused: person ${personId} not found`);
-
-  const connectionRows = await db
-    .select({
-      connectedOn: personBdConnection.connectedOn,
-      bdName: bd.name,
-    })
-    .from(personBdConnection)
-    .innerJoin(bd, eq(bd.id, personBdConnection.bdId))
-    .where(eq(personBdConnection.personId, personId));
-
-  const owner = row.ownerBdId ? await db.select({ name: bd.name }).from(bd).where(eq(bd.id, row.ownerBdId)) : [];
-
-  return {
-    id: row.id,
-    name: personDisplayName(row),
-    jobTitle: row.jobTitle,
-    email: row.email,
-    emailStatus: row.emailStatus,
-    profileKey: row.profileKey,
-    city: row.city,
-    region: row.region,
-    country: row.country,
-    ownerName: owner[0]?.name ?? null,
-    status: row.status,
-    createdAt: row.createdAt,
-    connections: connectionRows,
-  };
-}
-
-/** Returns null if the pair isn't open anymore (already resolved by someone else). */
+/**
+ * Returns null if the pair isn't open anymore (already resolved by someone else)
+ * or either person is gone.
+ *
+ * Two waves, four queries: the candidate, then persons / connections / owners
+ * for BOTH sides at once. Round trips are the cost here, not the work, so each
+ * table is read once with `inArray` instead of once per side.
+ */
 export async function getDuplicateCandidateDetail(candidateId: string): Promise<DuplicateCandidateDetail | null> {
   const [candidate] = await db
     .select()
@@ -157,45 +128,26 @@ export async function getDuplicateCandidateDetail(candidateId: string): Promise<
     .where(and(eq(duplicateCandidate.id, candidateId), eq(duplicateCandidate.status, "open")));
   if (!candidate) return null;
 
-  const [personARow] = await db.select().from(person).where(eq(person.id, candidate.personAId));
-  const [personBRow] = await db.select().from(person).where(eq(person.id, candidate.personBId));
-  if (!personARow || !personBRow) return null;
-
-  const [connectionsA, connectionsB, personA, personB] = await Promise.all([
-    db.select().from(personBdConnection).where(eq(personBdConnection.personId, candidate.personAId)),
-    db.select().from(personBdConnection).where(eq(personBdConnection.personId, candidate.personBId)),
-    readSidePerson(candidate.personAId),
-    readSidePerson(candidate.personBId),
+  const personIds = [candidate.personAId, candidate.personBId];
+  // Owner ids are only known from the person rows, so owners are read through
+  // a subquery on the same ids instead of waiting for a third wave.
+  const [persons, connections, owners] = await Promise.all([
+    db.select().from(person).where(inArray(person.id, personIds)),
+    // LEFT join: the survivor/preview logic needs every connection row, even
+    // one whose bd is missing; assembleDuplicateDetail drops those from the
+    // displayed list only.
+    db
+      .select({ connection: personBdConnection, bdName: bd.name })
+      .from(personBdConnection)
+      .leftJoin(bd, eq(bd.id, personBdConnection.bdId))
+      .where(inArray(personBdConnection.personId, personIds)),
+    db
+      .select({ id: bd.id, name: bd.name })
+      .from(bd)
+      .where(inArray(bd.id, db.select({ id: person.ownerBdId }).from(person).where(inArray(person.id, personIds)))),
   ]);
 
-  const recommendedSurvivor = chooseDefaultSurvivor(
-    { id: personARow.id, profileKey: personARow.profileKey, createdAt: personARow.createdAt },
-    connectionsA,
-    { id: personBRow.id, profileKey: personBRow.profileKey, createdAt: personBRow.createdAt },
-    connectionsB,
-  );
-
-  const survivorRow = recommendedSurvivor === "a" ? personARow : personBRow;
-  const mergedRow = recommendedSurvivor === "a" ? personBRow : personARow;
-  const survivorConnections = recommendedSurvivor === "a" ? connectionsA : connectionsB;
-  const mergedConnections = recommendedSurvivor === "a" ? connectionsB : connectionsA;
-
-  const preview = previewMergeOutcome({
-    survivor: toMergeFields(survivorRow),
-    merged: toMergeFields(mergedRow),
-    survivorConnections: survivorConnections.map(toMergeConnection),
-    mergedConnections: mergedConnections.map(toMergeConnection),
-  });
-
-  return {
-    id: candidate.id,
-    reason: candidate.reason,
-    matchKey: candidate.matchKey,
-    personA,
-    personB,
-    recommendedSurvivor,
-    preview,
-  };
+  return assembleDuplicateDetail({ candidate, persons, connections, owners });
 }
 
 export interface MergeHistoryRow {
