@@ -226,9 +226,9 @@ export function NewTaskButton({
                   onChange={(e) => setQuery(e.target.value)}
                   disabled={busy}
                 />
-                {searching && <p className="hint">{l.taskSubjectSearching}</p>}
+                {searching && <p className="help">{l.taskSubjectSearching}</p>}
                 {!searching && query.trim().length >= 2 && results.length === 0 && (
-                  <p className="hint">{l.taskSubjectNoResults}</p>
+                  <p className="help">{l.taskSubjectNoResults}</p>
                 )}
                 {results.length > 0 && (
                   <ul ref={listRef} className={styles.results} role="listbox">
@@ -252,7 +252,7 @@ export function NewTaskButton({
                 )}
               </div>
             )}
-            {!subject && title.trim() && <p className="hint">{l.taskSubjectRequired}</p>}
+            {!subject && title.trim() && <p className="help">{l.taskSubjectRequired}</p>}
           </div>
 
           <div className="form-grid">

@@ -921,7 +921,7 @@ export function DiscardForm({
           onChange={(e) => setNote(e.target.value)}
           disabled={busy}
         />
-        {requiresNote && <p className="hint">{l.discardNoteRequiredHint}</p>}
+        {requiresNote && <p className="help">{l.discardNoteRequiredHint}</p>}
       </div>
     </Dialog>
   );

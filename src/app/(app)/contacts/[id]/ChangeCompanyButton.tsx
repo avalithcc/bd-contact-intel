@@ -160,9 +160,9 @@ export function ChangeCompanyButton({
                 disabled={busy}
                 autoFocus
               />
-              {searching && <p className="hint">{l.changeCompanySearching}</p>}
+              {searching && <p className="help">{l.changeCompanySearching}</p>}
               {!searching && query.trim().length >= 2 && results.length === 0 && (
-                <p className="hint">
+                <p className="help">
                   {l.changeCompanyNoResults}{" "}
                   <Link href="/companies/new">{l.changeCompanyCreateLink}</Link>
                 </p>

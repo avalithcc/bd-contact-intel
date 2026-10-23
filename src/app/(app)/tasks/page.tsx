@@ -81,7 +81,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           <h1 className={styles.title}>{l.title}</h1>
           <p className={styles.subtitle}>{l.subtitle}</p>
         </div>
-        <div className="actions">
+        <div>
           <NewTaskButton
             labels={{
               newTask: l.newTask,
