@@ -31,12 +31,14 @@ type Props = {
   ownerName?: string;
   onAction: OnReviewAction;
   busy?: boolean;
+  /** A draft is being generated elsewhere on the screen: a second generation would collide with it (generationLock.ts). */
+  regenerateLocked?: boolean;
   error?: string | null;
   /** The shared send control: labels, the cadence and the state of the last server call. */
   send: SequenceSendContext;
 };
 
-export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, error = null, send }: Props) {
+export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, regenerateLocked = false, error = null, send }: Props) {
   const formId = useId();
   const view = m ? reviewView(m, step, schedule, now, readOnly) : null;
   const memberId = m?.memberId;
@@ -76,7 +78,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   // Always asks the server without a confirmation: it refuses to overwrite an edit and the container then confirms with the BD.
   const footerButton = (id: ReviewFooterId) =>
     id === "regenerate" ? (
-      <button key={id} type="button" className="btn btn-ghost left" disabled={busy} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}><GenerateIcon className="icon" />{l.reviewRegenerate}</button>
+      <button key={id} type="button" className="btn btn-ghost left" disabled={busy || regenerateLocked} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}><GenerateIcon className="icon" />{l.reviewRegenerate}</button>
     ) : id === "approve" && step === 1 ? (
       <SendSplitButton
         key={id}

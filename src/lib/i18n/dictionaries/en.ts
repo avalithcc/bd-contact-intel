@@ -3430,6 +3430,12 @@ export const en = {
     introTail: "Sent from your Gmail account and logged on each contact's record.",
     editSequence: "Edit sequence",
     generating: "Generating…",
+    // Shown while a draft is being generated (sequence-generating-lock): the banner and the reasons a control is locked.
+    generatingBannerTitle: "Generating the draft for {name}.",
+    generatingBannerBody: "It takes about 10-15 seconds. You can keep reading the drafts that are already ready; what you cannot do is ask for another draft until this one finishes.",
+    generatingBannerFail: "If it fails, we will tell you and the contact stays as it was.",
+    generateWaitTitle: "Wait for the draft for {name} to finish",
+    generateBulkWaitTitle: "Wait for the draft in progress to finish",
     approveReady: "Approve the {n} ready",
     approveReadyOne: "Approve the ready one",
     statReview: "Drafts to review",

@@ -12,6 +12,7 @@ import { slotOf } from "@/lib/sendSchedule/time";
 import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { approvedMoment, type ApprovedMoment } from "@/lib/sequences/approvedMoment";
+import type { GenerationLock } from "@/lib/sequences/generationLock";
 import { mapMemberCard, type CardActionId, type CardKind, type CardView } from "@/lib/sequences/memberCard";
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
 import { clockLabel, whenLabel } from "@/lib/scheduledEmail/view";
@@ -68,18 +69,22 @@ function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels
   return parts;
 }
 
-function Actions({ card, m, l, onAction, generating, send, now, moment }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generating: boolean; send: SequenceSendContext; now: Date; moment: ApprovedMoment | null }) {
+function Actions({ card, m, l, onAction, generation, send, now, moment }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generation: GenerationLock; send: SequenceSendContext; now: Date; moment: ApprovedMoment | null }) {
   const contactHref = `/contacts/${m.personId}`;
   const run = (type: CardActionId) => () => void onAction({ type, memberId: m.memberId } as Parameters<OnAction>[0]);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   const recipients = [{ name, zone: resolveRecipientZone(m.place ?? {}) }];
   const locked = moment?.phase === "locked";
   const lockProps = locked ? { disabled: true, title: l.lockedTitle } : {};
+  // A generation in flight (anywhere on the screen) locks every generate/regenerate here; see generationLock.ts for what it leaves alone.
+  const gen = generation.card(m.memberId);
+  const waitTitle = gen.generateDisabled && !gen.busyHere ? fill(l.generateWaitTitle, { name: generation.generatingName ?? "" }) : undefined;
+  const reviewLock = gen.reviewDisabled ? { disabled: true, title: waitTitle ?? fill(l.generateWaitTitle, { name: generation.generatingName ?? "" }) } : {};
   return (
     <div className="row wrap" style={{ justifyContent: "flex-end", flex: "none", marginLeft: "auto", alignItems: "flex-start" }}>
       {card.actions.map((a) => {
         if (a.id === "openConversation") return <Link key={a.id} className={`btn btn-${a.style} btn-sm`} href={contactHref}>{l.actions[a.id]}</Link>;
-        if (a.id === "generate") return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} disabled={generating} onClick={run(a.id)}><GenerateIcon className="icon" />{generating ? l.generating : l.actions[a.id]}</button>;
+        if (a.id === "generate") return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} disabled={gen.generateDisabled} title={waitTitle} aria-busy={gen.busyHere ? "true" : undefined} onClick={run(a.id)}>{gen.busyHere ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}{gen.busyHere ? l.generating : l.actions[a.id]}</button>;
         // A draft card's "Aprobar" is the split button; the reminder's stays a plain button (a reminder has no choice of moment).
         if (a.id === "approve" && card.kind === "draft") {
           return (
@@ -90,6 +95,8 @@ function Actions({ card, m, l, onAction, generating, send, now, moment }: { card
               labels={send.labels}
               primaryLabel={l.reviewApproveNow}
               busy={send.busy}
+              disabled={gen.reviewDisabled}
+              title={reviewLock.title}
               error={send.error}
               placement="down"
               schedule={approvalSchedule(send, recipients, "one")}
@@ -116,7 +123,8 @@ function Actions({ card, m, l, onAction, generating, send, now, moment }: { card
         }
         if (a.id === "sendNow") return <SendNowButton key={a.id} labels={send.labels} label={l.actions.sendNow} className={`btn btn-${a.style} btn-sm`} disabled={send.busy || locked} title={locked ? l.lockedTitle : undefined} onSend={() => onAction({ type: "reschedule", memberId: m.memberId, when: { kind: "now" } })} />;
         if (a.id === "cancel" || a.id === "cancelSchedule") return <button key={a.id} type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--color-danger-text)" }} disabled={locked} title={locked ? l.lockedTitle : undefined} onClick={run("cancel")}>{l.actions[a.id]}</button>;
-        return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} onClick={run(a.id)}>{l.actions[a.id]}</button>;
+        const isReview = a.id === "reviewDraft" || a.id === "reviewReminder" || a.id === "approve";
+        return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} onClick={run(a.id)} {...(isReview ? reviewLock : {})}>{l.actions[a.id]}</button>;
       })}
       {card.menu.length > 0 && (
         <DropdownMenu trigger={<MoreIcon className="icon" />} triggerClassName="btn btn-ghost btn-sm btn-icon" ariaLabel={l.moreActions}>
@@ -126,7 +134,7 @@ function Actions({ card, m, l, onAction, generating, send, now, moment }: { card
               {id === "openContact" ? (
                 <Link role="menuitem" className="menu-item" href={contactHref}>{l.actions[id]}</Link>
               ) : (
-                <button type="button" role="menuitem" className="menu-item" onClick={run(id)}>{l.actions[id]}</button>
+                <button type="button" role="menuitem" className="menu-item" onClick={run(id)} disabled={id === "regenerate" && gen.regenerateDisabled} title={id === "regenerate" ? waitTitle ?? reviewLock.title : undefined}>{l.actions[id]}</button>
               )}
             </Fragment>
           ))}
@@ -139,7 +147,7 @@ function Actions({ card, m, l, onAction, generating, send, now, moment }: { card
 /** `selection` makes a draft card selectable for the bulk bar (the spec's "selecting rows"); a card in any other state has nothing to select. */
 export type CardSelection = { selected: boolean; onToggle: () => void };
 
-export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generating = false, send }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generating?: boolean; send: SequenceSendContext }) {
+export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generation, send }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generation: GenerationLock; send: SequenceSendContext }) {
   const moment = m.state === "approved" && m.draft ? approvedMoment(m.draft, send.schedule, now) : null;
   const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, approvedMode: moment?.mode }, now, readOnly);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
@@ -167,7 +175,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
           <div className="meta">{parts.map((p, i) => <Fragment key={i}>{i > 0 && " · "}{p}</Fragment>)}</div>
           {chips.length > 0 && <div className="row wrap row-xs">{chips.map((c) => <span key={c} className="chip">{c}</span>)}</div>}
         </div>
-        <Actions card={card} m={m} l={l} onAction={onAction} generating={generating} send={send} now={now} moment={moment} />
+        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} />
       </div>
       {!readOnly && showOptOutPrompt(card.kind, optOutPhrase) && (
         <div className="card-body">
