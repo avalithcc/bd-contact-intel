@@ -16,7 +16,8 @@ import { isLeadershipRoleGroup } from "@/lib/outreach/ranking";
 import { isUuid } from "@/lib/uuid";
 import type { MemberState } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
-import { canonicalCompanyJoinSql, companyNameColumnsSql, sameCompanyAs } from "./rosterQuery";
+import { canonicalCompanyJoinSql, companyCountrySql, companyNameColumnsSql, postingMarketsSql, sameCompanyAs } from "./rosterQuery";
+import { buildMemberAudience, type ColleagueCountry, type MemberAudience } from "./audienceView";
 import type { RecipientPlace } from "@/lib/sendSchedule/zones";
 import { miamiCalendarDate } from "./miamiTime";
 import { parseSchedule, type Schedule } from "./schedule";
@@ -58,6 +59,8 @@ export type DetailMember = {
   reminderDraft: DetailDraft | null;
   /** Where the person probably is (person first, then the company's country): input of the time-zone reference only. */
   place?: RecipientPlace;
+  /** Language and legal address the draft will use, and why (the same chain as the draft itself). */
+  audience?: MemberAudience;
 };
 
 /** `sentToday`: sends recorded today (Miami day) from this Sequence's sending account, pending claims included: what the daily cap has already used. */
@@ -80,6 +83,8 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
            sm.id::text as member_id, sm.person_id::text as person_id, sm.state, sm.hold_reason, sm.sent_at, sm.replied_at, sm.reminder_due_at,
            sm.discarded_at, sm.discard_reason,
            p.first_name, p.last_name, p.job_title, ${companyNameColumnsSql}, p.company_key, p.email, p.email_status = 'verified' as verified, p.role_group, p.city, p.region, p.country, cn.country as company_country,
+           p.mobile_phone, p.phone, ${companyCountrySql} as audience_company_country, ${postingMarketsSql} as posting_markets,
+           col.decides as company_decides, col.countries as colleague_countries,
            coalesce(h.open_it, 0)::int as open_it, coalesce(h.is_florida, false) as is_florida,
            (select max(${effectiveActivityAtSql()}) from activity where activity.person_id = sm.person_id) as last_contact_at,
            d1.id as d1_id, d1.subject as d1_subject, d1.body as d1_body, d1.edited_at as d1_edited_at, d1.reviewed_at as d1_reviewed_at, d1.approved_at as d1_approved_at, d1.scheduled_for as d1_scheduled_for,
@@ -101,6 +106,18 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
       where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
         and ${sameCompanyAs("jp")}
     ) h on sm.id is not null
+    left join lateral (
+      select coalesce(sum(g.n) filter (where g.c is null), 0)::int as decides,
+             coalesce(json_agg(json_build_object('country', g.c, 'n', g.n)) filter (where g.c is not null), '[]'::json) as countries
+      from (
+        select nullif(btrim(q.country), '') as c, count(*)::int as n from person q
+        where sm.id is not null and nullif(btrim(p.country), '') is null and ${companyCountrySql} is not null
+          and q.merged_into_id is null and q.id <> p.id and btrim(coalesce(q.email, '')) <> ''
+          and (q.company_key in (select c.company_key from company c where ${sameCompanyAs("c")})
+            or q.company_key in (select sib.alias_key from company_alias sib where sib.company_key in (select c.company_key from company c where ${sameCompanyAs("c")})))
+        group by 1
+      ) g
+    ) col on true
     left join sequence_draft d1 on d1.sequence_member_id = sm.id and d1.step = 1
     left join sequence_draft d2 on d2.sequence_member_id = sm.id and d2.step = 2
     where s.id = ${sequenceId}::uuid ${owned}
@@ -145,6 +162,15 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
       draft: draftOf(r, "d1"),
       reminderDraft: draftOf(r, "d2"),
       place: { city: (r.city ?? null) as string | null, region: (r.region ?? null) as string | null, country: ((r.country || r.company_country) || null) as string | null },
+      audience: buildMemberAudience({
+        mobilePhone: (r.mobile_phone ?? null) as string | null,
+        phone: (r.phone ?? null) as string | null,
+        personCountry: (r.country ?? null) as string | null,
+        companyCountry: (r.audience_company_country ?? null) as string | null,
+        postingMarkets: (r.posting_markets ?? []) as string[],
+        companyDecides: Number(r.company_decides ?? 0),
+        colleagueCountries: ((r.colleague_countries ?? []) as ColleagueCountry[]).map((c) => ({ country: String(c.country), n: Number(c.n) })),
+      }),
     })),
   };
 }

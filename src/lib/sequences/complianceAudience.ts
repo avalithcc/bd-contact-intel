@@ -229,13 +229,37 @@ function fromPostingBucket(markets: readonly (string | null)[] | null | undefine
  * and the stripped-ICU test pins that it holds.
  */
 export function resolveComplianceAudience(input: ComplianceAudienceInputs): ComplianceAudience | null {
+  return explainComplianceAudience(input).audience;
+}
+
+/** Which link of the chain decided. */
+export type AudienceReason = "person_country" | "company_country" | "posting_markets" | "phone";
+
+export interface ComplianceAudienceExplained {
+  readonly audience: ComplianceAudience | null;
+  /** Which link DECIDED. Non-null even when `audience` is null: a link can decide to HOLD (unrecognised text, sanctioned). */
+  readonly reason: AudienceReason | null;
+  /** The raw value that link read, for the UI to quote back ("United States", "+54 223..."). Null when nothing decided. */
+  readonly evidence: string | null;
+}
+
+/**
+ * THE chain, the only copy: `resolveComplianceAudience` delegates here, so the answer the screen explains and the answer
+ * the draft uses cannot diverge (tests/unit/sequencesAudienceExplain.test.ts compares the two over a table). A link that
+ * has data decides, even to hold. When no link had any data, audience and reason are both null.
+ */
+export function explainComplianceAudience(input: ComplianceAudienceInputs): ComplianceAudienceExplained {
   const person = input.personCountry?.trim();
-  if (person) return audienceOfIso(resolveCountry(person));
+  if (person) return { audience: audienceOfIso(resolveCountry(person)), reason: "person_country", evidence: person };
   const company = input.companyCountry?.trim();
-  if (company) return audienceOfIso(resolveCountry(company));
+  if (company) return { audience: audienceOfIso(resolveCountry(company)), reason: "company_country", evidence: company };
   const posted = fromPostingBucket(input.postingMarkets);
-  if (posted) return posted;
-  return audienceOfIso(phoneCountryIso(input.mobilePhone, input.phone));
+  if (posted) return { audience: posted, reason: "posting_markets", evidence: fromPostings(input.postingMarkets) };
+  const iso = phoneCountryIso(input.mobilePhone, input.phone);
+  if (!iso) return { audience: null, reason: null, evidence: null };
+  // The raw number that placed the country: the first of mobile, phone that places one on its own (same order as phoneCountryIso).
+  const raw = [input.mobilePhone, input.phone].find((n) => phoneCountryIso(n, null) !== null)?.trim() ?? null;
+  return { audience: audienceOfCountry(iso), reason: "phone", evidence: raw };
 }
 
 function audienceOfIso(iso: string | null): ComplianceAudience | null {
