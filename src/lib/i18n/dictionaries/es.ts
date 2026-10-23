@@ -3694,6 +3694,8 @@ export const es: typeof en = {
     reviewBodyHelp: "Editalo libremente. Si lo cambiás, se guarda tu versión y no se vuelve a regenerar solo.",
     // Only on an already approved draft: saveDraftEdit() clears approved_at and scheduled_for and sends the member
     // back to `drafted`, because an approval binds to the exact content. Correct, but the BD has to see it coming.
+    reviewStaleNotice: "Este borrador cambió desde que lo abriste. Lo que ves abajo es la versión anterior.",
+    reviewStaleReload: "Ver la versión actual",
     reviewApprovedEditWarning: "Ojo: si guardás, se cancela el envío programado y vuelve a esperar tu aprobación.",
     reviewCadence: "Cadencia para este contacto",
     reviewReleases: "Sale el",

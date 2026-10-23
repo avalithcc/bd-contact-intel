@@ -137,9 +137,9 @@ export async function saveSequenceDraft(memberId: string, input: { subject: stri
 }
 
 /** Called when the review dialog opens ("revisado"). Never from passive listing. */
-export async function markDraftReviewed(memberId: string, step: 1 | 2 = 1) {
+export async function markDraftReviewed(memberId: string, step: 1 | 2, version: string) {
   const me = await getCurrentBd();
-  return markDraftReviewedRow(me.id, memberId, step);
+  return markDraftReviewedRow(me.id, memberId, version, step);
 }
 
 /** What an immediate release did, for the toast: how many left, how many wait for the cap, how many were held or failed. */

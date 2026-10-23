@@ -3695,6 +3695,8 @@ export const en = {
     reviewSubject: "Subject",
     reviewBody: "Body",
     reviewBodyHelp: "Edit it freely. If you change it, your version is saved and is not regenerated on its own.",
+    reviewStaleNotice: "This draft changed since you opened it. What you see below is the previous version.",
+    reviewStaleReload: "See the current version",
     reviewApprovedEditWarning: "Careful: saving cancels the scheduled send and puts this back to awaiting your approval.",
     reviewCadence: "Cadence for this contact",
     reviewReleases: "Goes out on",

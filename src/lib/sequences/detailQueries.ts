@@ -34,7 +34,8 @@ import { openFreshPostingSql } from "@/lib/hiring/openPosting";
  */
 export const SEQUENCE_DETAIL_MEMBER_LIMIT = 200;
 
-export type DetailDraft = { subject: string; body: string; edited: boolean; editedAt: Date | null; reviewedAt: Date | null; approvedAt: Date | null; scheduledFor: Date | null };
+/** `generatedAt` + `editedAt` are the content version (draftVersion.ts): the dialog sends it back with the review mark. */
+export type DetailDraft = { subject: string; body: string; edited: boolean; generatedAt: Date; editedAt: Date | null; reviewedAt: Date | null; approvedAt: Date | null; scheduledFor: Date | null };
 
 export type DetailMember = {
   memberId: string;
@@ -76,7 +77,10 @@ const ts = (v: unknown) => (v == null ? null : parseDbTimestamp(v as string | Da
 
 function draftOf(r: Row, p: "d1" | "d2"): DetailDraft | null {
   if (r[`${p}_id`] == null) return null;
-  return { subject: String(r[`${p}_subject`]), body: String(r[`${p}_body`]), editedAt: ts(r[`${p}_edited_at`]), edited: r[`${p}_edited_at`] != null, reviewedAt: ts(r[`${p}_reviewed_at`]), approvedAt: ts(r[`${p}_approved_at`]), scheduledFor: ts(r[`${p}_scheduled_for`]) };
+  // Not optional: the review mark is tied to it (draftVersion.ts). A missing column must fail loudly here, not as null.getTime() later.
+  const generatedAt = ts(r[`${p}_generated_at`]);
+  if (!generatedAt) throw new Error(`sequence detail read is missing ${p}_generated_at`);
+  return { subject: String(r[`${p}_subject`]), body: String(r[`${p}_body`]), generatedAt, editedAt: ts(r[`${p}_edited_at`]), edited: r[`${p}_edited_at`] != null, reviewedAt: ts(r[`${p}_reviewed_at`]), approvedAt: ts(r[`${p}_approved_at`]), scheduledFor: ts(r[`${p}_scheduled_for`]) };
 }
 
 function languageChoiceOf(r: Row): DetailMember["languageChoice"] {
@@ -96,8 +100,8 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
            col.decides as company_decides, col.countries as colleague_countries,
            coalesce(h.open_it, 0)::int as open_it, coalesce(h.is_florida, false) as is_florida,
            (select max(${effectiveActivityAtSql()}) from activity where activity.person_id = sm.person_id) as last_contact_at,
-           d1.id as d1_id, d1.subject as d1_subject, d1.body as d1_body, d1.edited_at as d1_edited_at, d1.reviewed_at as d1_reviewed_at, d1.approved_at as d1_approved_at, d1.scheduled_for as d1_scheduled_for,
-           d2.id as d2_id, d2.subject as d2_subject, d2.body as d2_body, d2.edited_at as d2_edited_at, d2.reviewed_at as d2_reviewed_at, d2.approved_at as d2_approved_at, d2.scheduled_for as d2_scheduled_for
+           d1.id as d1_id, d1.subject as d1_subject, d1.body as d1_body, d1.generated_at as d1_generated_at, d1.edited_at as d1_edited_at, d1.reviewed_at as d1_reviewed_at, d1.approved_at as d1_approved_at, d1.scheduled_for as d1_scheduled_for,
+           d2.id as d2_id, d2.subject as d2_subject, d2.body as d2_body, d2.generated_at as d2_generated_at, d2.edited_at as d2_edited_at, d2.reviewed_at as d2_reviewed_at, d2.approved_at as d2_approved_at, d2.scheduled_for as d2_scheduled_for
     from sequence s
     join bd ob on ob.id = s.owner_bd_id
     join email_account ea on ea.id = s.email_account_id

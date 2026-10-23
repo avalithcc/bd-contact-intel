@@ -18,7 +18,7 @@ const { generationLock } = require("@/lib/sequences/generationLock") as typeof i
 
 const L = es.sequences;
 const NOW = new Date("2026-10-15T14:00:00Z");
-const draft = { subject: "s", body: "b", edited: false, editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null };
+const draft = { subject: "s", body: "b", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null };
 
 // Synthetic people only.
 function member(i: number, over: Partial<DetailMember>): DetailMember {

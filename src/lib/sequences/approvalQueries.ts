@@ -10,6 +10,7 @@ import { auditLog, sequence, sequenceDraft, sequenceMember } from "@/db/schema";
 import { sequenceAuditRow } from "./approvalAudit";
 import { checkStep1Subject } from "./approvalChecks";
 import { bulkApprovalGate } from "./bulkApprovalGate";
+import { parseDraftVersion } from "./draftVersion";
 import { resolveComplianceAudience, type ComplianceAddress } from "./complianceAudience";
 import { complianceRefusal, type ComplianceRefusal } from "./complianceGate";
 import { COMPLIANCE_CONFIG } from "./config";
@@ -33,17 +34,38 @@ export type ApprovalRejection = {
 /** `too_many`: the request named more members than the page can ever offer (SEQUENCE_DETAIL_MEMBER_LIMIT). Refused before any lock. */
 export type ApproveResult = { ok: true; approved: string[] } | { ok: false; error: "rejected"; rejected: ApprovalRejection[] } | { ok: false; error: "too_many"; limit: number };
 
-/** Called when the review dialog opens. Passive listing never calls it. Keeps the first review time. */
-export async function markDraftReviewed(bdId: string, memberId: string, step: ApprovalStep = 1): Promise<{ ok: true } | { ok: false; error: "not_found" }> {
+/**
+ * `stale`: the version the dialog rendered is not the stored one (regenerated or edited since), so the mark was refused and
+ * the draft stays unreviewed. A draft that is already reviewed is `ok` whatever the version: nothing is written, so there is
+ * no wrong reading to record (and the dialog's once-per-open report stays idempotent).
+ */
+export type MarkReviewedResult = { ok: true } | { ok: false; error: "not_found" | "stale" };
+
+/** Called when the review dialog opens. Passive listing never calls it. Keeps the first review time. `version` is draftVersion() of the text the dialog showed. */
+export async function markDraftReviewed(bdId: string, memberId: string, version: string, step: ApprovalStep = 1): Promise<MarkReviewedResult> {
   const [row] = await db
-    .select({ id: sequenceDraft.id })
+    .select({ id: sequenceDraft.id, reviewedAt: sequenceDraft.reviewedAt })
     .from(sequenceDraft)
     .innerJoin(sequenceMember, eq(sequenceMember.id, sequenceDraft.sequenceMemberId))
     .innerJoin(sequence, eq(sequence.id, sequenceMember.sequenceId))
     .where(and(eq(sequenceMember.id, memberId), eq(sequence.ownerBdId, bdId), eq(sequenceDraft.step, step), inArray(sequenceMember.state, [...REVIEWABLE[step]])));
   if (!row) return { ok: false, error: "not_found" };
-  await db.update(sequenceDraft).set({ reviewedAt: new Date(), reviewedByBdId: bdId }).where(and(eq(sequenceDraft.id, row.id), isNull(sequenceDraft.reviewedAt)));
-  return { ok: true };
+  if (row.reviewedAt) return { ok: true };
+  const v = parseDraftVersion(version);
+  if (!v) return { ok: false, error: "stale" };
+  // The comparison is in whole milliseconds on both sides. It relies on extract(epoch ...) returning numeric (PG 14+; verified
+  // 17.6 in production): on PG 13 it is a double and a ms-exact timestamp could floor one off, leaving the draft permanently stale.
+  // One statement: the version is checked against the row as it is when the write lands, so an edit or a regenerate in
+  // between (both rewrite these columns) makes it match nothing instead of marking text nobody read.
+  const marked = await db
+    .update(sequenceDraft)
+    .set({ reviewedAt: new Date(), reviewedByBdId: bdId })
+    .where(and(eq(sequenceDraft.id, row.id), isNull(sequenceDraft.reviewedAt), sql`floor(extract(epoch from ${sequenceDraft.generatedAt}) * 1000)::bigint = ${v.generatedMs}`, sql`coalesce(floor(extract(epoch from ${sequenceDraft.editedAt}) * 1000)::bigint, 0) = ${v.editedMs}`))
+    .returning({ id: sequenceDraft.id });
+  if (marked.length) return { ok: true };
+  // Nothing matched: either someone reviewed it in between (an edit by the reviewer keeps its own review) or the text moved on.
+  const [now] = await db.select({ reviewedAt: sequenceDraft.reviewedAt }).from(sequenceDraft).where(eq(sequenceDraft.id, row.id));
+  return now?.reviewedAt ? { ok: true } : { ok: false, error: "stale" };
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];

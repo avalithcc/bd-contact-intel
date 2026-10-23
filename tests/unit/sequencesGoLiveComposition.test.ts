@@ -16,7 +16,7 @@ const { EditSequenceDialog } = require("@/app/(app)/sequences/_components/EditSe
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 const NOW = new Date("2026-10-15T14:00:00Z");
-const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject", body: "Body", edited: false, editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject", body: "Body", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 const member = (id: string, over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: id, personId: `00000000-0000-4000-8000-00000000000${id}`, state: "drafted", holdReason: null, firstName: `Test${id}`, lastName: "Person", jobTitle: "Lead",
   company: "Acme", companyKey: "acme", email: `p${id}@example.test`, emailVerified: true, openIt: 1, florida: false, leadership: false, lastContactAt: null,

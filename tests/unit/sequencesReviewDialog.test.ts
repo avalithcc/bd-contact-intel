@@ -15,7 +15,7 @@ const { ReviewDialog } = require("@/app/(app)/sequences/_components/ReviewDialog
 
 const NOW = new Date("2026-10-15T14:00:00Z");
 const hours = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
-const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject 1", body: "Body 1\n\n--\nSynthetic footer", edited: false, editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject 1", body: "Body 1\n\n--\nSynthetic footer", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 // Synthetic person only: the approved mockup holds real prospects and none of them may enter the repo.
 const member = (over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "drafted", holdReason: null, firstName: "Test1", lastName: "Person",
@@ -138,5 +138,18 @@ test("the notice says whose text it is only when the draft was edited, and the i
 test("every new review label exists in both dictionaries", () => {
   for (const k of ["reviewEditedLead", "reviewEditedStrong", "reviewEditedStrongOther", "reviewEditedRest", "reviewEditedTail", "reviewEditedTailOther", "reviewEditedRestOther", "reviewSignalsEditedLead", "reviewSignalsEditedStrong", "reviewSignalsEditedTail", "reviewSignalsEditedTailOther", "regenConfirmTailOther", "regenConfirmTitle", "regenConfirmTitleOther", "regenConfirmLead", "regenConfirmLeadOther", "regenConfirmStrong", "regenConfirmTail", "regenConfirmHelp", "regenConfirmCancel", "regenConfirmAction", "editedBy", "editedByOther"] as const) {
     assert.ok(es.sequences[k] && en.sequences[k], k);
+  }
+});
+
+test("a refused review mark shows the stale warning with the button for the current text, in es and en; otherwise neither", () => {
+  const html = (stale: boolean, lang = es) => renderToStaticMarkup(createElement(ReviewDialog, { open: true, onClose: () => {}, member: member(), step: 1, fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, signals: null, now: NOW, labels: lang.sequences, ownView: true, stale, onAction: () => {}, send: SEND }));
+  const on = html(true);
+  assert.match(on, /class="alert alert-warn"[^>]*role="alert"/);
+  assert.ok(on.includes("Este borrador cambió desde que lo abriste. Lo que ves abajo es la versión anterior."));
+  assert.match(on, /<button[^>]*>Ver la versión actual<\/button>/);
+  assert.ok(html(true, en).includes(en.sequences.reviewStaleNotice));
+  for (const off of [html(false), render(member())]) {
+    assert.ok(!off.includes(es.sequences.reviewStaleNotice));
+    assert.ok(!off.includes(es.sequences.reviewStaleReload));
   }
 });
