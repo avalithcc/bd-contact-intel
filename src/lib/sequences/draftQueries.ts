@@ -17,7 +17,9 @@ import { sequenceAuditRow } from "./approvalAudit";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { REGENERABLE_STATES } from "./detailFlow";
 import { blocksEditedOverwrite, composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult, type EditConfirmations, type SkippedEdit } from "./draftCompose";
-import { buildSequenceDraftInput, draftSignals, senderIdentity } from "@/lib/sequences/draftInput";
+import { buildSequenceDraftInput, draftSignals, resolveDraftCompliance, senderIdentity } from "@/lib/sequences/draftInput";
+import { parseLanguageChoice } from "./languageChoice";
+import type { AudienceLanguage } from "./complianceAudience";
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
 import { resolveComplianceAudience, type ComplianceAudience } from "./complianceAudience";
@@ -53,7 +55,7 @@ const rowsOf = <T>(r: unknown) => r as T[];
 async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   const [r] = rowsOf<Row>(
     await db.execute(sql`
-      select sm.state, sm.hold_reason, sm.sequence_id::text, p.id::text as person_id, p.email, p.first_name, p.last_name,
+      select sm.state, sm.hold_reason, sm.draft_language, sm.sequence_id::text, p.id::text as person_id, p.email, p.first_name, p.last_name,
              p.job_title, p.role_group, p.industry, p.company_key, p.country as person_country, p.mobile_phone, p.phone, b.name as sender_name,
              ${companyCountrySql} as company_country,
              coalesce((select json_agg(distinct jp.market) from job_posting jp
@@ -76,7 +78,9 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
     companyCountry: r.company_country as string | null,
     postingMarkets: r.posting_markets as string[],
   });
-  return { r, audience, state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };
+  // The recorded human choice, if any. A stored value that is not es/en reads as no choice, so it can never reach the generator.
+  const chosenLanguage = parseLanguageChoice(r.draft_language);
+  return { r, audience, chosenLanguage, state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };
 }
 
 /** Everything the model may see, loaded as the signed-in owner (R6: counts and shared notes only, never messages). */
@@ -116,7 +120,9 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
   const facts = await loadFacts(bdId, memberId, sequenceId);
   if (!facts || !editable.includes(facts.state)) return "skipped";
   if (reminder ? !facts.hasDraft || (mode === "missing" && facts.hasReminderDraft) : mode === "missing" && (facts.state !== "drafted" || facts.hasDraft)) return "skipped";
-  const { r, audience } = facts;
+  const { r, audience, chosenLanguage } = facts;
+  // The address is the audience's; only the language can be a recorded human choice (draftInput.ts).
+  const compliance = resolveDraftCompliance(audience, chosenLanguage);
   // Cheap early exit so a refused overwrite does not spend a model call. The authoritative check is inside the transaction below.
   const seenEditedAt = reminder ? facts.reminderEditedAt : facts.draftEditedAt;
   if (blocksEditedOverwrite(mode, guard.confirmed[memberId] ?? null, seenEditedAt)) {
@@ -124,8 +130,8 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
     return "skipped";
   }
 
-  const input = audience && buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", audience.language) }, audience, reminder ? "reminder" : "first");
-  if (!audience || !input) {
+  const input = audience && compliance && buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", compliance.language) }, audience, reminder ? "reminder" : "first", chosenLanguage);
+  if (!audience || !compliance || !input) {
     // No audience (no location signal, or an embargoed jurisdiction): hold, do not draft. The reason is a code; the UI words it.
     await db.update(sequenceMember).set({ holdReason: UNMAPPED_MARKET_HOLD, holdAt: new Date() }).where(and(eq(sequenceMember.id, memberId), sql`${sequenceMember.holdReason} is distinct from ${UNMAPPED_MARKET_HOLD}`));
     held.push(memberId);
@@ -135,7 +141,7 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
   const generated = await deps.generate(input, 0);
   if (!generated.ok || !generated.subject || !generated.body) throw new Error(`generation failed: ${generated.ok ? "empty output" : generated.errorKey}`);
   const token = await deps.issueToken({ sequenceMemberId: memberId, email: r.email as string });
-  const draft = composeDraft({ subject: generated.subject, body: generated.body }, audience.address, audience.language, buildUnsubscribeUrl(deps.siteUrl, token));
+  const draft = composeDraft({ subject: generated.subject, body: generated.body }, compliance.address, compliance.language, buildUnsubscribeUrl(deps.siteUrl, token));
   if (!draft) throw new Error("no footer for an address that has an audience");
 
   return db.transaction(async (tx) => {
@@ -176,7 +182,8 @@ export async function memberDraftSignals(bdId: string, memberId: string, step: 1
   const facts = await loadFacts(bdId, memberId);
   if (!facts) return null;
   if (!facts.audience) return [];
-  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", facts.audience.language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first");
+  const language = resolveDraftCompliance(facts.audience, facts.chosenLanguage)!.language;
+  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first", facts.chosenLanguage);
   return input ? draftSignals(input) : [];
 }
 
@@ -228,6 +235,23 @@ export const regenerateReminderDraft = (bdId: string, sequenceId: string, member
  */
 export const generateReminderDraft = (bdId: string, sequenceId: string, memberId: string, deps: Partial<DraftDeps> = {}, mode: Mode = "missing", confirmed: EditConfirmations = {}) =>
   draftMember(bdId, sequenceId, memberId, mode, { ...liveDeps(), ...deps }, [], REMINDER_STEP, { confirmed, skippedEdited: [] }) as Promise<"generated" | "skipped">;
+
+export type SetLanguageResult = { ok: true } | { ok: false; error: "not_found" | "not_editable" | "held" };
+
+/**
+ * Records (or, with null, clears) the BD's choice of the draft language for ONE member, together with who and when. Owner-checked
+ * (loadFacts joins the Sequence on the owner). Refuses a member with no audience: a HOLD has no address, so no draft, and a language
+ * must never be a way around that. The caller validates `language` (parseLanguageChoice); this never touches the address.
+ */
+export async function setMemberDraftLanguage(bdId: string, memberId: string, language: AudienceLanguage | null): Promise<SetLanguageResult> {
+  const facts = await loadFacts(bdId, memberId);
+  if (!facts) return { ok: false, error: "not_found" };
+  if (!facts.audience) return { ok: false, error: "held" };
+  if (!EDITABLE.includes(facts.state)) return { ok: false, error: "not_editable" };
+  const record = language === null ? { draftLanguage: null, draftLanguageByBdId: null, draftLanguageAt: null } : { draftLanguage: language, draftLanguageByBdId: bdId, draftLanguageAt: new Date() };
+  await db.update(sequenceMember).set(record).where(eq(sequenceMember.id, memberId));
+  return { ok: true };
+}
 
 export type SaveEditResult = { ok: true; footerWarning: boolean } | { ok: false; error: "empty" | "not_found" | "not_editable" };
 

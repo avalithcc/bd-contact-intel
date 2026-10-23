@@ -12,6 +12,8 @@ import type { SendChoice } from "@/lib/sequences/sendMoment";
 import { releaseToast, sendRecipients, type ReleaseToast } from "@/lib/sequences/sendUi";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
 import { optOutErrorKey } from "@/lib/sequences/contactContext";
+import { choiceToStore } from "@/lib/sequences/languageChoice";
+import type { AudienceLanguage } from "@/lib/sequences/complianceAudience";
 import { generationLock } from "@/lib/sequences/generationLock";
 import { isReadOnlyAction, isReadOnlyView } from "@/lib/sequences/readOnly";
 import { agoText, fill, type SequenceLabels } from "@/lib/sequences/viewText";
@@ -21,6 +23,8 @@ import {
   approveBulk,
   approveMember,
   cancelApproval,
+  chooseDraftLanguage,
+  clearDraftLanguage,
   generateMemberDraft,
   loadReviewSignals,
   markDraftReviewed,
@@ -35,6 +39,7 @@ import {
 } from "../actions";
 import { BulkBar, RemoveReasonDialog } from "../_components/BulkBar";
 import { EditSequenceDialog } from "../_components/EditSequenceDialog";
+import { LanguageChoiceDialog } from "../_components/LanguageChoiceDialog";
 import { OptOutDialog } from "../_components/OptOutDialog";
 import { RegenerateConfirmDialog } from "../_components/RegenerateConfirmDialog";
 import { ReviewDialog } from "../_components/ReviewDialog";
@@ -68,6 +73,9 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   // A "Regenerar" the server refused because the draft is hand-edited waits here for confirmation.
   const [regen, setRegen] = useState<{ skipped: SkippedEdit; step: 1 | 2; review: boolean } | null>(null);
+  // The language question asked before every generate/regenerate; `review` = it was opened from the review dialog's "Regenerar".
+  const [lang, setLang] = useState<{ memberId: string; mode: "generate" | "regenerate"; review: boolean } | null>(null);
+  const [langError, setLangError] = useState<string | null>(null);
   const readOnly = isReadOnlyView(viewerBdId, detail.ownerBdId);
   const ownView = !readOnly;
   const member = (id: string) => detail.members.find((m) => m.memberId === id) ?? null;
@@ -103,7 +111,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       setGeneratingId(null);
     }
   }
-  const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setError(null); setSendError(null); };
+  const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setLang(null); setLangError(null); setError(null); setSendError(null); };
   const reasonText = (reason: string) => (l.reviewErrors as Record<string, string>)[reason] ?? l.reviewErrors.failed;
 
   /**
@@ -200,6 +208,32 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     await reportBatch(r, l.toastGeneratedOne, l.toastGeneratedOne);
   }
 
+  /** Opens the language question. A HOLD (no audience) or a generation in flight never gets it: neither may start a draft. */
+  function askLanguage(memberId: string, mode: "generate" | "regenerate", review = false) {
+    if (!member(memberId)?.audience?.audience || lock.active) return;
+    setLangError(null);
+    setLang({ memberId, mode, review });
+  }
+
+  /** Stores the choice only when it differs from what is already recorded, then generates with it (the server reads it back). */
+  async function confirmLanguage(selected: AudienceLanguage) {
+    const m = lang ? member(lang.memberId) : null;
+    const resolved = m?.audience?.audience?.language;
+    if (!lang || !m || !resolved) return;
+    const step = choiceToStore(resolved, m.languageChoice?.language ?? null, selected);
+    setLangError(null);
+    if (step.action !== "none") {
+      const r = await guarded(() => (step.action === "set" ? chooseDraftLanguage(m.memberId, step.language) : clearDraftLanguage(m.memberId)), setLangError);
+      if (!r) return;
+      if (!r.ok) return setLangError(l.languageChoice.saveFailed);
+      router.refresh();
+    }
+    const { memberId, mode, review } = lang;
+    setLang(null);
+    if (review) return void reviewRegenerate({ type: "regenerate", memberId, step: 1 });
+    return void (mode === "generate" ? generateOne(memberId) : regenerateOne(memberId));
+  }
+
   async function openReview(memberId: string, step: 1 | 2) {
     setError(null);
     // The chips are the generator's own input, read on demand: opening with an empty list would say "no signals" for a draft that had some.
@@ -216,11 +250,13 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       case "changeCadence": return showToast(fill(l.toastCadenceFixed, { n: detail.schedule.step2.afterDays }), "success");
       case "createNext": return router.push("/sequences/new");
       case "approveReady": return setSelected(readyMemberIds(detail.members));
-      case "generate": return void generateOne(a.memberId);
+      case "generate": return askLanguage(a.memberId, "generate");
       case "reviewDraft": case "viewDraft": case "viewEmail": case "viewSent": case "reviewReminder": case "viewReminder": return void openReview(a.memberId, cardStep(a.type));
       case "remove": return setRemoveIds([a.memberId]);
       case "optOut": return setOptOutId(a.memberId);
-      case "regenerate": return void regenerateOne(a.memberId);
+      case "regenerate": return askLanguage(a.memberId, "regenerate");
+      case "chooseLanguage": return askLanguage(a.memberId, member(a.memberId)?.draft ? "regenerate" : "generate");
+      case "resetLanguage": return void guarded(() => clearDraftLanguage(a.memberId)).then((r) => { if (!r) return; if (r.ok) showToast(l.languageChoice.toastReset, "success"); else fail(); router.refresh(); });
       case "approveWith": return approveWith([a.memberId], a.when, false);
       case "reschedule": return reschedule(a.memberId, a.when);
       case "sendNow": return void reschedule(a.memberId, { kind: "now" });
@@ -242,6 +278,16 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     }
   }
 
+  /** The review dialog's "Regenerar" (after the language question for step 1; a step 2 reminder reuses the stored choice). */
+  async function reviewRegenerate(a: Extract<ReviewAction, { type: "regenerate" }>) {
+    const confirmed = a.confirmedEdits ?? {};
+    const r = await guarded(() => whileGenerating(a.memberId, () => (a.step === 2 ? regenerateSequenceReminder(detail.id, a.memberId, confirmed) : regenerateSequenceDrafts(detail.id, [a.memberId], confirmed)), setError), setError);
+    if (!r) return;
+    if (r.ok && r.skippedEdited[0]) return setRegen({ skipped: r.skippedEdited[0], step: a.step, review: true });
+    if (r.ok && r.generated.length > 0) { showToast(l.toastRegenerated, "success"); closeDialogs(); } else setError(l.actionFailed);
+    return router.refresh();
+  }
+
   async function onReview(a: ReviewAction) {
     if (readOnly) return;
     const m = member(a.memberId);
@@ -252,14 +298,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       if (r?.ok) router.refresh();
       return;
     }
-    if (a.type === "regenerate") {
-      const confirmed = a.confirmedEdits ?? {};
-      const r = await guarded(() => whileGenerating(a.memberId, () => (a.step === 2 ? regenerateSequenceReminder(detail.id, a.memberId, confirmed) : regenerateSequenceDrafts(detail.id, [a.memberId], confirmed)), setError), setError);
-      if (!r) return;
-      if (r.ok && r.skippedEdited[0]) return setRegen({ skipped: r.skippedEdited[0], step: a.step, review: true });
-      if (r.ok && r.generated.length > 0) { showToast(l.toastRegenerated, "success"); closeDialogs(); } else setError(l.actionFailed);
-      return router.refresh();
-    }
+    if (a.type === "regenerate") return a.step === 1 && !a.confirmedEdits ? askLanguage(a.memberId, "regenerate", true) : reviewRegenerate(a);
     if (!("subject" in a)) return;
     const { type: intent, memberId, step, subject, body } = a;
     const stored = (step === 2 ? m.reminderDraft : m.draft) ?? { subject: "", body: "" };
@@ -351,6 +390,10 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
             if (r.review) void onReview({ type: "regenerate", memberId: r.skipped.memberId, step: r.step, confirmedEdits: confirmed });
             else void regenerateOne(r.skipped.memberId, confirmed);
           }} />
+      )}
+      {lang && member(lang.memberId) && (
+        <LanguageChoiceDialog key={lang.memberId} member={member(lang.memberId)!} name={[member(lang.memberId)!.firstName, member(lang.memberId)!.lastName].filter(Boolean).join(" ") || l.unnamed} mode={lang.mode} labels={l}
+          busy={busy} locked={lock.active} error={langError} onCancel={() => { setLang(null); setLangError(null); }} onConfirm={(language) => void confirmLanguage(language)} />
       )}
       {editing && <EditSequenceDialog open name={detail.name} cap={detail.dailySendCap} labels={l} onClose={closeDialogs} onSave={onEdit} busy={busy} error={error} />}
     </>
