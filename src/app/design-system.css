@@ -471,6 +471,10 @@ details.card:not([open]) > summary { border-bottom: 0; }
 .bulk-bar .btn-ghost:hover { background: var(--color-on-dark-hover); color: var(--color-accent-fg); }
 .bulk-bar .count { font-weight: 600; font-size: var(--text-base); margin-right: var(--space-sm); }
 .bulk-bar .sep { width: 1px; height: 18px; background: var(--color-on-dark-sep); }
+/* The reason a disabled action is disabled, INSIDE the sticky bar: the bar pins to the viewport and carries the
+   button with it, so an explanation left outside (it used to be a `.help` paragraph below) scrolls away from the
+   control it explains. Full-width so it wraps onto its own line under the actions. */
+.bulk-bar .note { flex: 1 1 100%; margin: 0; font-size: var(--text-sm); color: var(--color-on-dark); opacity: 0.82; }
 
 /* ------------------------------------------------------------ dropdown */
 .dropdown { position: relative; display: inline-block; }

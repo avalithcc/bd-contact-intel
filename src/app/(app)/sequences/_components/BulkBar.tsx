@@ -22,6 +22,9 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
   const v = bulkBarView(selection);
   if (!v.visible) return null;
   const one = v.selected === 1;
+  const unopened = v.selected - v.reviewed;
+  const missing = fill(unopened === 1 ? l.bulkMissingOne : l.bulkMissing, { n: unopened });
+  const gateTitle = `${missing} ${l.bulkMissingPending}`;
   const n = { n: v.selected };
   const outlook = capOutlook({ count: v.selected, cap: cap.cap, sentToday: cap.sentToday });
   return (
@@ -36,7 +39,7 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
           labels={send.labels}
           primaryLabel={fill(one ? l.bulkApproveNowOne : l.bulkApproveNow, n)}
           disabled={!v.approveEnabled || lock.bulkApproveDisabled}
-          title={lock.bulkApproveDisabled ? l.generateBulkWaitTitle : undefined}
+          title={lock.bulkApproveDisabled ? l.generateBulkWaitTitle : !v.approveEnabled ? gateTitle : undefined}
           busy={send.busy}
           error={send.error}
           schedule={approvalSchedule(send, recipients, "bulk", v.selected)}
@@ -44,6 +47,8 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
           onSendNow={() => onAction({ type: "approve", memberIds: v.ids, when: { kind: "now" } })}
           onSchedule={(slot) => onAction({ type: "approve", memberIds: v.ids, when: { kind: "at", ...slot } })}
         />
+        {/* Inside the sticky bar so the reason travels with the disabled button instead of being scrolled away. */}
+        {!v.approveEnabled && <p className="note"><strong>{missing}</strong> {l.bulkMissingPending}. {l.bulkBlockedWhy}</p>}
       </div>
       {v.approveEnabled && outlook.deferred > 0 && (
         <div className="alert alert-warn mt-md" role="status">
@@ -52,7 +57,6 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
           </div>
         </div>
       )}
-      {!v.approveEnabled && <p className="help mt-md">{fill(one ? l.bulkBlockedOne : l.bulkBlocked, n)}</p>}
     </>
   );
 }
