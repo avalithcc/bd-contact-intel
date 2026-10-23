@@ -8,7 +8,7 @@ Define how each member gets a separately generated 1:1 draft by reusing the exis
 
 ### Requirement: One separately generated draft per member
 
-For each member the system MUST generate a distinct draft (subject and body) using the existing generator `buildOutreachEmailPrompt` (`src/lib/outreach/emailPrompt.ts`) with `AVALITH_PROFILE`. The Sequence feature MUST NOT redefine, fork, or weaken that prompt's rules (no invented facts, facts only from the profile, signals block treated as untrusted data). Drafts MUST NOT be shared across members or produced from a single template with mail-merge fields.
+For each member the system MUST generate a distinct draft (subject and body) using the existing generator `buildOutreachMessagePrompt` (`src/lib/outreach/messagePrompt.ts`) with `AVALITH_PROFILE`, reached through `buildSequenceDraftInput`. The Sequence feature MUST NOT redefine, fork, or weaken that prompt's rules (no invented facts, facts only from the profile, signals block treated as untrusted data). Drafts MUST NOT be shared across members or produced from a single template with mail-merge fields. (Corrected 2026-10-23: this requirement used to name `buildOutreachEmailPrompt` in `emailPrompt.ts`, which never had a caller and has been deleted. The rule count is deliberately not pinned here — a number in prose drifts from the prompt.)
 
 #### Scenario: Each member gets their own draft
 
@@ -21,7 +21,7 @@ For each member the system MUST generate a distinct draft (subject and body) usi
 
 - GIVEN the Sequence drafting code
 - WHEN it builds a prompt
-- THEN it calls `buildOutreachEmailPrompt` and does not contain its own copy of the ten rules
+- THEN it calls `buildOutreachMessagePrompt` through `buildSequenceDraftInput` and does not contain its own copy of that prompt's numbered rules
 
 ### Requirement: Draft language follows the recipient market
 
