@@ -25,7 +25,10 @@ export type OnAction = (action: DetailAction) => void | Promise<boolean | void>;
  * exact content. `markReviewed` is reported once when a draft nobody opened is opened (markDraftReviewed).
  */
 export type ReviewAction =
-  | { type: "markReviewed"; memberId: string; step: 1 | 2 }
+  /** `version` is draftVersion() of the text the dialog showed: the server refuses the mark when the stored text moved on. */
+  | { type: "markReviewed"; memberId: string; step: 1 | 2; version: string }
+  /** "Ver la versión actual" after a refused mark: refetch, then the dialog shows (and reports) the stored text. */
+  | { type: "reloadCurrent"; memberId: string; step: 1 | 2 }
   /** `confirmedEdits` (member id -> the `editedAt` the BD was shown) is set only after the BD confirmed losing exactly that text; the server refuses to overwrite an edit otherwise. */
   | { type: "regenerate"; memberId: string; step: 1 | 2; confirmedEdits?: Record<string, number> }
   | { type: "save"; memberId: string; step: 1 | 2; subject: string; body: string }

@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useId, type FormEvent } from "react";
+import { useEffect, useId, useReducer, type FormEvent } from "react";
 import { Dialog } from "@/components/Dialog";
-import { EyeIcon, GenerateIcon, InfoIcon } from "@/components/icons";
+import { EyeIcon, GenerateIcon, InfoIcon, WarningIcon } from "@/components/icons";
 import { SendSplitButton } from "@/components/send/SendSplitButton";
 import { resolveRecipientZone } from "@/lib/sendSchedule/zones";
+import { draftVersion } from "@/lib/sequences/draftVersion";
+import { INITIAL_RELOAD, reloadKey, reloadReducer } from "@/lib/sequences/reviewReload";
 import type { SendChoice } from "@/lib/sequences/sendMoment";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { reviewView, type ReviewFooterId } from "@/lib/sequences/reviewDialog";
@@ -34,21 +36,37 @@ type Props = {
   /** A draft is being generated elsewhere on the screen: a second generation would collide with it (generationLock.ts). */
   regenerateLocked?: boolean;
   error?: string | null;
+  /** The server refused the review mark: the text shown here is not the stored one. The draft stays unreviewed. */
+  stale?: boolean;
   /** The shared send control: labels, the cadence and the state of the last server call. */
   send: SequenceSendContext;
 };
 
-export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, regenerateLocked = false, error = null, send }: Props) {
+/** A reload whose refetch never answers frees the button after this long. */
+const RELOAD_TIMEOUT_MS = 10_000;
+
+export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, regenerateLocked = false, error = null, stale = false, send }: Props) {
   const formId = useId();
   const view = m ? reviewView(m, step, schedule, now, readOnly) : null;
   const memberId = m?.memberId;
   const marks = open && view?.marksReviewed === true;
-  // Opening is the review: report it once per open, never from a passive listing.
+  const [reload, dispatch] = useReducer(reloadReducer, INITIAL_RELOAD);
+  const { reads, pending } = reload;
+  const version = view ? draftVersion(view.draft.generatedAt, view.draft.editedAt) : null;
+  const reloadAt = memberId ? reloadKey(memberId, step) : null;
+  useEffect(() => { dispatch({ type: "props", open, key: reloadAt, marker: m }); }, [open, reloadAt, m]);
   useEffect(() => {
-    if (marks && memberId) onAction({ type: "markReviewed", memberId, step });
+    if (!pending) return;
+    const t = setTimeout(() => dispatch({ type: "timeout" }), RELOAD_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [pending]);
+  // Opening is the review: report it once per open (and once per explicit reload), never from a passive listing or a
+  // background refresh. The version sent is the one of the render the form was mounted with, which is what the person read.
+  useEffect(() => {
+    if (marks && memberId && version) onAction({ type: "markReviewed", memberId, step, version });
     // The intent is per open; a new onAction identity must not re-report it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [marks, memberId, step]);
+  }, [marks, memberId, step, reads]);
   if (!m || !view) return null;
 
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
@@ -98,7 +116,14 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   return (
     <Dialog open={open} onClose={onClose} title={title} wide closeDisabled={busy}
       footer={view.readOnly ? <button type="button" className="btn btn-secondary" onClick={onClose}>{l.reviewClose}</button> : view.footer.map(footerButton)}>
-      <form id={formId} className="stack" onSubmit={submit} key={`${m.memberId}-${step}`}>
+      <form id={formId} className="stack" onSubmit={submit} key={`${m.memberId}-${step}-${reads}`}>
+        {(stale || pending !== null) && (
+          <div className="alert alert-warn" role="alert">
+            <WarningIcon className="icon" />
+            <div className="grow">{l.reviewStaleNotice}</div>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={pending !== null} onClick={() => { dispatch({ type: "click", key: reloadKey(m.memberId, step), marker: m }); onAction({ type: "reloadCurrent", memberId: m.memberId, step }); }}>{l.reviewStaleReload}</button>
+          </div>
+        )}
         {readOnly ? (
           <div className="alert alert-neutral"><EyeIcon className="icon" /><div>{fill(l.readOnlyDialogNotice, { owner: ownerName })}</div></div>
         ) : (

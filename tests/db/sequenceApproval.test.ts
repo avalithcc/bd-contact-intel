@@ -48,6 +48,13 @@ async function draftOf(memberId: string, step = 1) {
   return (await db.select().from(sequenceDraft).where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, step))))[0];
 }
 
+/** The version the dialog would send for the draft as stored now: built by the real producer from the stored row. */
+async function versionOf(memberId: string, step = 1) {
+  const { draftVersion } = await import("@/lib/sequences/draftVersion");
+  const d = await draftOf(memberId, step);
+  return draftVersion(d.generatedAt, d.editedAt);
+}
+
 async function stateOf(memberId: string) {
   const { db } = await import("@/db");
   const { sequenceMember } = await import("@/db/schema");
@@ -92,11 +99,11 @@ test("opening the dialog marks the draft reviewed and stays marked; an unopened 
   const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
   const opened = await mkMember("open");
   const passive = await mkMember("passive");
-  assert.deepEqual(await markDraftReviewed(bdId, opened.memberId), { ok: true });
+  assert.deepEqual(await markDraftReviewed(bdId, opened.memberId, await versionOf(opened.memberId)), { ok: true });
   const first = (await draftOf(opened.memberId)).reviewedAt;
   assert.ok(first);
   assert.equal((await draftOf(opened.memberId)).reviewedByBdId, bdId);
-  await markDraftReviewed(bdId, opened.memberId);
+  await markDraftReviewed(bdId, opened.memberId, await versionOf(opened.memberId));
   assert.deepEqual((await draftOf(opened.memberId)).reviewedAt, first, "re-opening keeps the first review time");
   assert.equal((await draftOf(passive.memberId)).reviewedAt, null);
 });
@@ -104,7 +111,7 @@ test("opening the dialog marks the draft reviewed and stays marked; an unopened 
 test("another BD cannot mark, approve or cancel a member of someone else's sequence", async () => {
   const { approveMember, cancelApproval, markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
   const m = await mkMember("foreign");
-  assert.deepEqual(await markDraftReviewed(otherBdId, m.memberId), { ok: false, error: "not_found" });
+  assert.deepEqual(await markDraftReviewed(otherBdId, m.memberId, await versionOf(m.memberId)), { ok: false, error: "not_found" });
   const approved = await approveMember(otherBdId, m.memberId);
   assert.ok(!approved.ok && approved.error === "rejected" && approved.rejected[0].reason === "not_found");
   assert.deepEqual(await cancelApproval(otherBdId, m.memberId), { ok: false, error: "not_found" });
@@ -365,4 +372,147 @@ test("a bulk request over the roster limit is refused as too_many before anythin
   // Duplicates are collapsed first: the same id repeated past the limit is one member, not an oversized request.
   const repeated = await approveBulk(bdId, Array.from({ length: SEQUENCE_DETAIL_MEMBER_LIMIT + 5 }, () => m.memberId));
   assert.deepEqual(repeated, { ok: true, approved: [m.memberId] });
+});
+
+async function regenerate(memberId: string) {
+  const { regenerateDrafts } = await import("@/lib/sequences/draftQueries");
+  const body = await footedBody();
+  const generate = async () => ({ ok: true as const, channel: "email" as const, message: "", subject: "Regenerated", body, historyCount: 0, signals: [] });
+  await regenerateDrafts(bdId, sequenceId, [memberId], { generate: generate as never, siteUrl: "https://example.test" });
+}
+
+test("the review mark is tied to the text that was read: a stale version is refused and the draft stays unreviewed", async () => {
+  const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkMember("stale-regen");
+  const opened = await versionOf(m.memberId);
+  await regenerate(m.memberId);
+  assert.notEqual(await versionOf(m.memberId), opened);
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, opened), { ok: false, error: "stale" });
+  assert.equal((await draftOf(m.memberId)).reviewedAt, null);
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, await versionOf(m.memberId)), { ok: true });
+  assert.ok((await draftOf(m.memberId)).reviewedAt);
+});
+
+test("two consecutive regenerations leave different versions, so a tab on the first cannot mark the second", async () => {
+  const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkMember("stale-twice");
+  await regenerate(m.memberId);
+  const first = await versionOf(m.memberId);
+  assert.equal((await draftOf(m.memberId)).editedAt, null);
+  await regenerate(m.memberId);
+  assert.equal((await draftOf(m.memberId)).editedAt, null);
+  assert.notEqual(await versionOf(m.memberId), first);
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, first), { ok: false, error: "stale" });
+  assert.equal((await draftOf(m.memberId)).reviewedAt, null);
+});
+
+test("an edit by someone else moves the version and clears their review; the old tab is refused", async () => {
+  const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
+  const { saveDraftEdit } = await import("@/lib/sequences/draftQueries");
+  const m = await mkMember("stale-edit");
+  const opened = await versionOf(m.memberId);
+  await saveDraftEdit(bdId, m.memberId, { subject: "Edited", body: `${await footedBody()}\n\nEdited.` });
+  assert.notEqual(await versionOf(m.memberId), opened);
+  // The editor's own save already reviewed it (editReview.ts); clear that to model a draft nobody has read.
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await db.update(sequenceDraft).set({ reviewedAt: null, reviewedByBdId: null }).where(eq(sequenceDraft.sequenceMemberId, m.memberId));
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, opened), { ok: false, error: "stale" });
+});
+
+test("a report for an already reviewed draft is a no-op ok, never stale, and keeps the first review time", async () => {
+  const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkMember("noop", { reviewed: true });
+  const first = (await draftOf(m.memberId)).reviewedAt;
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, "1:0"), { ok: true });
+  assert.deepEqual((await draftOf(m.memberId)).reviewedAt, first);
+});
+
+test("saving your own edit keeps the review and does not fight the version check", async () => {
+  const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
+  const { saveDraftEdit } = await import("@/lib/sequences/draftQueries");
+  const m = await mkMember("own-edit");
+  const opened = await versionOf(m.memberId);
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, opened), { ok: true });
+  assert.deepEqual(await saveDraftEdit(bdId, m.memberId, { subject: "Mine", body: `${await footedBody()}\n\nMine.` }), { ok: true, footerWarning: false });
+  const d = await draftOf(m.memberId);
+  assert.ok(d.reviewedAt && d.reviewedByBdId === bdId, "the edit refreshed the review in the same transaction");
+  assert.notEqual(await versionOf(m.memberId), opened);
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, opened), { ok: true }, "a late report of the old version is idempotent, not stale");
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, await versionOf(m.memberId)), { ok: true });
+  assert.deepEqual((await draftOf(m.memberId)).reviewedAt, d.reviewedAt);
+});
+
+test("a malformed version is refused as stale, and a missing draft is not_found", async () => {
+  const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkMember("malformed");
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, "nope"), { ok: false, error: "stale" });
+  assert.deepEqual(await markDraftReviewed(bdId, m.memberId, await versionOf(m.memberId), 2), { ok: false, error: "not_found" });
+  const gone = await mkMember("nodraft", { noDraft: true });
+  assert.deepEqual(await markDraftReviewed(bdId, gone.memberId, "1:0"), { ok: false, error: "not_found" });
+});
+
+/** The shared sequence is deliberately over the roster limit (a test above), which getSequenceDetail refuses to read: members for the read tests go in a small one. */
+async function inSmallSequence(body: () => Promise<void>) {
+  const { db } = await import("@/db");
+  const { emailAccount, sequence } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const [acc] = await db.select().from(emailAccount).where(eq(emailAccount.bdId, bdId));
+  const [small] = await db.insert(sequence).values({ name: key("small"), ownerBdId: bdId, emailAccountId: acc.id, schedule: {} }).returning();
+  const shared = sequenceId;
+  sequenceId = small.id;
+  try { await body(); } finally { sequenceId = shared; }
+}
+
+/** The version exactly as the dialog gets it: from getSequenceDetail's raw-SQL read, not from the drizzle row. */
+async function shownVersion(memberId: string, step: 1 | 2) {
+  const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
+  const { draftVersion } = await import("@/lib/sequences/draftVersion");
+  const detail = await getSequenceDetail({ id: bdId, role: "bd" }, sequenceId);
+  const m = detail?.members.find((x) => x.memberId === memberId);
+  const d = step === 2 ? m?.reminderDraft : m?.draft;
+  assert.ok(d, "the read carries the draft");
+  assert.ok(d.generatedAt instanceof Date && !Number.isNaN(d.generatedAt.getTime()), "generatedAt is a real Date from the read");
+  return draftVersion(d.generatedAt, d.editedAt);
+}
+
+test("the version the read produces marks the step 1 draft, before and after a save-edit (producer to consumer)", async () => {
+  await inSmallSequence(async () => {
+    const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
+    const { saveDraftEdit } = await import("@/lib/sequences/draftQueries");
+    const plain = await mkMember("read-v1");
+    assert.deepEqual(await markDraftReviewed(bdId, plain.memberId, await shownVersion(plain.memberId, 1)), { ok: true });
+    assert.ok((await draftOf(plain.memberId)).reviewedAt);
+    const edited = await mkMember("read-v1-edited");
+    await saveDraftEdit(bdId, edited.memberId, { subject: "Mine", body: `${await footedBody()}\n\nMine.` });
+    const { db } = await import("@/db");
+    const { sequenceDraft } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.update(sequenceDraft).set({ reviewedAt: null, reviewedByBdId: null }).where(eq(sequenceDraft.sequenceMemberId, edited.memberId));
+    const v = await shownVersion(edited.memberId, 1);
+    assert.ok(!v.endsWith(":0"), "the edit is part of the version the read produced");
+    assert.deepEqual(await markDraftReviewed(bdId, edited.memberId, v), { ok: true });
+  });
+});
+
+test("the version the read produces marks the reminder (step 2), and a stale reminder version is refused", async () => {
+  await inSmallSequence(async () => {
+    const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
+    const { saveDraftEdit } = await import("@/lib/sequences/draftQueries");
+    const m = await mkSent("read-v2");
+    const opened = await shownVersion(m.memberId, 2);
+    assert.deepEqual(await markDraftReviewed(bdId, m.memberId, opened, 2), { ok: true });
+    assert.ok((await draftOf(m.memberId, 2)).reviewedAt);
+    assert.equal((await draftOf(m.memberId, 1)).reviewedAt, null, "marking the reminder never marks step 1");
+    const stale = await mkSent("read-v2-stale");
+    const before = await shownVersion(stale.memberId, 2);
+    assert.deepEqual(await saveDraftEdit(bdId, stale.memberId, { subject: "Re: Mine", body: `${await footedBody()}\n\nMine.` }, 2), { ok: true, footerWarning: false });
+    const { db } = await import("@/db");
+    const { sequenceDraft } = await import("@/db/schema");
+    const { and, eq } = await import("drizzle-orm");
+    await db.update(sequenceDraft).set({ reviewedAt: null, reviewedByBdId: null }).where(and(eq(sequenceDraft.sequenceMemberId, stale.memberId), eq(sequenceDraft.step, 2)));
+    assert.deepEqual(await markDraftReviewed(bdId, stale.memberId, before, 2), { ok: false, error: "stale" });
+    assert.deepEqual(await markDraftReviewed(bdId, stale.memberId, await shownVersion(stale.memberId, 2), 2), { ok: true });
+  });
 });

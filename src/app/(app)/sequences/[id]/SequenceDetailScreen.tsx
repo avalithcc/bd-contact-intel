@@ -63,6 +63,8 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [staleKey, setStaleKey] = useState<string | null>(null);
+  const reviewKey = (memberId: string, step: 1 | 2) => `${memberId}:${step}`;
   // The reason a split-button popover keeps open with (a card or the bulk bar): separate from the dialogs' own `error`.
   const [sendError, setSendError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -111,7 +113,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       setGeneratingId(null);
     }
   }
-  const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setLang(null); setLangError(null); setError(null); setSendError(null); };
+  const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setLang(null); setLangError(null); setError(null); setSendError(null); setStaleKey(null); };
   const reasonText = (reason: string) => (l.reviewErrors as Record<string, string>)[reason] ?? l.reviewErrors.failed;
 
   /**
@@ -294,8 +296,15 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     if (!m) return;
     if (a.type === "markReviewed") {
       // The dialog reports once per open. Refetch on success, or the bar's "N de M revisados" and the approve gate stay stale.
-      const r = await markDraftReviewed(a.memberId, a.step).catch(() => null);
-      if (r?.ok) router.refresh();
+      const r = await markDraftReviewed(a.memberId, a.step, a.version).catch(() => null);
+      if (r?.ok) { setStaleKey(null); router.refresh(); }
+      // Refused: the text on screen is not the stored one. The draft stays unreviewed and the dialog says so.
+      else if (r && r.error === "stale") setStaleKey(reviewKey(a.memberId, a.step));
+      return;
+    }
+    if (a.type === "reloadCurrent") {
+      // The warning stays until the re-report of the refetched text answers ok (a stale answer keeps it).
+      router.refresh();
       return;
     }
     if (a.type === "regenerate") return a.step === 1 && !a.confirmedEdits ? askLanguage(a.memberId, "regenerate", true) : reviewRegenerate(a);
@@ -377,7 +386,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
         lock={lock} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
         bulk={readOnly ? undefined : (g) => <BulkBar lock={g} selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} />}
       />
-      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={lock.active} error={error} send={{ ...send, error }} />
+      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={lock.active} error={error} stale={review !== null && staleKey === reviewKey(review.memberId, review.step)} send={{ ...send, error }} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />
       <OptOutDialog open={optOutId !== null} email={optOutMember?.email ?? null} ownLiveCount={optOutLive} labels={l} onClose={closeDialogs} onConfirm={onOptOut} busy={busy} error={error} />
       {regen && (
