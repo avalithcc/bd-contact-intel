@@ -690,6 +690,8 @@ table.data.compact td { padding: 0.35rem var(--space-md); }
 .thread-msg + .thread-msg { border-top: 1px solid var(--color-border); }
 .thread-msg .from { font-weight: 600; }
 .thread-msg .snippet { color: var(--color-ink-soft); margin-top: var(--space-2xs); }
+/* Same rule outside a thread card: renderForeignMailBody (admin reading another BD's lone email) and the lone own-email body (LoneEmailBody) sit in .tl-body, with no .thread-msg ancestor. */
+.tl-body .snippet { color: var(--color-ink-soft); margin-top: var(--space-2xs); white-space: pre-wrap; }
 .thread-msg-head { display: flex; align-items: baseline; gap: 6px; flex-wrap: nowrap; min-width: 0; }
 .thread-msg-head .who { display: inline-flex; align-items: center; gap: 3px; flex-wrap: nowrap; min-width: 0; overflow: hidden; }
 .thread-msg-head .who .from { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
