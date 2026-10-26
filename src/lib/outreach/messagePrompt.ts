@@ -264,6 +264,11 @@ function languageInstruction(channel: OutreachChannel, language: MessageLanguage
   return "Write in natural, professional English, warm but not overly casual — a peer writing to a peer, not a cold sales pitch.";
 }
 
+// The opener is deliberately a courtesy, not a greeting between friends. The English LinkedIn exemplar used to open
+// "how's it going?", which is the English twin of the "cómo va?" the owner rejected on 2026-10-26 — and it survived the
+// Spanish cleanup because only the Spanish exemplar was edited. `languageInstruction` already said "warm but not overly
+// casual"; the model copied the example over the rule, which is this file's own documented failure mode (see the
+// length-rule comment below). Mirror of the Spanish "un gusto saludarte". Pinned by tests/unit/outreachPromptTone.test.ts.
 // Reference style (rule-free tone exemplar at the end of the system prompt). Spanish keeps the original example,
 // which is correct for the existing Spanish callers; any other language gets an English one instead of a Spanish
 // exemplar that would pull the draft toward Spanish phrasing.
@@ -279,7 +284,7 @@ function referenceStyleFor(isEmail: boolean, language: MessageLanguage): string 
     ? `Reference style (do not copy verbatim, tone example only, in English, for a FIRST email with no prior history):
 {"subject": "Senior nearshore squads for Affirm", "body": "Hi Gonzalo,\\n\\nI saw Affirm has several open senior backend roles across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. At Avalith we build squads of senior engineers in US-aligned timezones, embedded within days, to add capacity while those roles get filled — we do not compete with your hiring process.\\n\\nWould a 15-minute call next week make sense?\\n\\nCristian Civita, COO at Avalith"}`
     : `Reference style (do not copy verbatim, this is a tone example only, in English, for a FIRST outreach with no prior history):
-"Hi Gonzalo, how's it going? I'm Cristian Civita, COO at Avalith. I was looking at Affirm's open roles and saw you're adding a lot of senior backend people across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. Since 2011 we've been building small teams of senior engineers in US-aligned timezones, embedded within days. It's not meant to replace your hiring, just extra capacity while those roles get filled. Open to a 15-minute chat next week?"`;
+"Hi Gonzalo, good to meet you. I'm Cristian Civita, COO at Avalith. I was looking at Affirm's open roles and saw you're adding several senior backend engineers across Card, Fraud, Identity and Payments, mostly remote in the US and Europe. Since 2011 we've been building small teams of senior engineers in US-aligned timezones, embedded within days. It's not meant to replace your hiring, just extra capacity while those roles get filled. Open to a 15-minute chat next week?"`;
 }
 
 export function buildOutreachMessagePrompt(
