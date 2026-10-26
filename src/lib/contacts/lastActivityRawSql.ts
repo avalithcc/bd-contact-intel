@@ -1,5 +1,6 @@
 import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { activity } from "@/db/schema";
+import { LINKEDIN_LAST_ACTIVITY_TYPE } from "@/lib/contacts/lastActivity";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 
 /**
@@ -21,15 +22,27 @@ import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
  * @param personId the outer query's person id expression
  */
 export function lastActivityRawSql(personId: SQLWrapper): SQL {
-  return sql`(
+  // Precedence: a real touch wins; the LinkedIn connection date is the
+  // fallback only when no touch exists (the `is not null` filter also drops a
+  // person whose only rows are non-touch). Direction is unknown for LinkedIn,
+  // hence the unqualified label (see resolveLastActivity in lastActivity.ts).
+  return sql`coalesce((
     select json_build_object(
       'type', activity.type,
       'metadata', activity.metadata,
       'createdAt', ${effectiveActivityAtSql()}
     )
     from ${activity}
-    where activity.person_id = ${personId}
-    order by ${effectiveActivityAtSql()} desc nulls last, activity.id desc
+    where activity.person_id = ${personId} and ${effectiveActivityAtSql()} is not null
+    order by ${effectiveActivityAtSql()} desc, activity.id desc
     limit 1
-  )`;
+  ), (
+    select json_build_object('type', ${LINKEDIN_LAST_ACTIVITY_TYPE}::text, 'metadata', null, 'createdAt', li.last_at)
+    from (
+      select max(pbc_li.last_message_at) as last_at
+      from person_bd_connection pbc_li
+      where pbc_li.person_id = ${personId}
+    ) li
+    where li.last_at is not null
+  ))`;
 }

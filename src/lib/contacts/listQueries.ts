@@ -30,7 +30,7 @@ import {
   type BdConnectionRow,
   type BdConnectionSummary,
 } from "@/lib/contacts/bdConnections";
-import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts/lastActivity";
+import { buildLastActivityEntries, resolveLastActivity, type LastActivityEntry } from "@/lib/contacts/lastActivity";
 import type { ContactSortKey } from "@/lib/contacts/sort";
 import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/contacts/bulkTargetIds";
 import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
@@ -248,6 +248,7 @@ async function attachDerivedColumns(
         personId: personBdConnection.personId,
         bdId: personBdConnection.bdId,
         bdName: bd.name,
+        lastMessageAt: personBdConnection.lastMessageAt,
       })
       .from(personBdConnection)
       .innerJoin(bd, eq(bd.id, personBdConnection.bdId))
@@ -288,12 +289,18 @@ async function attachDerivedColumns(
     dict,
   );
 
+  const linkedinLastAt = new Map<string, Date>();
+  for (const c of connectionRows) {
+    const prev = linkedinLastAt.get(c.personId);
+    if (c.lastMessageAt && (!prev || c.lastMessageAt > prev)) linkedinLastAt.set(c.personId, c.lastMessageAt);
+  }
+
   return rows.map((row) => ({
     ...row,
     bdConnections: groupedConnections.has(row.id)
       ? buildBdConnectionSummaries(groupedConnections.get(row.id)!)
       : EMPTY_BD_CONNECTION_SUMMARY,
-    lastActivity: lastActivityMap.get(row.id) ?? null,
+    lastActivity: resolveLastActivity(lastActivityMap.get(row.id), linkedinLastAt.get(row.id), dict),
   }));
 }
 

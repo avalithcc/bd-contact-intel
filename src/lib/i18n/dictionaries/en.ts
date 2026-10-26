@@ -3187,6 +3187,7 @@ export const en = {
     lastActivityDiscarded: "Discarded",
     lastActivityReplyReceived: "Reply received",
     lastActivityAutoReply: "Automatic reply",
+    lastActivityLinkedin: "LinkedIn message",
     lastActivityBounced: "Email bounced",
     lastActivityNote: "Note logged",
     lastActivityHunterLookup: "Email lookup",

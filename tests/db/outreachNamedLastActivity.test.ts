@@ -14,7 +14,9 @@ assertScratchDatabaseUrl(process.env.DATABASE_URL);
 
 const run = randomUUID().slice(0, 8);
 const lastName = `NamedAct${run}`;
+const LI_AT = new Date("2026-10-10T10:00:00.000Z");
 const AT = new Date("2026-10-20T10:00:00.000Z");
+const KINDS = ["email_sent", "reply_received", "auto_reply_received", "none", "linkedin_only", "touch_and_linkedin"];
 const ids: Record<string, string> = {};
 const bdIds: string[] = [];
 
@@ -27,11 +29,17 @@ before(async () => {
   const other = await mkBd("other");
   bdIds.push(me.id, other.id);
   ids.me = me.id;
-  const kinds = ["email_sent", "reply_received", "auto_reply_received", "none"];
+  const kinds = KINDS;
   for (const kind of kinds) {
     const [p] = await db.insert(person).values({ firstName: kind, lastName }).returning();
     ids[kind] = p!.id;
-    if (kind !== "none") {
+    if (kind === "linkedin_only") {
+      await db.insert(personBdConnection).values({ personId: p!.id, bdId: me.id, messageCount: 2, lastMessageAt: LI_AT, reciprocal: false });
+    } else if (kind === "touch_and_linkedin") {
+      // The LinkedIn date is NEWER than the activity: the real touch must still win.
+      await db.insert(activity).values({ personId: p!.id, actorBdId: me.id, type: "email_sent", metadata: {}, createdAt: AT });
+      await db.insert(personBdConnection).values({ personId: p!.id, bdId: me.id, messageCount: 2, lastMessageAt: new Date("2026-10-25T10:00:00Z"), reciprocal: false });
+    } else if (kind !== "none") {
       await db.insert(activity).values({ personId: p!.id, actorBdId: me.id, type: kind, metadata: {}, createdAt: AT });
     }
   }
@@ -51,7 +59,7 @@ after(async () => {
   const { db } = await import("@/db");
   const { activity, bd, person, personBdConnection } = await import("@/db/schema");
   const { inArray } = await import("drizzle-orm");
-  const personIds = ["email_sent", "reply_received", "auto_reply_received", "none"].map((k) => ids[k]!);
+  const personIds = KINDS.map((k) => ids[k]!);
   await db.delete(activity).where(inArray(activity.personId, personIds));
   await db.delete(personBdConnection).where(inArray(personBdConnection.personId, personIds));
   await db.delete(person).where(inArray(person.id, personIds));
@@ -77,7 +85,7 @@ async function outreachCell(personId: string) {
   return { row: r, lastActivity: mapped!.lastActivity };
 }
 
-for (const kind of ["email_sent", "reply_received", "auto_reply_received", "none"]) {
+for (const kind of KINDS) {
   test(`outreach row and contacts list agree on the last activity of a person whose latest is ${kind}`, async () => {
     const { getContactListPage } = await import("@/lib/contacts/listQueries");
     const { es } = await import("@/lib/i18n/dictionaries/es");
@@ -93,7 +101,10 @@ for (const kind of ["email_sent", "reply_received", "auto_reply_received", "none
     assert.ok(lastActivity);
     assert.equal(lastActivity.label, listed.lastActivity?.label);
     assert.equal(lastActivity.createdAt.toISOString(), listed.lastActivity?.createdAt.toISOString());
-    assert.equal(lastActivity.createdAt.toISOString(), AT.toISOString());
+    const expectedAt = kind === "linkedin_only" ? LI_AT : AT;
+    assert.equal(lastActivity.createdAt.toISOString(), expectedAt.toISOString());
+    if (kind === "linkedin_only") assert.equal(lastActivity.label, es.contactList.lastActivityLinkedin);
+    if (kind === "touch_and_linkedin") assert.equal(lastActivity.label, es.contactList.lastActivityEmailSent);
   });
 }
 

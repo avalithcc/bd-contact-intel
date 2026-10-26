@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { attachOutreachReasons } from "@/lib/contacts/outreachView";
 import type { OutreachRow } from "@/lib/outreach/ranking";
+import { resolveLastActivity } from "@/lib/contacts/lastActivity";
 import { t } from "@/lib/i18n/dictionaries";
 
 function row(overrides: Partial<OutreachRow> = {}): OutreachRow {
@@ -82,4 +83,24 @@ test("attachOutreachReasons gives no lastActivity when there is none", () => {
   assert.equal(attachOutreachReasons([row()], relTime, dict)[0].lastActivity, null);
   const nonTouch = row({ lastActivityRaw: { type: "task_updated", metadata: {}, createdAt: null } });
   assert.equal(attachOutreachReasons([nonTouch], relTime, dict)[0].lastActivity, null);
+});
+
+test("a linkedin_message entry renders the unqualified LinkedIn label, never an 'enviado' variant", () => {
+  const [r] = attachOutreachReasons(
+    [row({ lastActivityRaw: { type: "linkedin_message", metadata: null, createdAt: "2026-09-20T10:00:00Z" } })],
+    relTime,
+    dict,
+  );
+  assert.equal(r.lastActivity?.label, "Mensaje de LinkedIn");
+});
+
+test("resolveLastActivity: LinkedIn date is the fallback, a real activity always wins, neither is null", () => {
+  const li = new Date("2026-09-20T10:00:00Z");
+  const act = { type: "email_sent", label: dict.contactList.lastActivityEmailSent, createdAt: new Date("2026-01-01T00:00:00Z") };
+  const fallback = resolveLastActivity(null, li, dict);
+  assert.equal(fallback?.label, dict.contactList.lastActivityLinkedin);
+  assert.equal(fallback?.createdAt.toISOString(), li.toISOString());
+  // Precedence holds even when the LinkedIn date is NEWER than the activity.
+  assert.equal(resolveLastActivity(act, li, dict), act);
+  assert.equal(resolveLastActivity(null, null, dict), null);
 });
