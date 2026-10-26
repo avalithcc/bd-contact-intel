@@ -114,3 +114,14 @@ test("messageCount stays the LinkedIn sum however many activities the person has
     assert.equal(r.messageCount, 7);
   });
 });
+
+test("another BD's activity counts as contact: a touch logged by a different BD is the viewer's lastMessageAt", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { activity, bd } = await import("@/db/schema");
+    const { meId, personId } = await seed(tx, { linkedin: false, activities: [] });
+    const [other] = await tx.insert(bd).values({ email: `zz-lc-other-${Math.random().toString(36).slice(2)}@example.test`, name: "ZZ Other" }).returning();
+    await tx.insert(activity).values({ personId, actorBdId: other!.id, type: "email_sent", metadata: {}, createdAt: EMAIL_AT });
+    const r = await rowOf(tx, meId, personId);
+    assert.equal(r.lastMessageAt?.toISOString(), EMAIL_AT.toISOString());
+  });
+});
