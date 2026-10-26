@@ -112,3 +112,52 @@ test("a contact with no person_id_map row falls back to its own LinkedIn date in
     assert.equal(parseDbTimestamp(rows[0]!.lastMessageAt!).toISOString(), LINKEDIN_AT.toISOString());
   });
 });
+
+test("scoped to the viewing BD: another BD's contact at the same company never appears", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { bd, contact } = await import("@/db/schema");
+    const { selectWhatsNewContacts } = await import("@/lib/whatsnew/queries");
+    const mine = await seed(tx, { linkedin: true, activities: [] });
+    const [other] = await tx.insert(bd).values({ email: `zz-wnlc-other-${Math.random().toString(36).slice(2)}@example.test`, name: "ZZ Other" }).returning();
+    const [theirs] = await tx
+      .insert(contact)
+      .values({ bdId: other!.id, profileKey: `zz-wnlc-theirs-${Math.random().toString(36).slice(2)}`, firstName: "Otro", companyKey: COMPANY_KEY })
+      .returning();
+    const rows = await selectWhatsNewContacts(tx as never, mine.meId, [COMPANY_KEY]);
+    assert.deepEqual(rows.map((r) => r.id), [mine.contactId]);
+    assert.ok(!rows.some((r) => r.id === theirs!.id));
+  });
+});
+
+test("the LinkedIn side is the newest date across ALL BDs, not just the viewing BD's connection", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { bd, personBdConnection } = await import("@/db/schema");
+    const s = await seed(tx, { linkedin: true, activities: [] });
+    const newer = new Date("2026-08-15T12:00:00.000Z");
+    const [other] = await tx.insert(bd).values({ email: `zz-wnlc-other-${Math.random().toString(36).slice(2)}@example.test`, name: "ZZ Other" }).returning();
+    await tx.insert(personBdConnection).values({ personId: s.personId, bdId: other!.id, messageCount: 2, lastMessageAt: newer, reciprocal: false });
+    const r = await bothScreens(tx, s);
+    assert.equal(r.whatsnewAt, newer.toISOString());
+    assert.equal(r.whatsnewAt, r.outreachAt);
+  });
+});
+
+test("after a real merge the contact resolves to the survivor and shows the survivor's activity", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { person } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { mergeContacts } = await import("@/lib/identity/mergeDb");
+    const { activity } = await import("@/db/schema");
+    const merged = await seed(tx, { linkedin: false, activities: [] });
+    const [survivor] = await tx.insert(person).values({ firstName: "Lucía", lastName: "Fernández", companyKey: COMPANY_KEY }).returning();
+    await tx.insert(activity).values({ personId: survivor!.id, actorBdId: merged.meId, type: "email_sent", metadata: {}, createdAt: EMAIL_AT });
+    await mergeContacts(tx as never, survivor!.id, merged.personId, "test", merged.meId);
+    const [m] = await tx.select().from(person).where(eq(person.id, merged.personId));
+    assert.equal(m!.mergedIntoId, survivor!.id);
+    const { selectWhatsNewContacts } = await import("@/lib/whatsnew/queries");
+    const { parseDbTimestamp } = await import("@/lib/db/timestamp");
+    const rows = (await selectWhatsNewContacts(tx as never, merged.meId, [COMPANY_KEY])).filter((r) => r.id === merged.contactId);
+    assert.equal(rows.length, 1);
+    assert.equal(parseDbTimestamp(rows[0]!.lastMessageAt!).toISOString(), EMAIL_AT.toISOString());
+  });
+});

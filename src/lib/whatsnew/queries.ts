@@ -152,6 +152,11 @@ export async function selectWhatsNewContacts(database: typeof db, bdId: string, 
     (select ${companyAlias.companyKey} from ${companyAlias} where ${companyAlias.aliasKey} = ${contact.companyKey}),
     ${contact.companyKey}
   )`;
+  // The id-map join is the single source of the person for BOTH the LinkedIn input below and the
+  // `lastContactAtSql` argument in the select: change the join and both move together.
+  // No `merged_into_id is null` guard (unlike /outreach): `mergeContacts` repoints every id-map row to the
+  // survivor in the same transaction (`repointIdMapRows`, src/lib/identity/mergeDb.ts), so the map never
+  // points at a merged-away person. Pinned by tests/db/whatsnewLastContact.test.ts.
   const linkedinLastAt = sql`coalesce((select max(${personBdConnection.lastMessageAt}) from ${personBdConnection} where ${personBdConnection.personId} = ${personIdMap.personId}), ${contact.lastMessageAt})`;
   return await database
     .select({
