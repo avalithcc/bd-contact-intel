@@ -1,10 +1,11 @@
 import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { companyAlias, contact, jobPosting, syncRun, targetCompany } from "@/db/schema";
+import { companyAlias, contact, jobPosting, personBdConnection, personIdMap, syncRun, targetCompany } from "@/db/schema";
 import { resolveHiringCompanies } from "@/lib/hiring/queries";
 import type { MarketKey } from "@/lib/hiring/markets";
 import { isDormant } from "@/lib/queries";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
+import { lastContactAtSql } from "@/lib/outreach/lastContact";
 import {
   compareOutreachRows,
   isLeadershipRoleGroup,
@@ -131,6 +132,47 @@ interface ContactForRanking {
   lastMessageAt: Date | null;
   reciprocal: boolean;
   canonicalCompanyKey: string;
+}
+
+/**
+ * Query 5 of getWhatsNewFeed, split out so a db test can run it inside a rolled-back transaction.
+ *
+ * Contact-keyed (this BD's own legacy `contact` rows), so the person is resolved through `person_id_map`
+ * (legacy_table = 'contact'; PK on (legacy_table, legacy_id), so the left join cannot fan out). An unmapped
+ * contact has a NULL person id: its activity side is NULL and it falls back to its own LinkedIn date.
+ * `lastMessageAt` is `lastContactAtSql`, the same value /outreach shows: the LinkedIn input is the person's
+ * newest date across ALL BDs' connections (what /outreach aggregates), not just this contact row's.
+ */
+export async function selectWhatsNewContacts(database: typeof db, bdId: string, companyKeys: string[]) {
+  // Same alias-resolution idea as companyKeyFilter in src/lib/queries.ts,
+  // generalized to a set of canonical keys instead of one: a contact's
+  // free-text company_key may itself be an alias of one of these target
+  // companies rather than the canonical key.
+  const canonicalKeyExpr = sql<string>`coalesce(
+    (select ${companyAlias.companyKey} from ${companyAlias} where ${companyAlias.aliasKey} = ${contact.companyKey}),
+    ${contact.companyKey}
+  )`;
+  // The id-map join is the single source of the person for BOTH the LinkedIn input below and the
+  // `lastContactAtSql` argument in the select: change the join and both move together.
+  // No `merged_into_id is null` guard (unlike /outreach): `mergeContacts` repoints every id-map row to the
+  // survivor in the same transaction (`repointIdMapRows`, src/lib/identity/mergeDb.ts), so the map never
+  // points at a merged-away person. Pinned by tests/db/whatsnewLastContact.test.ts.
+  const linkedinLastAt = sql`coalesce((select max(${personBdConnection.lastMessageAt}) from ${personBdConnection} where ${personBdConnection.personId} = ${personIdMap.personId}), ${contact.lastMessageAt})`;
+  return await database
+    .select({
+      id: contact.id,
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      position: contact.position,
+      roleGroup: contact.roleGroup,
+      messageCount: contact.messageCount,
+      lastMessageAt: sql<Date | string | null>`${lastContactAtSql(personIdMap.personId, linkedinLastAt)}`,
+      reciprocal: contact.reciprocal,
+      canonicalCompanyKey: canonicalKeyExpr,
+    })
+    .from(contact)
+    .leftJoin(personIdMap, and(eq(personIdMap.legacyTable, "contact"), eq(personIdMap.legacyId, contact.id)))
+    .where(and(eq(contact.bdId, bdId), inArray(canonicalKeyExpr, companyKeys)));
 }
 
 /**
@@ -290,32 +332,12 @@ export async function getWhatsNewFeed(
   // job postings and target companies above are shared, cross-BD data.
   const contactsByCompany = new Map<string, ContactForRanking[]>();
   if (relevantCompanyKeys.length) {
-    // Same alias-resolution idea as companyKeyFilter in src/lib/queries.ts,
-    // generalized to a set of canonical keys instead of one: a contact's
-    // free-text company_key may itself be an alias of one of these target
-    // companies rather than the canonical key.
-    const canonicalKeyExpr = sql<string>`coalesce(
-      (select ${companyAlias.companyKey} from ${companyAlias} where ${companyAlias.aliasKey} = ${contact.companyKey}),
-      ${contact.companyKey}
-    )`;
-    const rows = await db // query 5 — BD-scoped
-      .select({
-        id: contact.id,
-        firstName: contact.firstName,
-        lastName: contact.lastName,
-        position: contact.position,
-        roleGroup: contact.roleGroup,
-        messageCount: contact.messageCount,
-        lastMessageAt: contact.lastMessageAt,
-        reciprocal: contact.reciprocal,
-        canonicalCompanyKey: canonicalKeyExpr,
-      })
-      .from(contact)
-      .where(and(eq(contact.bdId, bdId), inArray(canonicalKeyExpr, relevantCompanyKeys)));
+    const rows = await selectWhatsNewContacts(db, bdId, relevantCompanyKeys); // query 5 — BD-scoped
 
     for (const r of rows) {
       const list = contactsByCompany.get(r.canonicalCompanyKey) ?? [];
-      list.push(r);
+      // Raw `sql` timestamps arrive as strings: pin to a Date before the ranking helpers see it.
+      list.push({ ...r, lastMessageAt: r.lastMessageAt == null ? null : parseDbTimestamp(r.lastMessageAt) });
       contactsByCompany.set(r.canonicalCompanyKey, list);
     }
   }
