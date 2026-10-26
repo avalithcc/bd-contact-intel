@@ -220,7 +220,11 @@ test("undo removes the follow-up task it created while untouched, and leaves an 
 
     const second = await pendingMeeting(tx, contact.id, me.id);
     const b = await applyMeetingOutcome(second, me.id, input, TITLES, NOW, { database: tx });
-    await tx.update(task).set({ title: "Editada a mano", updatedAt: new Date(NOW.getTime() + 60_000) }).where(eq(task.id, b.followUpTaskId!));
+    // Anchor the edit to the row's OWN createdAt. createTask stamps that with the DATABASE clock while NOW is the
+    // test's logical time, so `NOW + 60s` can land days BEFORE createdAt and the untouched check then reads the edit
+    // as no edit at all — which is exactly how this test used to pass a bug instead of catching it.
+    const [beforeEdit] = await tx.select().from(task).where(eq(task.id, b.followUpTaskId!));
+    await tx.update(task).set({ title: "Editada a mano", updatedAt: new Date(beforeEdit.createdAt.getTime() + 60_000) }).where(eq(task.id, b.followUpTaskId!));
     await undoMeetingOutcome(second, me.id, NOW, { database: tx });
     assert.equal((await tx.select().from(task).where(eq(task.id, b.followUpTaskId!))).length, 1, "an edited task is the BD's own work now");
     assert.equal((await meetingRow(tx, second))?.status, "scheduled");

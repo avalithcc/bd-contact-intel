@@ -217,6 +217,13 @@ test("the auto-created follow-up task goes away on undo only while it is open an
   assert.equal(canRemoveFollowUpTask({ status: "open", createdAt: created, updatedAt: created }), true);
   assert.equal(canRemoveFollowUpTask({ status: "open", createdAt: created, updatedAt: new Date(created.getTime() + 30_000) }), false);
   assert.equal(canRemoveFollowUpTask({ status: "done", createdAt: created, updatedAt: created }), false);
+  // The other direction, which a plain `updatedAt - createdAt <= 1000` got wrong: an updatedAt BEFORE createdAt is a
+  // negative difference, and a negative number is <= 1000, so the row read as untouched and the edit was deleted.
+  assert.equal(canRemoveFollowUpTask({ status: "open", createdAt: created, updatedAt: new Date(created.getTime() - 30_000) }), false);
+  assert.equal(canRemoveFollowUpTask({ status: "open", createdAt: created, updatedAt: new Date(created.getTime() - 4 * 24 * 3600_000) }), false);
+  // The allowance itself stays symmetric and still admits the create write's own few milliseconds.
+  assert.equal(canRemoveFollowUpTask({ status: "open", createdAt: created, updatedAt: new Date(created.getTime() + 900) }), true);
+  assert.equal(canRemoveFollowUpTask({ status: "open", createdAt: created, updatedAt: new Date(created.getTime() - 900) }), true);
 });
 
 test("only meeting_logged moves the contact stage; every other meeting activity is status-neutral and not a touch", () => {
