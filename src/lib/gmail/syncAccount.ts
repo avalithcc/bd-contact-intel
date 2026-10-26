@@ -16,6 +16,7 @@ import {
   type KnownPersonEmail,
   type NeverLogRule,
 } from "./classify";
+import { looksLikeDeliveryReport } from "./automatedMessage";
 import { isTransientDbError } from "./bounceErrors";
 import { parseBounce, type ParsedBounce } from "./parseBounce";
 import { parseGmailMessage, type ParsedGmailMessage } from "./parseMessage";
@@ -80,6 +81,10 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
   const ids = [...messageIds];
   const rawMessages: ParsedGmailMessage[] = [];
   const bounces: ParsedBounce[] = [];
+  // Messages that CLAIM to be a delivery report (looksLikeDeliveryReport) and still yielded no bounce. An out-of-office never
+  // counts: it is automated but not a notification. A real one in an unexpected shape does (2026-10: three bounces were
+  // dropped for days with no trace), so the count is logged.
+  let unparsedAutomated = 0;
   // Ids we actually ASKED Gmail about. Distinct from `rawMessages.length`,
   // which counts only the ones that came back — see the cursor rule below.
   let attempted = 0;
@@ -103,11 +108,15 @@ export async function syncAccountIncremental(deps: SyncAccountDeps): Promise<Syn
       try {
         const bounce = parseBounce(raw);
         if (bounce) bounces.push(bounce);
+        else if (looksLikeDeliveryReport(raw.payload?.headers, raw.payload?.mimeType)) unparsedAutomated += 1;
       } catch {
         console.error("bounce parse failed for one notification; skipped");
       }
     }
   }
+
+  // Counts only, same rule as bounceQueries.ts#recordBounces: no address, subject, id or diagnostic ever reaches the log.
+  if (unparsedAutomated > 0) console.warn(`bounces: unparsed=${unparsedAutomated}`);
 
   const candidateAddresses = [
     ...new Set(

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseBounce } from "@/lib/gmail/parseBounce";
-import { ORIGINAL_ID, ORIGINAL_SUBJECT, exchangeNdr, failedWith, gmailDelay422, gmailHard511, outOfOffice, postfixTextBody } from "./bounceFixtures";
+import { ORIGINAL_ID, ORIGINAL_SUBJECT, exchangeNdr, failedWith, gmailDelay422, gmailHard511, outOfOffice, postfixTextBody, PROD_DSN_ADDRESS, PROD_DSN_ALIAS, PROD_DSN_ORIGINAL_ID, PROD_DSN_STATUS, prodDsn, prodDsnBodyAndChildren, prodDsnStructuredDiffers, withProse, prodDsnRelayed, type ProdDsnShape } from "./bounceFixtures";
 
 test("Gmail failure notification: hard, 5.1.1, mailbox not found, linked through In-Reply-To and the embedded original", () => {
   const b = parseBounce(gmailHard511());
@@ -147,4 +147,95 @@ test("parsing twice gives the same result and never touches the payload", () => 
   const before = JSON.stringify(m);
   assert.deepEqual(parseBounce(m), parseBounce(m));
   assert.equal(JSON.stringify(m), before);
+});
+
+// --- the production notification 1a16a2f1d04e80d7 (2026-10-23), in both shapes Gmail serves ----------------------------
+
+for (const shape of ["inline", "attachment", "children"] as ProdDsnShape[]) {
+  test(`production DSN, delivery-status ${shape}: a hard mailbox_not_found bounce for the failed address`, () => {
+    const b = parseBounce(prodDsn(shape));
+    assert.ok(b, "a null here is the production bug: a real notification dropped without a trace");
+    assert.equal(b.recipients.length, 1);
+    assert.equal(b.recipients[0]?.address, PROD_DSN_ADDRESS);
+    assert.equal(b.recipients[0]?.severity, "hard");
+    assert.equal(b.recipients[0]?.statusCode, "5.1.1");
+    assert.equal(b.recipients[0]?.reasonKey, "mailbox_not_found");
+  });
+
+  test(`production DSN, delivery-status ${shape}: it links to the original and keeps the sender checks' inputs`, () => {
+    const b = parseBounce(prodDsn(shape));
+    assert.ok(b);
+    assert.ok(b.linkRfcIds.includes(PROD_DSN_ORIGINAL_ID));
+    assert.equal(b.returnPath, "<>");
+    assert.equal(b.fromAddress, "mailer-daemon@googlemail.com");
+  });
+}
+
+// The attachment shape cannot express this: it hides the report, so there is nothing to respect.
+for (const shape of ["inline", "children"] as ProdDsnShape[]) {
+  test(`production DSN with a relayed (Status 2.0.0) report, ${shape}: still null, X-Failed-Recipients must not override a real report`, () => {
+    assert.equal(parseBounce(prodDsnRelayed(shape)), null);
+  });
+}
+
+test("report text is read only from the delivery-status part's own subtree: a quoted report in another text/plain is ignored", () => {
+  const m = prodDsnRelayed("children");
+  const quoted = "Final-Recipient: rfc822; otra.persona@acme-ejemplo.test\nAction: failed\nStatus: 5.1.1\nDiagnostic-Code: smtp; 550 5.1.1 User Unknown";
+  m.payload!.parts!.push({ mimeType: "text/plain", body: { data: Buffer.from(quoted, "utf8").toString("base64url") } });
+  assert.equal(parseBounce(m), null);
+});
+
+for (const shape of ["inline", "children"] as ProdDsnShape[]) {
+  test(`${shape} shape: address, code and original recipient come from the structured report, not from the prose`, () => {
+    const r = parseBounce(prodDsnStructuredDiffers(shape))?.recipients[0];
+    assert.equal(r?.statusCode, "5.1.2", "the prose says 5.1.1: only the report says 5.1.2");
+    assert.equal(r?.reasonKey, "domain_not_found");
+    assert.equal(r?.originalAddress, PROD_DSN_ALIAS, "only the report has an Original-Recipient");
+  });
+}
+
+test("attachment shape: the fallback names the address and hard severity from the header and the text", () => {
+  const r = parseBounce(prodDsn("attachment"))?.recipients[0];
+  assert.equal(r?.address, PROD_DSN_ADDRESS);
+  assert.equal(r?.severity, "hard");
+});
+
+test("attachment shape without X-Failed-Recipients: nothing names an address, so it is null", () => {
+  assert.equal(parseBounce(withProse(prodDsn("attachment"), "550 5.1.1 User Unknown", null)), null);
+});
+
+test("attachment shape with a delay subject is soft", () => {
+  const m = prodDsn("attachment");
+  m.payload!.headers = m.payload!.headers!.map((h) => (h.name === "Subject" ? { ...h, value: "Delivery Status Notification (Delay)" } : h));
+  assert.equal(parseBounce(m)?.recipients[0]?.severity, "soft");
+});
+
+const FIRST = "a@acme-ejemplo.test";
+const SECOND = "b@acme-ejemplo.test";
+const MIXED = `${FIRST}: 550 5.1.1 User Unknown\n${SECOND}: 552 5.2.2 mailbox full`;
+
+test("fallback with several failed addresses: a scraped code is unattributable, so none is hard and none carries the code", () => {
+  const b = parseBounce(withProse(prodDsn("attachment"), MIXED, `${FIRST}, ${SECOND}`));
+  assert.deepEqual(b?.recipients.map((r) => [r.address, r.severity, r.statusCode]), [[FIRST, "soft", null], [SECOND, "soft", null]]);
+});
+
+test("fallback with ONE failed address still reads the scraped code: 5.1.1 is hard", () => {
+  const r = parseBounce(withProse(prodDsn("attachment"), `${FIRST}: 550 5.1.1 User Unknown`, FIRST))?.recipients[0];
+  assert.equal(r?.severity, "hard");
+  assert.equal(r?.statusCode, "5.1.1");
+});
+
+test("fallback with several addresses and a success code is still no bounce", () => {
+  assert.equal(parseBounce(withProse(prodDsn("attachment"), "250 2.0.0 OK", `${FIRST}, ${SECOND}`)), null);
+});
+
+test("a delivery-status part with its own body AND text/plain children: the body is read first and wins for a repeated address", () => {
+  const children = PROD_DSN_STATUS.replace("Status: 5.1.1", "Status: 4.2.2").replace("Action: failed", "Action: delayed");
+  const r = parseBounce(prodDsnBodyAndChildren(PROD_DSN_STATUS, children))?.recipients[0];
+  assert.equal(r?.statusCode, "5.1.1");
+  assert.equal(r?.severity, "hard");
+});
+
+test("the Postfix text-only fallback keeps working: no delivery-status part at all", () => {
+  assert.equal(parseBounce(postfixTextBody())?.recipients[0]?.address, "bob@viejo-ejemplo.test");
 });

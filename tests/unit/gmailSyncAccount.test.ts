@@ -6,14 +6,14 @@
  * Run with: npx tsx --test tests/unit/gmailSyncAccount.test.ts
  */
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { mock, test } from "node:test";
 import { syncAccountIncremental, type SyncAccountDeps } from "@/lib/gmail/syncAccount";
 import type { GmailClient, GmailHistoryResult } from "@/lib/gmail/client";
 import type { GmailApiMessage } from "@/lib/gmail/parseMessage";
 import type { ClassifiedMessage, KnownPersonEmail, NeverLogRule } from "@/lib/gmail/classify";
 import type { ParsedBounce } from "@/lib/gmail/parseBounce";
 import { isContentionDbError, isTransientDbError } from "@/lib/gmail/bounceErrors";
-import { gmailHard511, outOfOffice } from "./bounceFixtures";
+import { PROD_DSN_ADDRESS, gmailHard511, outOfOffice, prodDsn, prodDsnRelayed } from "./bounceFixtures";
 
 function b64url(text: string): string {
   return Buffer.from(text, "utf8").toString("base64url");
@@ -331,6 +331,43 @@ test("a delivery notification is handed to recordBounces even though no Contact 
   assert.equal(seen[0]![0]!.recipients[0]!.address, "lucia@acme-ejemplo.test");
   assert.deepEqual(written, [], "the notification itself is never stored as an email_message");
   assert.equal(result.newHistoryId, "400");
+});
+
+async function warningsOf(run: () => Promise<unknown>): Promise<string[]> {
+  const warn = mock.method(console, "warn", () => {});
+  try {
+    await run();
+    return warn.mock.calls.map((c) => String(c.arguments[0]));
+  } finally {
+    warn.mock.restore();
+  }
+}
+
+test("a delivery-report-shaped message that parseBounce reads as no bounce is logged as a bare count: no address, id or subject", async () => {
+  const client = fakeClient({ historyPages: historyFor("dsn-r"), messagesById: { "dsn-r": prodDsnRelayed() } });
+  const lines = await warningsOf(() => syncAccountIncremental(baseDeps({ client })));
+  assert.deepEqual(lines, ["bounces: unparsed=1"]);
+  assert.ok(!lines.join("\n").includes("acme-ejemplo"));
+});
+
+test("an out-of-office is automated but not a delivery report: no unparsed line", async () => {
+  const client = fakeClient({ historyPages: historyFor("ooo-1"), messagesById: { "ooo-1": outOfOffice() } });
+  assert.deepEqual(await warningsOf(() => syncAccountIncremental(baseDeps({ client }))), []);
+});
+
+test("no unparsed line when every automated message yielded a bounce, or when there are none", async () => {
+  const withBounce = fakeClient({ historyPages: historyFor("dsn-1"), messagesById: { "dsn-1": gmailHard511() } });
+  assert.deepEqual(await warningsOf(() => syncAccountIncremental(baseDeps({ client: withBounce }))), []);
+  const plain = fakeClient({ historyPages: historyFor("m-1"), messagesById: { "m-1": fixtureRawMessage("m-1", "a@x.test", "b@y.test") } });
+  assert.deepEqual(await warningsOf(() => syncAccountIncremental(baseDeps({ client: plain }))), []);
+});
+
+test("a notification recorded from the attachment shape is not counted as unparsed", async () => {
+  const client = fakeClient({ historyPages: historyFor("1a16a2f1d04e80d7"), messagesById: { "1a16a2f1d04e80d7": prodDsn("attachment") } });
+  const seen: ParsedBounce[][] = [];
+  const lines = await warningsOf(() => syncAccountIncremental(baseDeps({ client, recordBounces: async (b) => void seen.push([...b]) })));
+  assert.deepEqual(lines, []);
+  assert.equal(seen[0]?.[0]?.recipients[0]?.address, PROD_DSN_ADDRESS);
 });
 
 test("an out-of-office is not handed to recordBounces", async () => {

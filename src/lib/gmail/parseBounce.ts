@@ -132,6 +132,13 @@ export function parseBounce(message: GmailApiMessage): ParsedBounce | null {
     if (mime === "message/delivery-status") {
       if (p.headers?.length) statusBlocks.push(fieldsOfHeaders(p.headers));
       statusBlocks.push(...blocksOfText(textOf(p)));
+      // Gmail may also serve the RFC 3464 groups as text/plain CHILDREN of this part. Only this part's own subtree is read as
+      // report text, never a text/plain elsewhere in the message (a person's reply could quote "Final-Recipient: ...").
+      for (const child of p.parts ?? []) {
+        walk(child, (c) => {
+          if ((c.mimeType ?? "").toLowerCase() === "text/plain") statusBlocks.push(...blocksOfText(textOf(c)));
+        });
+      }
     } else if (mime === "message/rfc822") {
       if (p.headers?.length) originals.push(fieldsOfHeaders(p.headers));
     } else if (mime === "text/rfc822-headers") {
@@ -162,15 +169,30 @@ export function parseBounce(message: GmailApiMessage): ParsedBounce | null {
     add({ address, originalAddress: originalAddress && originalAddress !== address ? originalAddress : null, severity, statusCode, reasonKey: bounceReasonKey(statusCode, diagnostic), diagnostic });
   }
 
-  if (recipients.length === 0 && statusBlocks.length === 0) {
-    // Fallback for MTAs that attach no machine-readable report: the header names the address, the text carries the code.
+  // A block only counts as a machine-readable report when it names a recipient. Gmail can serve the delivery-status part as
+  // an attachment (no body, one Content-Type header): that is a non-empty block with nothing in it, and it must not switch the
+  // fallback off. A report that DID name a recipient but was dropped by severityOf (relayed, delivered, 2.x.x) still does: its
+  // verdict is "not a failure", and a stale X-Failed-Recipients must not override it.
+  const reported = statusBlocks.some((b) => b.has("final-recipient") || b.has("original-recipient"));
+  if (recipients.length === 0 && !reported) {
+    // Fallback for MTAs that attach no usable machine-readable report: the header names the address, the text carries the code.
     const failed = extractEmailAddresses(top.get("x-failed-recipients"));
     const text = `${plainText}\n${message.payload?.body?.data ? decode(message.payload.body.data) : ""}`;
-    const statusCode = STATUS_CODE.exec(text)?.[1] ?? null;
     const delayed = /\(delay\)|delayed|warning/i.test(top.get("subject") ?? "");
-    const snippet = statusCode ? (new RegExp(`.{0,60}${statusCode.replace(/\./g, "\\.")}.{0,120}`).exec(text)?.[0].trim() ?? "") : text.trim().slice(0, MAX_DIAGNOSTIC);
-    const diagnostic = snippet ? clean(snippet).slice(0, MAX_DIAGNOSTIC) : null;
-    const severity = severityOf(delayed ? "delayed" : "failed", statusCode, diagnostic);
+    const action = delayed ? "delayed" : "failed";
+    const scrapedCode = STATUS_CODE.exec(text)?.[1] ?? null;
+    const snippet = scrapedCode ? (new RegExp(`.{0,60}${scrapedCode.replace(/\./g, "\\.")}.{0,120}`).exec(text)?.[0].trim() ?? "") : text.trim().slice(0, MAX_DIAGNOSTIC);
+    const scrapedDiagnostic = snippet ? clean(snippet).slice(0, MAX_DIAGNOSTIC) : null;
+    // A code scraped from prose cannot be attributed to one of SEVERAL addresses ("a: 550 5.1.1 ... b: 552 5.2.2 mailbox full"):
+    // only the structured per-recipient report can. With more than one address the scraped evidence is withheld, so severityOf
+    // (still the single source of the severity rule) sees none and answers soft: every address is recorded, none is suppressed.
+    // A wrongly hard bounce kills a live contact for good; a soft one only waits for a clearer notification. Evidence that
+    // severityOf would already reject (a 2.x code) still yields no bounce at all, as with a single address.
+    const attributable = failed.length <= 1;
+    const statusCode = attributable ? scrapedCode : null;
+    const diagnostic = attributable ? scrapedDiagnostic : null;
+    const scraped = severityOf(action, scrapedCode, scrapedDiagnostic);
+    const severity = scraped && !attributable ? severityOf(action, null, null) : scraped;
     if (severity) for (const address of failed) add({ address, originalAddress: null, severity, statusCode, reasonKey: bounceReasonKey(statusCode, diagnostic), diagnostic });
   }
   if (recipients.length === 0) return null;
