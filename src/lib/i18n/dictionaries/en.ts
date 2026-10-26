@@ -255,7 +255,10 @@ export const en = {
   leadStatuses,
 
   // App shell sidebar/topbar (design.md D9, fresh-review fix on tasks.md
-  // 8.2).
+  // 8.2). The nav item labelled "Who to contact" (mirrors the Spanish "A quién
+  // contactar", see es.ts) opens /contacts?view=outreach; its internal key
+  // stays `nav.outreach`. The separate /outreach route is not linked from the
+  // nav. The Sequences/Scheduled eyebrow is "Sends", not "Outreach".
   nav: {
     workspaceSection: "CENTRAL",
     signalsSection: "AREAS",
@@ -266,7 +269,7 @@ export const en = {
     meetings: "Meetings",
     sequences: "Sequences",
     scheduled: "Scheduled",
-    outreach: "Outreach",
+    outreach: "Who to contact",
     hiring: "Hiring",
     whatsNew: "What's New",
     discovery: "Discovery",
@@ -1039,7 +1042,7 @@ export const en = {
     toastScheduleCancelled: "Send cancelled.",
     toastScheduleSaved: "Changes saved.",
     toastScheduleSendNow: "It goes out within the next minute.",
-    schedPageEyebrow: "Outreach",
+    schedPageEyebrow: "Sends",
     schedPageTitle: "Scheduled emails",
     schedPageIntro: "1:1 emails you wrote that go out later from your own Gmail account.",
     schedPageOnlyYours: "You only see your own",
@@ -3849,7 +3852,7 @@ export const en = {
     unitContactMany: "contacts",
     unitCompanyOne: "company",
     unitCompanyMany: "companies",
-    listEyebrow: "Outreach",
+    listEyebrow: "Sends",
     listTitle: "Sequences",
     listIntroLead: "Batches of 1:1 emails to contacts you picked by hand, sent from your own Gmail account.",
     listIntroStrong: "You only see your own",
