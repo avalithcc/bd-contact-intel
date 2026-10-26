@@ -33,6 +33,9 @@ and the per-feature usage table. Treat them as unverified at today's date.
 
 ## Where we actually are
 
+(Note 2026-10-26: the tables and counts in this section were measured on
+2026-10-01/03 and are stale. They were not re-measured; read them as that old.)
+
 Almost everything in the database arrived by import, but it is **no longer
 true that nothing was produced by a BD working in the app**: since 2026-09-30
 Mariel and Macarena have logged calls, meetings, tasks, a discard, notes and
@@ -413,8 +416,10 @@ never run". The key is present in `.env.local` (name checked 2026-10-01, value
 not read), and production has an `audit_log` row `bd_password_reset` at
 2026-09-29 12:53 UTC whose target is the owner's own account — the smoke test
 this entry asked for was done.) The row's note records that it ran before the
-custom SMTP existed; whether a reset was re-run end to end after the SMTP
-switch is unverified. Remaining owner action: none known for this script.
+custom SMTP existed. (Corrected 2026-10-26: the "re-run after the SMTP switch"
+question is obsolete — Resend replaced HostGator SMTP (`1557ca7d`), so a re-run
+against the old transport would prove nothing.) Remaining owner action: none
+known for this script.
 
 ### gmail-connection
 Every BD needs to connect their own Gmail account before they can send
@@ -439,7 +444,8 @@ Runs via Supabase `pg_cron` every 15 minutes (`net.http_get`,
 carries `timeout_milliseconds := 60000` (#224), and 12 runs succeeded in the 3
 hours before 01:45 UTC. (`vercel.json` also schedules `/api/gmail/sync` once a
 day at 12:00 UTC as a second trigger; why both exist was not investigated:
-unverified.) This is what lets `person.status` reach `replied` from an inbound
+unverified. Resolved 2026-10-26: `vercel.json` keeps a daily fallback, and the
+sub-daily runs are Supabase `pg_cron`, which fires every 2 minutes.) This is what lets `person.status` reach `replied` from an inbound
 signal — previously nothing captured inbound mail. Measured 2026-10-01:
 322 rows in `email_message`; 209 `email_sent` and 187 `reply_received`
 activities carry `metadata.source = 'gmail_sync'`.
@@ -531,8 +537,13 @@ Still gaps in the send path, re-checked 2026-10-01 (`rg` finds no
   contacts of the same company, "Cc" only @avalith.net, one activity per Para
   contact. Migration 0053 and `scripts/sql/email-attachments-bucket.sql`
   applied to production the same day. Scheduling WITH files needs
-  `SUPABASE_SERVICE_ROLE_KEY` in Vercel (owner to add). Unverified until the
-  first real send: Gmail's upload endpoint and Supabase direct upload. ~~A multi-recipient `To`
+  `SUPABASE_SERVICE_ROLE_KEY` in Vercel. (Verified 2026-10-26 in production:
+  2 real sends with PDF attachments on 2026-10-20 — one scheduled at 07:33, one
+  direct at 13:33; the activities carry `metadata.attachments` and storage
+  cleanup worked, `removed_at` is set. 8 scheduled emails exist, all sent, none
+  failed. The key is set in Vercel Production only, NOT Preview, so previews
+  cannot schedule sends with files. Cc / multi-recipient has never been used
+  yet. Recipient-side rendering remains unverifiable from the DB.) ~~A multi-recipient `To`
   string passes the guard~~ — fixed 2026-10-18: `buildRawMessage` and
   `assertSafeSendInput` call `assertRecipients`, so a new email, a scheduled
   send and sequences reject a list or a malformed address (`invalid_recipient`;
@@ -624,7 +635,8 @@ slice 1 #258, 2 #259, 3 #260, 4 #263, 5 #264, 6 #266. **Measured in production
 2026-10-01: 71 columns of type `timestamp with time zone` and 0 of type
 `timestamp without time zone` in the `public` schema — 71 of 71.** The
 `drizzle.__drizzle_migrations` table holds 36 rows, matching the 36 journal
-entries, and its latest `created_at` equals the journal's last `when`. The
+entries (as of 2026-10-01; see the 2026-10-26 reconciliation under **Known
+defects → drizzle journal is future-dated**), and its latest `created_at` equals the journal's last `when`. The
 "run local checks with `TZ=UTC`" advice is obsolete: `npm run test:unit`
 (2,317 tests) passes unchanged under `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`
 and `TZ=Asia/Tokyo` (run 2026-10-01). Standing consequence for anyone adding a
@@ -873,6 +885,11 @@ an Exchange/M365 `550 5.4.1` stays a soft bounce; NDRs from
 historical bounces.
 Owner decision 2026-10-19: the Exchange/M365 `550 5.4.1` stays a soft bounce and
 there is no historical bounce backfill, for now.
+(Measured 2026-10-26, verified read-only against production: since #413 only 1
+bounce is recorded — a hard `5.1.1` at 2026-10-26 13:40 UTC — suppression is in
+place and 0 mail was sent to that address afterwards. 0 `5.4.1` / soft bounces
+are recorded, so the soft-bounce trade-off above is not yet exercised.
+Re-measure in a week.)
 
 ### Lusha phone reveal: measured 2026-10-15, three findings from the real shape
 
@@ -921,7 +938,9 @@ The shape, which had never been seen:
 Owner decision 2026-10-18: keep the current behaviour for `doNotCall` (warning only,
 no block).
 
-### Lusha per BD: enable/disable from admin, and a consumption report — shipped 2026-10-16, cap still global
+### Lusha per BD: enable/disable from admin, and a consumption report — shipped 2026-10-16, cap per BD since #392/#393
+(Corrected 2026-10-26: the "cap still global" status below is superseded — the
+cap is now per BD (#392) with an editor (#393), verified 2026-10-26.)
 
 **Status 2026-10-18 (checked in code): the switch and the consumption report
 are both shipped** (merge `2d517df6`, "lusha-per-bd"). `bd.lusha_enabled`
@@ -931,7 +950,8 @@ flipped from `/admin/lusha` (`LushaSwitch.tsx`, `setLushaEnabled` in
 screen holds the per-BD usage report by week/month/quarter
 (`src/lib/lusha/usageReport.ts`). **Still open:** the daily cap is still the
 global module constant (`src/lib/lusha/cap.ts`); a per-BD cap was never decided.
-Owner decision 2026-10-18: the daily cap stays global.
+Owner decision 2026-10-18: the daily cap stays global. (Superseded 2026-10-26:
+per-BD cap #392 + editor #393 shipped after this decision.)
 The original brief follows.
 
 Owner decision, 2026-10-15: **a new BD starts DISABLED.** Access to a paid
@@ -951,7 +971,7 @@ Two things to settle when this is picked up:
   wrong. A column on `bd`, or a small settings table, is the obvious
   alternative; unverified which fits the existing admin screens better.
 - Whether the cap is global (as today) or per BD too. The owner has not been
-  asked. Note that a per-BD cap and a global cap answer different questions:
+  asked. (Resolved: per BD, #392/#393.) Note that a per-BD cap and a global cap answer different questions:
   one stops a person, the other stops the invoice.
 
 ### Admins read another BD's conversation inline, with no click and no audit row
@@ -1045,7 +1065,14 @@ what the owner would see).
   below; the "11 pairs" figure recorded here previously is stale (see that
   entry for why and for the current count).
 
-### company-contact-counts
+### company-contact-counts — resolved (obsolete as written)
+(Resolved 2026-10-26, verified against `main` and production: `main` already
+carries the same fix as `80c883db` (2026-10-09); the record count at
+`src/lib/companies/queries.ts:119-122` uses `companyContactsCondition`;
+`company_alias` has 62 rows, not 0; 0 companies show a wrong count. The branch
+`fix/company-contact-count-alias` was obsolete and its remote was deleted on
+2026-10-26 (owner-approved). The entry below is history.)
+
 The `/companies` list's "Contactos" column and the company record's contacts
 card match `person.company_key` directly instead of resolving through
 `company_alias`, so both undercount. **Latent today** — `company_alias` has 0
@@ -1064,7 +1091,17 @@ day (#247) — see **Shipped** above for the three bugs and their fixes.
 ### duplicates queue — 244 open, 98 merged, 2 dismissed (re-measured 2026-10-01)
 **Superseded 2026-10-19 (re-measured in production):** 0 open, 333 merged, 2 dismissed. The 244 were merged on 2026-10-07 (11) and 2026-10-08 (224); `/admin/duplicates` now shows an empty queue and only the merge history (with undo). The 2026-10-18 "joint review" deferral applies only to the 230 nameless contacts. The rest of this section is history.
 Owner decision 2026-10-18: deferred for a joint human review later (with the 230 nameless
-contacts); stays TODO.
+contacts); stays TODO. (Corrected 2026-10-26: that deferral no longer covers this
+queue — it is empty. What is still open is only the 230 nameless contacts and
+company-key alias duplicates; see the re-scan note below.)
+**Duplicate re-scan (#403) — working, verified 2026-10-26 (read-only, production):**
+4 `duplicates_rescan` audit rows — manual 2026-10-23 found 32 and created 30;
+cron 2026-10-24 created 1; 2026-10-25 and 2026-10-26 created 0. All 31 new
+candidates are resolved (364 merged in total, 2 `not_duplicate`, 0 open). Still
+open, and the only parts of this item that are: (1) company-key alias
+duplicates — the two Roberto Gorchs sit under `andina` vs `andina tech`, both
+real `company` rows with no alias between them, and a prefix heuristic finds 59
+same-name groups of this kind; (2) the 230 nameless contacts.
 Previously recorded as 353 open pairs with a recommendation to dismiss 9
 pairs whose two sides had different **verified** emails, on the premise that
 two differing verified emails mean two different people. **That premise was
@@ -1177,7 +1214,9 @@ Two pieces of work, and they were independent — both are done:
   `src/lib/identity/restoreNormalizedMergedPhones.ts`, never guesses a country,
   same audit row and revert as `restore-merged-phones.ts`. **Not yet run on
   production:** the orchestrator runs the dry run, then executes after
-  approval); the merge happened 2026-09-30
+  approval. Executed — verified 2026-10-26: a second `restore_merged_phones_run`
+  audit row exists at 2026-10-19 20:33, and a read-only replan finds 0
+  restorable survivors, 0 unresolved, 0 conflicts); the merge happened 2026-09-30
    22:11 UTC, before the fix. (Corrected 2026-10-01: this said "recover the 35";
    the real figure is 34 recovered plus 1 invalid.)
 2. **Stop it recurring — done (#272).** Both phone columns are in
@@ -1231,7 +1270,10 @@ against production, which had 24 task rows on 2026-10-01).
 Not measured: no production query was run, because there is no data-shaped
 trigger to look for.
 
-### task.lead_id and task.contact_id — dead legacy columns, recommendation: drop both
+### task.lead_id and task.contact_id — dead legacy columns, recommendation: drop both — DONE (applied; verified 2026-10-26)
+(Done, verified 2026-10-26: migration 0050 is applied to production — the
+reconciliation's object check of that date confirmed the columns are gone. The
+"NOT yet applied" line below is history.)
 Same shape for both columns, no user can reach either. `task.contact_id`
 (`src/db/schema.ts:1175`, indexed as `task_contact_idx` at `schema.ts:1198`) and
 `task.lead_id` (`schema.ts:1171`, `task_lead_idx` at `:1196`) are **selected** on
@@ -1264,7 +1306,8 @@ the first measured one. A new migration will also need a hand-set journal `when`
 — see **drizzle journal is future-dated** below.
 Owner decision 2026-10-18: drop APPROVED. Code commit (reads/writes removed) and
 migration `drizzle/0050_task_drop_legacy_subject_columns.sql` (+ `_rollback.sql`) are
-built; NOT yet applied to production.
+built; NOT yet applied to production. (Applied since: verified 2026-10-26, see
+the heading above.)
 
 ### hotel-phone-dial-codes — 15 contacts whose dial code disagrees with their country (2026-10-01)
 The hotel import stored each number as it arrived and flagged rows whose dial
@@ -1315,6 +1358,10 @@ Hoteldirektor, Hotelmanager, Generaldirektor, whole-title `Direktor`), tested in
 --actor=<bd id>`); for runs of up to 500 rows its audit row now also stores
 `changes` (`{id, from, to}`) so the run reverts exactly. **Remaining for the
 orchestrator:** run the dry run on production, then `--execute` after approval.
+(Closed 2026-10-26: already run — `backfill_person_role_groups` audit rows exist
+from 2026-10-02, verified read-only against production. The fixed classifier
+would change 0 of the 147 live hotel persons, and 0 titles match the German
+regex, so there is nothing left to recompute.)
 
 **Correction to the README's headline finding** (2026-10-01, after #284): the
 README says 51 of 147 hotel contacts do not appear in Mariel's default view,
@@ -1373,6 +1420,17 @@ than 1792527871556; `drizzle-kit generate` stamps the current time and would be
 skipped. `tests/unit/drizzleJournal.test.ts` enforces strictly increasing `when`
 and its failure message says how to fix it (`src/lib/migration/journalWhen.ts`,
 #279). Nothing to fix; recorded so nobody rediscovers it by losing a migration.
+
+**Ledger reconciled 2026-10-26 (verified against production).** Migrations
+0045–0058 had been applied by hand and were missing from
+`drizzle.__drizzle_migrations`, and 0059 carried a placeholder hash. They were
+reconciled on 2026-10-26 in one guarded transaction (28 object checks first). The
+ledger is now **62 rows = 62 files**, hashes and `created_at` in journal order.
+The ledger's max `created_at` is **1794774000000 (2026-11-15)**, so a new
+migration's `when` must exceed it (the 1792527871556 / 2026-10-20 figures above
+are history). A unit test guarding this is being added on branch
+`chore/test-discipline`. Any entry elsewhere in this file that says a migration
+is "not yet applied" or unrecorded predates this reconciliation.
 
 ### `db:migrate` could not build the database from empty — fixed 2026-10-13: use `db:migrate`, never `db:push` (2026-10-13)
 The first three paragraphs are the finding as first written, kept as history; the
@@ -1914,7 +1972,8 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
     **0**. The 1,736 contacts that changed address were a POPULATION count, never a
     regeneration queue.
 - ~~**The unsubscribe page was English for every recipient**~~ **Fixed on branch
-  `feat/unsubscribe-language`** (commits `fe854854`, `8a927cb4`; not yet merged). We mail a
+  `feat/unsubscribe-language`** (commits `fe854854`, `8a927cb4`; ~~not yet merged~~
+  shipped — merged as #376 and #414, verified 2026-10-26). We mail a
   Spanish-speaking contact in Spanish and the CAN-SPAM opt-out page they land on was in
   English. `unsubscribeQueries.ts:130` already resolved the recipient's FULL audience —
   postal address AND language — and threw the language away.
@@ -2105,7 +2164,7 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   having no footer check shipped as #375 (main `8a095603`). The unsubscribe page being
   hard-wired to English (`unsubscribeHtml.ts:13` was `t("en")` at module level, and
   `unsubscribeRequest.ts:33` hard-coded `<html lang="en">`) is fixed on
-  `feat/unsubscribe-language` — see **Open, noted 2026-10-20**. Also: `person.country` can only ever hold "United States" or one
+  `feat/unsubscribe-language` (merged as #376/#414, verified 2026-10-26) — see **Open, noted 2026-10-20**. Also: `person.country` can only ever hold "United States" or one
   of the 15 LATAM country names, because `splitLocation`
   (`src/lib/contacts/locationSplit.ts:21`) writes a country only when the last
   token passes `isKnownCountryName` (`src/lib/hiring/markets.ts:437-441`) — so a
@@ -2149,8 +2208,9 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   boolean and `classifyMarket` checks `LATAM_RULES` before `US_RULES` and
   RETURNS, so evaluation ORDER is the tie-breaker and a full country name weighs
   exactly as much as a bare ambiguous 2-letter code.
-  **Fixed as a constants-only change** on `fix/hiring-market-constants` (pending
-  fresh-context review and the person-impact gate): US tokens `in` removed (239
+  **Fixed as a constants-only change** on `fix/hiring-market-constants` (~~pending
+  fresh-context review and the person-impact gate~~ merged as #379, verified
+  2026-10-26): US tokens `in` removed (239
   rows, 70 openIT, 50 freshIT — ~130 India, 43 `"In-Office"`, ~56
   `"Anywhere in France"`-style; real Indiana is 3 rows, none live), `de` removed
   (113 / 8 / 3 — Germany, French `"Hauts-de-France"`, Spanish
@@ -2253,6 +2313,10 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   `0055_email_account_drop_reconnect_banner.sql` (DROP COLUMN IF EXISTS) with
   `0055_email_account_drop_reconnect_banner_rollback.sql` (not journaled).
   **Not yet applied to production:** deploy the code first, then apply 0055.
+  (Corrected 2026-10-26: 0045–0058 were applied by hand and are now recorded in
+  `drizzle.__drizzle_migrations` — the ledger was reconciled on 2026-10-26 and
+  holds 62 rows = 62 files; see **drizzle journal is future-dated**. The
+  "not yet applied" line is history.)
   (Checked 2026-10-18:
   only declared, `src/db/schema.ts:1411`, and created/retyped by migrations
   0027 and 0033; nothing in `src/` reads or writes it, and 0 production rows
