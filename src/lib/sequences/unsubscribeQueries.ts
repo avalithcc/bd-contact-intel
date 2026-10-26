@@ -109,23 +109,26 @@ export async function suppressByToken(tokenHash: string): Promise<{ email: strin
 
 /**
  * What the unsubscribe page needs about the recipient: the postal address AND the language their own email carried, i.e.
- * their compliance audience (complianceAudience.ts), found from the token the same way the draft found it (person country,
- * company country, postings, phone). One read, no writes: the GET path is typed read-only on purpose. Undefined for an
- * unknown token or a contact with no audience: the page then shows no address (never another country's) and English.
+ * their compliance audience (complianceAudience.ts) found from the token (person country, company country, postings, phone),
+ * UNLESS a person recorded the draft's language on the member (sequence_member.draft_language), which wins for the language
+ * only: the address is always the audience's. Both come from the one statement below; unsubscribePageAudience decides. One
+ * read, no writes: the GET path is typed read-only on purpose. Undefined for an unknown token or a contact with neither an
+ * audience nor a chosen language: English and no address (never another country's). A chosen language with no audience
+ * gives that language and no address.
  */
 export async function unsubscribeAudienceForToken(tokenHash: string): Promise<UnsubscribePageAudience | undefined> {
   const rows = (await db.execute(sql`
-    select p.country as person_country, p.mobile_phone, p.phone,
+    select sm.draft_language, p.country as person_country, p.mobile_phone, p.phone,
            ${companyCountrySql} as company_country,
            coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets
     from sequence_unsubscribe_token t
     join sequence_member sm on sm.id = t.sequence_member_id
     join person p on p.id = sm.person_id
     where t.token_hash = ${tokenHash}
-    limit 1`)) as unknown as { person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }[];
+    limit 1`)) as unknown as { draft_language: string | null; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }[];
   const row = rows[0];
   if (!row) return undefined;
-  return unsubscribePageAudience({ mobilePhone: row.mobile_phone, phone: row.phone, personCountry: row.person_country, companyCountry: row.company_country, postingMarkets: row.posting_markets });
+  return unsubscribePageAudience({ mobilePhone: row.mobile_phone, phone: row.phone, personCountry: row.person_country, companyCountry: row.company_country, postingMarkets: row.posting_markets }, row.draft_language);
 }
 
 /** The port the unsubscribe route (PR 13) is given. */
