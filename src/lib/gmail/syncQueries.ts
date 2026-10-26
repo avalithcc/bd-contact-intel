@@ -11,6 +11,8 @@ import { activity, emailAccount, emailMessage, emailMessagePerson, person } from
 import { needsReconnectForSync } from "./needsReconnectForSync";
 import { getNeverLogRules } from "./neverLog";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
+import { isOwnerTouchType } from "@/lib/identity/ownerOnTouch";
+import { transferOwnersOnTouch } from "@/lib/identity/ownerOnTouchDb";
 import { verifyRepliedAddressesInTx } from "./inboundReplyVerificationDb";
 import { executeSyncedMessageWrite, type SyncWriteStore } from "./syncWriteCore";
 import { chunk, WRITE_BATCH_SIZE } from "@/lib/migration/collapseWriteRows";
@@ -256,6 +258,11 @@ function txSyncStore(tx: SyncTransaction): SyncWriteStore {
         .values(rows.map((r) => ({ personId: r.personId, type: r.type, actorBdId: bdId, metadata: r.metadata })))
         .returning({ personId: activity.personId });
       await recomputePersonStatuses(tx, inserted.map((r) => r.personId!));
+      await transferOwnersOnTouch(
+        tx,
+        rows.filter((r) => r.personId && isOwnerTouchType(r.type)).map((r) => r.personId!),
+        bdId,
+      );
     },
     verifyRepliedAddresses: (candidates) => verifyRepliedAddressesInTx(tx, candidates),
   };

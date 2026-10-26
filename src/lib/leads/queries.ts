@@ -22,6 +22,7 @@ import {
   withIdentityLock,
 } from "@/lib/identity/resolveDb";
 import { recomputePersonStatus } from "@/lib/status/recompute";
+import { transferOwnersOnTouch } from "@/lib/identity/ownerOnTouchDb";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 // Cap on whitespace-separated search tokens in the free-text name filter, so
@@ -486,7 +487,10 @@ export async function updateLeadStatus(
       .returning({ personId: activity.personId });
     // Task 5.2: same transaction as the activity write — a status_change
     // activity is itself stage/discard evidence (design D4).
-    if (inserted?.personId) await recomputePersonStatus(tx, inserted.personId);
+    if (inserted?.personId) {
+      await recomputePersonStatus(tx, inserted.personId);
+      await transferOwnersOnTouch(tx, [inserted.personId], updatedByBdId ?? null);
+    }
   });
 }
 

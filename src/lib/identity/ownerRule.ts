@@ -5,8 +5,9 @@
  * did. Connection seniority survives only as a tie-breaker and as the
  * fallback when nobody has touched the contact.
  *
- * The rule runs only at merge time and in the one-shot backfill; nothing
- * re-evaluates it when a BD later works the contact.
+ * The rule runs at merge time, in the backfill (script + nightly cron) and,
+ * since the on-touch hook (ownerOnTouchDb.ts), whenever a touch lands: the BD
+ * who contacts is the new owner, immediately instead of at the next cron.
  *
  * A BD's last touch is the later of their `person_bd_connection.last_message_at`
  * and their latest activity on the person (`OwnerTouch`, read by
@@ -27,6 +28,8 @@ export const OWNER_HISTORY_PROPERTIES: readonly string[] = [OWNER_HISTORY_PROPER
 export const MANUAL_OWNER_SOURCE = "edit";
 /** Source of history rows written by scripts/backfill-owner-last-worked.ts. Must NEVER equal `edit`, or every backfilled owner would turn sticky. */
 export const OWNER_BACKFILL_SOURCE = "owner_backfill";
+/** Source of history rows written when a touch transfers ownership (ownerOnTouchDb.ts). Same rule as above: must NEVER equal `edit`. */
+export const OWNER_TOUCH_SOURCE = "owner_touch";
 
 export interface OwnerHistoryMarker {
   property: string;
