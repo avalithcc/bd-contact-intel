@@ -337,12 +337,29 @@ test("pinned limit: a city whose name is also a country resolves to the country 
   assert.deepEqual(audience({ personCountry: "Santa Lucía" }), MIAMI_EN);
 });
 
-test("ISO long-form country names: the one in the data resolves, and a sanctioned long form still holds", () => {
-  // Measured in production 2026-10-20: of the 58 distinct country strings, "Bolivia, Plurinational State of" was the
-  // only ISO long form, and the only text the old classifyMarket admitted (by substring) that this resolver refused —
+test("ISO long-form country names: each one in the data resolves to its plain name, and a sanctioned long form still holds", () => {
+  // Measured in production 2026-10-20: of the 58 distinct country strings then, "Bolivia, Plurinational State of" was
+  // the only ISO long form AT THE TIME (no longer true — see the Venezuela lines below), and the only text the old classifyMarket admitted (by substring) that this resolver refused —
   // one contact. Pinned here so the alias is not dropped as noise.
   assert.equal(resolveCountry("Bolivia, Plurinational State of"), "BO");
   assert.deepEqual(audience({ personCountry: "Bolivia, Plurinational State of" }), MIAMI_ES);
+  // Re-measured 2026-10-26: company.country also holds "Venezuela, Bolivarian Republic of" (5 contacts at one company),
+  // so BO was no longer the only long form. The long form must give the SAME audience as the plain name — that equality
+  // is the point, and it is why adding the alias settles no policy question.
+  assert.equal(resolveCountry("Venezuela, Bolivarian Republic of"), "VE");
+  assert.equal(resolveCountry("Venezuela"), "VE");
+  assert.deepEqual(
+    audience({ personCountry: "Venezuela, Bolivarian Republic of" }),
+    audience({ personCountry: "Venezuela" }),
+  );
+  assert.deepEqual(audience({ personCountry: "Venezuela, Bolivarian Republic of" }), MIAMI_ES);
+  // company.country is the field that actually carries this text in production, and it is a different link of the chain
+  // than personCountry, so assert it there too rather than trusting that both reach resolveCountry.
+  assert.deepEqual(audience({ companyCountry: "Venezuela, Bolivarian Republic of" }), MIAMI_ES);
+  assert.deepEqual(
+    audience({ companyCountry: "Venezuela, Bolivarian Republic of" }),
+    audience({ companyCountry: "Venezuela" }),
+  );
   // A long form that is NOT in the alias table holds, and for a sanctioned jurisdiction that is already the right
   // answer, so the gap fails in the safe direction. Do not "fix" this by matching the text before the comma: that
   // would turn every "City, Country" string into a country guess.

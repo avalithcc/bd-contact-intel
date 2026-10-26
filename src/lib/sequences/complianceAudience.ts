@@ -113,11 +113,19 @@ const ALIASES: Readonly<Record<string, readonly string[]>> = {
   GB: ["uk", "u k", "great britain", "england", "scotland", "wales", "inglaterra"],
   NL: ["the netherlands", "holland", "holanda"],
   DO: ["rep dominicana"],
-  // ISO 3166-1's long form. Measured in production 2026-10-20: "Bolivia, Plurinational State of" is the ONLY long-form
-  // name in the data, and the only country text that `classifyMarket` admitted (by substring) and this resolver did not —
-  // one contact. Other long forms ("Korea, Republic of", "Tanzania, United Republic of") would hold until added here;
-  // for a SANCTIONED one ("Iran, Islamic Republic of") holding is already the correct answer, so that direction is safe.
+  // ISO 3166-1 long forms, added one at a time as the data produces them. Other long forms ("Korea, Republic of",
+  // "Tanzania, United Republic of") hold until listed here; for a SANCTIONED one ("Iran, Islamic Republic of") holding is
+  // already the correct answer, so that direction fails safe. Do NOT replace this with a rule that matches the text
+  // before the comma: ICU names KR "South Korea" and KP "North Korea", so the prefix of "Korea, Republic of" is not a
+  // country name at all and would resolve to nothing — and an alias added to rescue it could not say which Korea it
+  // meant. It would also turn every "City, Country" string into a country guess.
+  // BO added 2026-10-20, when it was the only long form in the data and the only text the old `classifyMarket` admitted
+  // (by substring) that this resolver refused. Re-measured 2026-10-26: that is no longer true — company.country also
+  // holds "Venezuela, Bolivarian Republic of" (5 contacts at one company). No contact LOST its audience to it, because
+  // their person.country covered them, so this was a latent gap rather than a live hold. Adding VE decides no policy:
+  // the plain "Venezuela" already resolves and already yields the same audience, so this only closes a spelling gap.
   BO: ["bolivia plurinational state of"],
+  VE: ["venezuela bolivarian republic of"],
   MX: ["estados unidos mexicanos"],
   AE: ["uae"],
   TR: ["turkey"],
