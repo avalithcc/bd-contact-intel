@@ -1,7 +1,20 @@
 # Glossary — English term → Spanish UI term
 
-Neutral, professional Spanish. No regional slang, no voseo/tú. Actions use the
-infinitive ("Guardar", not "Guarda" or "Guardá").
+Spanish register is decided by AUDIENCE, not by one house style. The rule below
+describes what the code already does; the previous wording ("no voseo/tú"
+everywhere) contradicted ~29 live strings and was corrected on 2026-10-26 by the
+owner's decision.
+
+| Where | Register | Example |
+|---|---|---|
+| Action labels (buttons, menu items) | Infinitive, never an imperative | "Guardar", "No contactar", "Posponer", "Reincorporar" — not "Guarda" and not "Guardá" |
+| Prose addressed to the BD using the CRM | Rioplatense voseo | "Elegí una hora al menos 5 minutos adelante.", "Revisá su respuesta y decidí.", "Estás al día" |
+| Copy a PROSPECT reads — the emails a sequence sends, the unsubscribe page | Neutral, professional Spanish. No voseo, no regional slang | the opt-out sentence, the legal footer, every draft body |
+
+The third row is the one that matters commercially and is what the old blanket
+rule was protecting: a prospect in Mexico or Colombia reading "Elegí" reads us as
+foreign. The mistake was applying an outbound-email rule to the internal CRM.
+No regional slang in any of the three.
 
 Product/brand names (Gmail, LinkedIn, Avalith) stay as-is. "BD" stays as the
 team's term. The sidebar item labelled "A quién contactar" (English: "Who to
