@@ -1006,7 +1006,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                     </td>
                     <td>{r.roleGroup ? dict.roleGroups[r.roleGroup] : "—"}</td>
                     <td>{r.openItCount}</td>
-                    <td className="nowrap meta">{r.lastMessageAt ? relTime(new Date(r.lastMessageAt)) : dict.common.never}</td>
+                    <td className="nowrap meta">{r.lastActivity ? `${r.lastActivity.label} · ${relTime(r.lastActivity.createdAt)}` : "—"}</td>
                     <td>
                       <div className="reason-chips">
                         {r.reasons.map((reason) => (

@@ -15,6 +15,7 @@ import type { MarketKey } from "@/lib/hiring/markets";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { CompanyCategoryKey } from "@/lib/companyCategories";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import type { InlineLastActivityRaw } from "@/lib/contacts/inlineDerivedColumns";
 
 export type { HiringMatch };
 
@@ -113,6 +114,10 @@ export interface OutreachRow {
   roleGroup: RoleGroupKey | null;
   messageCount: number;
   lastMessageAt: Date | null;
+  // Raw newest-activity JSON (lastActivityRawSql), the source of the NAMED
+  // "Último contacto" cell. Display only: ranking keeps using lastMessageAt.
+  // Optional because whatsnew builds OutreachRow-shaped rows without it.
+  lastActivityRaw?: InlineLastActivityRaw | null;
   reciprocal: boolean;
   dormant: boolean;
   isLeadership: boolean;

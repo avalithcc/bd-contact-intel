@@ -70,6 +70,18 @@ function parseEffectiveActivityAt(value: string): Date {
   return parseDbTimestamp(value);
 }
 
+/** One `lastActivityRaw` value -> the render-ready entry (`null` for no
+ * activity or a non-touch-only person). The ONE mapping the contacts list and
+ * the Outreach view share, so both always show the same label. */
+export function mapLastActivityRaw(raw: InlineLastActivityRaw | null | undefined, dict: Dict): LastActivityEntry | null {
+  if (!raw || raw.createdAt === null) return null;
+  return {
+    type: raw.type,
+    label: formatLastActivityLabel(raw, dict),
+    createdAt: parseEffectiveActivityAt(raw.createdAt),
+  };
+}
+
 /**
  * Maps the inline JSON columns onto the render-ready shape
  * `attachDerivedColumns` used to produce. `bdConnectionsRaw` is already
@@ -90,14 +102,7 @@ export function mapInlineDerivedColumns<
       bdConnections: bdConnectionsRaw?.length
         ? buildBdConnectionSummaries(bdConnectionsRaw)
         : EMPTY_BD_CONNECTION_SUMMARY,
-      lastActivity:
-        lastActivityRaw && lastActivityRaw.createdAt !== null
-          ? {
-              type: lastActivityRaw.type,
-              label: formatLastActivityLabel(lastActivityRaw, dict),
-              createdAt: parseEffectiveActivityAt(lastActivityRaw.createdAt),
-            }
-          : null,
+      lastActivity: mapLastActivityRaw(lastActivityRaw, dict),
     } satisfies ContactListRow;
   });
 }

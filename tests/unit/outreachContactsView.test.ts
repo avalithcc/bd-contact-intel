@@ -63,3 +63,23 @@ test("attachOutreachReasons is a pure superset of OutreachRow — no fields drop
   assert.equal(result.isStartup, true);
   assert.equal(result.startupReason, "seed");
 });
+
+test("attachOutreachReasons names the newest activity with the contacts-list label", () => {
+  const at = "2026-09-20T10:00:00Z";
+  const cases = [
+    { type: "email_sent", label: dict.contactList.lastActivityEmailSent },
+    { type: "reply_received", label: dict.contactList.lastActivityReplyReceived },
+    { type: "auto_reply_received", label: dict.contactList.lastActivityAutoReply },
+  ];
+  for (const c of cases) {
+    const [r] = attachOutreachReasons([row({ lastActivityRaw: { type: c.type, metadata: {}, createdAt: at } })], relTime, dict);
+    assert.equal(r.lastActivity?.label, c.label, c.type);
+  }
+  assert.notEqual(dict.contactList.lastActivityAutoReply, dict.contactList.lastActivityReplyReceived);
+});
+
+test("attachOutreachReasons gives no lastActivity when there is none", () => {
+  assert.equal(attachOutreachReasons([row()], relTime, dict)[0].lastActivity, null);
+  const nonTouch = row({ lastActivityRaw: { type: "task_updated", metadata: {}, createdAt: null } });
+  assert.equal(attachOutreachReasons([nonTouch], relTime, dict)[0].lastActivity, null);
+});

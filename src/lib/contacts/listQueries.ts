@@ -36,7 +36,8 @@ import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/c
 import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { companyNameMatchCondition } from "@/lib/contacts/companyNameCondition";
-import { mapInlineDerivedColumns, type InlineDerivedRawRow } from "@/lib/contacts/inlineDerivedColumns";
+import { mapInlineDerivedColumns, type InlineDerivedRawRow, type InlineLastActivityRaw } from "@/lib/contacts/inlineDerivedColumns";
+import { lastActivityRawSql } from "@/lib/contacts/lastActivityRawSql";
 import { contactTypeFilterCondition } from "@/lib/contacts/contactTypeCondition";
 import { createTtlCache } from "@/lib/ttlCache";
 import { roleGroupVisibilityCondition } from "@/lib/contacts/roleVisibility";
@@ -435,21 +436,7 @@ export async function getContactListPage(
       // `effectiveActivityAtSql()`, NOT `created_at` — see that helper's doc
       // comment), `activity.id desc` as a tiebreak for two rows sharing the
       // exact same effective timestamp.
-      lastActivityRaw: sql<{ type: string; metadata: unknown; createdAt: string | null } | null>`(
-        select json_build_object(
-          'type', activity.type,
-          'metadata', activity.metadata,
-          'createdAt', ${effectiveActivityAtSql()}
-        )
-        from ${activity}
-        where activity.person_id = pcl_page.id
-        -- nulls last: a non-touch row (task_updated/etc., effective time
-        -- NULL) must never win this "single most recent" pick over a real
-        -- touch — see attachDerivedColumns' DISTINCT ON above for the same
-        -- fix and full rationale.
-        order by ${effectiveActivityAtSql()} desc nulls last, activity.id desc
-        limit 1
-      )`,
+      lastActivityRaw: sql<InlineLastActivityRaw | null>`${lastActivityRawSql(sql`pcl_page.id`)}`,
     })
     .from(pclPageRows)) as InlineDerivedRawRow[];
 
