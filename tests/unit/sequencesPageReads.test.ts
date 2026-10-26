@@ -8,7 +8,7 @@ import { pickerView, toggleOne } from "@/lib/sequences/pickerView";
 import { t } from "@/lib/i18n/dictionaries";
 
 const T0 = new Date("2026-10-01T12:00:00Z");
-const listRow = (id: string, over: Partial<ListDbRow> = {}): ListDbRow => ({ id, name: `Seq ${id}`, created_at: T0, daily_send_cap: 5, schedule: DEFAULT_SCHEDULE, state: "drafted", has_draft: true, scheduled_for: null, company: "Acme", ...over });
+const listRow = (id: string, over: Partial<ListDbRow> = {}): ListDbRow => ({ id, name: `Seq ${id}`, created_at: T0, daily_send_cap: 5, schedule: DEFAULT_SCHEDULE, state: "drafted", has_draft: true, scheduled_for: null, sent_at: null, discard_reason: null, company: "Acme", ...over });
 
 // --- list: the counts are derived from the rows handed in, so the grouping must keep every member -------------------
 
@@ -38,8 +38,8 @@ test("companies are the distinct names in roster order, matched without regard t
 
 test("a member's draft flag and release instant survive the grouping (the queue foot reads them)", () => {
   const at = new Date("2026-10-02T13:00:00Z");
-  const [row] = groupListRows([listRow("a", { state: "approved", has_draft: true, scheduled_for: at }), listRow("a", { state: "drafted", has_draft: false })]);
-  assert.deepEqual(row.members, [{ state: "approved", hasDraft: true, scheduledFor: at }, { state: "drafted", hasDraft: false, scheduledFor: null }]);
+  const [row] = groupListRows([listRow("a", { state: "approved", has_draft: true, scheduled_for: at }), listRow("a", { state: "discarded", has_draft: false, sent_at: at, discard_reason: "bounce" })]);
+  assert.deepEqual(row.members, [{ state: "approved", hasDraft: true, scheduledFor: at, sentAt: null, discardReason: null }, { state: "discarded", hasDraft: false, scheduledFor: null, sentAt: at, discardReason: "bounce" }]);
 });
 
 // --- picker: non-addable candidates stay, with a reason ----------------------------------------------------------

@@ -30,7 +30,7 @@ export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, 
   // An admin reads another BD's Sequence (audited): the cards must not word its approvals as the reader's own.
   const readOnly = isReadOnlyView(viewerBdId, detail.ownerBdId);
   const ownView = !readOnly;
-  const stats = sequenceStats(detail.members.map((m) => ({ state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null })));
+  const stats = sequenceStats(detail.members.map((m) => ({ state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null, sentAt: m.sentAt, discardReason: m.discardReason })));
   return (
     <>
       {readOnly && (

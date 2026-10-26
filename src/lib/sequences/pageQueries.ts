@@ -62,7 +62,7 @@ export async function listAllSequences(meId?: string, limit = ALL_SEQUENCES_LIMI
 async function readListRows(ownerCols: SQL, ownerJoin: SQL, where: SQL): Promise<SequenceListRow[]> {
   const rows = rowsOf<Row>(
     await db.execute(sql`
-      select s.id::text as id, s.name, s.created_at, s.daily_send_cap, s.schedule, sm.state, (d.id is not null) as has_draft, d.scheduled_for, ${companyNameColumnsSql}${ownerCols}
+      select s.id::text as id, s.name, s.created_at, s.daily_send_cap, s.schedule, sm.state, (d.id is not null) as has_draft, d.scheduled_for, sm.sent_at, sm.discard_reason, ${companyNameColumnsSql}${ownerCols}
       from sequence s
       ${ownerJoin}
       left join sequence_member sm on sm.sequence_id = s.id
@@ -72,7 +72,7 @@ async function readListRows(ownerCols: SQL, ownerJoin: SQL, where: SQL): Promise
       ${where}
       order by s.created_at desc, s.id, sm.created_at, sm.id`),
   );
-  return groupListRows(withResolvedCompanyName(rows.map((r) => ({ ...(r as ListDbRow & { companyCanonicalName: string | null }), created_at: date(r.created_at)!, scheduled_for: date(r.scheduled_for) }))));
+  return groupListRows(withResolvedCompanyName(rows.map((r) => ({ ...(r as ListDbRow & { companyCanonicalName: string | null }), created_at: date(r.created_at)!, scheduled_for: date(r.scheduled_for), sent_at: date(r.sent_at) }))));
 }
 
 /** The BD's connected Gmail account, the one a Sequence sends from. Null when none is connected: nothing can be created. */

@@ -7,7 +7,7 @@ import { es } from "@/lib/i18n/dictionaries/es";
 import type { MemberState } from "@/lib/sequences/memberState";
 
 const NOW = new Date("2026-10-15T16:00:00Z");
-const m = (state: MemberState, over: { hasDraft?: boolean; scheduledFor?: Date | null } = {}) => ({ state, hasDraft: state !== "drafted" || over.hasDraft !== false, scheduledFor: over.scheduledFor ?? null });
+const m = (state: MemberState, over: { hasDraft?: boolean; scheduledFor?: Date | null } = {}) => ({ state, hasDraft: state !== "drafted" || over.hasDraft !== false, scheduledFor: over.scheduledFor ?? null, sentAt: state === "sent" || state === "replied" || state === "no_reply" ? new Date("2026-10-14T13:00:00Z") : null, discardReason: null });
 const row = (id: string, createdAt: string, members: ReturnType<typeof m>[], over: Partial<SequenceListRow> = {}): SequenceListRow =>
   ({ id, name: `Seq ${id}`, createdAt: new Date(createdAt), dailySendCap: 5, schedule: DEFAULT_SCHEDULE, companies: ["A", "B", "C"], members, ...over });
 

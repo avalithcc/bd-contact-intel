@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { MemberState } from "@/lib/sequences/memberState";
+import { SENT_STATES } from "@/lib/sequences/memberState";
 import { sequenceStats, type StatMember } from "@/lib/sequences/stats";
+
+const SENT_AT = new Date("2026-10-14T13:00:00Z");
 
 // Counts only: no names, so no fixture can ever hold a real prospect.
 function members(spec: Partial<Record<MemberState, number>>, over: Partial<StatMember> = {}): StatMember[] {
   const out: StatMember[] = [];
   for (const [state, n] of Object.entries(spec) as [MemberState, number][]) {
-    for (let i = 0; i < n; i++) out.push({ state, hasDraft: true, scheduledFor: null, ...over });
+    for (let i = 0; i < n; i++) out.push({ state, hasDraft: true, scheduledFor: null, sentAt: (SENT_STATES as readonly string[]).includes(state) ? SENT_AT : null, discardReason: null, ...over });
   }
   return out;
 }
@@ -93,4 +96,38 @@ test("no members renders live with zeroes, never NaN", () => {
   assert.equal(s.view, "live");
   assert.equal(s.segments.sentPct, 0);
   assert.equal(s.segments.queuedPct, 0);
+});
+
+// "No contactables": the tile counts addresses this Sequence actually wrote to and that then bounced or opted out.
+const gone = (reason: string | null, sentAt: Date | null, state: MemberState = "discarded"): StatMember => ({ state, hasDraft: true, scheduledFor: null, sentAt, discardReason: reason });
+
+test("not contactable counts a sent bounce and a sent opt-out, and the foot rate is over what went out", () => {
+  // The mockup: 6 left (3 awaiting a reminder + 1 replied + 2 gone), 3 not contactable -> 50%.
+  const s = sequenceStats([...members({ sent: 3, replied: 1 }), gone("bounce", SENT_AT), gone("opt_out", SENT_AT), gone("bounce", SENT_AT)]);
+  assert.equal(s.sent, 7);
+  assert.equal(s.notContactable, 3);
+  assert.equal(s.notContactablePct, 43);
+});
+
+test("not contactable EXCLUDES a bounce whose sent_at is null: the address was burned elsewhere and this Sequence never wrote", () => {
+  const s = sequenceStats([...members({ sent: 2 }), gone("bounce", null), gone("opt_out", null)]);
+  assert.equal(s.notContactable, 0);
+  assert.equal(s.sent, 2);
+});
+
+test("not contactable excludes a manual discard, even one made after the email went out", () => {
+  const s = sequenceStats([...members({ sent: 1 }), gone("wrong_profile", SENT_AT), gone(null, SENT_AT)]);
+  assert.equal(s.notContactable, 0);
+});
+
+test("sent counts a member who bounced or was discarded after the email left, but not the awaiting-reminder foot", () => {
+  const s = sequenceStats([...members({ sent: 2 }), gone("bounce", SENT_AT), gone("manual", SENT_AT)]);
+  assert.equal(s.sent, 4);
+  assert.equal(s.awaitingReminder, 2);
+});
+
+test("the rate is 0, not NaN, when nothing went out", () => {
+  const s = sequenceStats(members({ drafted: 2 }));
+  assert.equal(s.notContactable, 0);
+  assert.equal(s.notContactablePct, 0);
 });
