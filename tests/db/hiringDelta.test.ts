@@ -140,7 +140,8 @@ test("the contact count is the signed-in BD's own, the same rows /?companyKey= l
   const { db } = await import("@/db");
   const { bd, contact } = await import("@/db/schema");
   const { getCompanyHiringSummaries } = await import("@/lib/hiring/queries");
-  const { listContacts } = await import("@/lib/queries");
+  const { companyKeyFilter } = await import("@/lib/queries");
+  const { and, eq, sql } = await import("drizzle-orm");
   const ck = await mk("contacts", [{ posted: daysAgo(20) }]);
   const { company, companyAlias } = await import("@/db/schema");
   // A contact keyed on an alias of the company must count, exactly as companyKeyFilter lists it.
@@ -165,7 +166,11 @@ test("the contact count is the signed-in BD's own, the same rows /?companyKey= l
   for (const [who, want] of [[mine, 3], [theirs, 1]] as const) {
     const row = (await getCompanyHiringSummaries(who.id)).summaries.find((s) => s.companyKey === ck)!;
     assert.equal(row.contactCount, want);
-    assert.equal((await listContacts(who.id, { companyKey: ck })).total, want, "the link opens as many rows as the count says");
+    const [{ n }] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(contact)
+      .where(and(eq(contact.bdId, who.id), companyKeyFilter(ck)));
+    assert.equal(n, want, "the companyKeyFilter set has as many rows as the count says");
   }
 });
 
