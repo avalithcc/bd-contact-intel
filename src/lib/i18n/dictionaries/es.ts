@@ -3180,6 +3180,7 @@ export const es: typeof en = {
     lastActivityDiscarded: "Descartado",
     lastActivityReplyReceived: "Respuesta recibida",
     lastActivityAutoReply: "Respuesta automática",
+    lastActivityLinkedin: "Mensaje de LinkedIn",
     lastActivityBounced: "Correo rebotado",
     lastActivityNote: "Nota registrada",
     lastActivityHunterLookup: "Búsqueda de correo",

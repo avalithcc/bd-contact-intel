@@ -30,13 +30,14 @@ import {
   type BdConnectionRow,
   type BdConnectionSummary,
 } from "@/lib/contacts/bdConnections";
-import { buildLastActivityEntries, type LastActivityEntry } from "@/lib/contacts/lastActivity";
+import { buildLastActivityEntries, resolveLastActivity, type LastActivityEntry } from "@/lib/contacts/lastActivity";
 import type { ContactSortKey } from "@/lib/contacts/sort";
 import { idsFromContactListPage, type ContactIdsForFiltersResult } from "@/lib/contacts/bulkTargetIds";
 import { buildSinceIso, effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { companyNameMatchCondition } from "@/lib/contacts/companyNameCondition";
-import { mapInlineDerivedColumns, type InlineDerivedRawRow } from "@/lib/contacts/inlineDerivedColumns";
+import { mapInlineDerivedColumns, type InlineDerivedRawRow, type InlineLastActivityRaw } from "@/lib/contacts/inlineDerivedColumns";
+import { lastActivityRawSql } from "@/lib/contacts/lastActivityRawSql";
 import { contactTypeFilterCondition } from "@/lib/contacts/contactTypeCondition";
 import { createTtlCache } from "@/lib/ttlCache";
 import { roleGroupVisibilityCondition } from "@/lib/contacts/roleVisibility";
@@ -144,17 +145,32 @@ async function baseContactFilterConditions(
   // ArrayBuffer, so a bare `${since}` Date threw across every
   // `?lastActivityDays=` request. Explicitly cast on the SQL side too
   // (`::timestamptz`) rather than relying on implicit coercion.
+  // Same population as the "Última actividad" cell (newest of touch and
+  // LinkedIn date): a touch OR a LinkedIn message inside the window matches.
   if (filters.lastActivityDays) {
     const sinceIso = buildSinceIso(filters.lastActivityDays);
     where.push(
-      exists(
-        db
-          .select({ one: sql`1` })
-          .from(activity)
-          .where(
-            and(eq(activity.personId, person.id), sql`${effectiveActivityAtSql()} >= ${sinceIso}::timestamptz`),
-          ),
-      ),
+      or(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(activity)
+            .where(
+              and(eq(activity.personId, person.id), sql`${effectiveActivityAtSql()} >= ${sinceIso}::timestamptz`),
+            ),
+        ),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(personBdConnection)
+            .where(
+              and(
+                eq(personBdConnection.personId, person.id),
+                sql`${personBdConnection.lastMessageAt} >= ${sinceIso}::timestamptz`,
+              ),
+            ),
+        ),
+      )!,
     );
   }
   return where;
@@ -247,6 +263,7 @@ async function attachDerivedColumns(
         personId: personBdConnection.personId,
         bdId: personBdConnection.bdId,
         bdName: bd.name,
+        lastMessageAt: personBdConnection.lastMessageAt,
       })
       .from(personBdConnection)
       .innerJoin(bd, eq(bd.id, personBdConnection.bdId))
@@ -287,12 +304,18 @@ async function attachDerivedColumns(
     dict,
   );
 
+  const linkedinLastAt = new Map<string, Date>();
+  for (const c of connectionRows) {
+    const prev = linkedinLastAt.get(c.personId);
+    if (c.lastMessageAt && (!prev || c.lastMessageAt > prev)) linkedinLastAt.set(c.personId, c.lastMessageAt);
+  }
+
   return rows.map((row) => ({
     ...row,
     bdConnections: groupedConnections.has(row.id)
       ? buildBdConnectionSummaries(groupedConnections.get(row.id)!)
       : EMPTY_BD_CONNECTION_SUMMARY,
-    lastActivity: lastActivityMap.get(row.id) ?? null,
+    lastActivity: resolveLastActivity(lastActivityMap.get(row.id), linkedinLastAt.get(row.id), dict),
   }));
 }
 
@@ -326,6 +349,17 @@ const lastActivityAgg = db
   .where(sql`${activity.personId} is not null`)
   .groupBy(activity.personId)
   .as("last_activity_agg");
+
+/** MAX(person_bd_connection.last_message_at) per person: the LinkedIn half of
+ * the cell's "newest wins" value, used by the sort below. */
+const linkedinLastAgg = db
+  .select({
+    personId: personBdConnection.personId,
+    linkedinLastAt: sql<Date>`max(${personBdConnection.lastMessageAt})`.as("linkedin_last_at"),
+  })
+  .from(personBdConnection)
+  .groupBy(personBdConnection.personId)
+  .as("linkedin_last_agg");
 
 export async function getContactListPage(
   filters: ContactFilters,
@@ -362,7 +396,7 @@ export async function getContactListPage(
   // was nothing to preserve. The row SET and the total are unaffected.
   const orderBy =
     sort === "lastActivity"
-      ? [sql`${lastActivityAgg.lastActivityAt} desc nulls last`, asc(person.id)]
+      ? [sql`greatest(${lastActivityAgg.lastActivityAt}, ${linkedinLastAgg.linkedinLastAt}) desc nulls last`, asc(person.id)]
       : [asc(person.lastName), asc(person.firstName), asc(person.id)];
 
   // Perf fix (round trips; orchestrator measured ~1,395ms across 4 serialized
@@ -387,6 +421,7 @@ export async function getContactListPage(
       .from(person)
       .leftJoin(bd, eq(bd.id, person.ownerBdId))
       .leftJoin(lastActivityAgg, eq(lastActivityAgg.personId, person.id))
+      .leftJoin(linkedinLastAgg, eq(linkedinLastAgg.personId, person.id))
       .leftJoin(company, eq(company.companyKey, person.companyKey))
       .where(and(...where))
       .orderBy(...orderBy)
@@ -435,21 +470,7 @@ export async function getContactListPage(
       // `effectiveActivityAtSql()`, NOT `created_at` — see that helper's doc
       // comment), `activity.id desc` as a tiebreak for two rows sharing the
       // exact same effective timestamp.
-      lastActivityRaw: sql<{ type: string; metadata: unknown; createdAt: string | null } | null>`(
-        select json_build_object(
-          'type', activity.type,
-          'metadata', activity.metadata,
-          'createdAt', ${effectiveActivityAtSql()}
-        )
-        from ${activity}
-        where activity.person_id = pcl_page.id
-        -- nulls last: a non-touch row (task_updated/etc., effective time
-        -- NULL) must never win this "single most recent" pick over a real
-        -- touch — see attachDerivedColumns' DISTINCT ON above for the same
-        -- fix and full rationale.
-        order by ${effectiveActivityAtSql()} desc nulls last, activity.id desc
-        limit 1
-      )`,
+      lastActivityRaw: sql<InlineLastActivityRaw | null>`${lastActivityRawSql(sql`pcl_page.id`)}`,
     })
     .from(pclPageRows)) as InlineDerivedRawRow[];
 

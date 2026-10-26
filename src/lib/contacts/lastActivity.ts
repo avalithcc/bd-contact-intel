@@ -39,6 +39,9 @@ export interface LastActivityRawRow {
   createdAt: Date | string | null;
 }
 
+/** Synthetic `type` of the LinkedIn fallback entry (not an `activity.type`). */
+export const LINKEDIN_LAST_ACTIVITY_TYPE = "linkedin_message";
+
 export interface LastActivityEntry {
   type: string;
   label: string;
@@ -75,6 +78,10 @@ export function formatLastActivityLabel(
     // An out-of-office is not "Respuesta recibida": the list must not read as if the Contact answered.
     case "auto_reply_received":
       return l.lastActivityAutoReply;
+    // Fallback only (see resolveLastActivity): `person_bd_connection.last_message_at`
+    // carries no direction, so the label must stay unqualified (never "enviado").
+    case LINKEDIN_LAST_ACTIVITY_TYPE:
+      return l.lastActivityLinkedin;
     case "email_bounced":
       return l.lastActivityBounced;
     case "meeting_logged":
@@ -119,4 +126,31 @@ export function buildLastActivityEntries(
     });
   }
   return map;
+}
+
+/**
+ * The "Última actividad" cell shows the NEWEST of the newest `activity` touch
+ * and the LinkedIn connection date (mockups/contacts.html: "Mensaje de
+ * LinkedIn · hace 5d"). An exact tie goes to the activity: a specific fact
+ * beats a coarse aggregate with no direction. `—` (null) when neither exists.
+ * INVARIANT: the returned time equals `lastMessageAt` (lastContactAtSql:
+ * greatest(touch, LinkedIn)) for the same person. A LinkedIn-only cell cannot
+ * show direction; `relationshipTier` ("Contactado, sin respuesta" vs
+ * reciprocal) carries that signal for the row as a whole. The SQL twin is
+ * lastActivityRawSql.ts (same rule); this is the batched-path version.
+ */
+export function resolveLastActivity(
+  activityEntry: LastActivityEntry | null | undefined,
+  linkedinLastAt: Date | null | undefined,
+  dict: Dict,
+): LastActivityEntry | null {
+  if (activityEntry && (!linkedinLastAt || activityEntry.createdAt.getTime() >= linkedinLastAt.getTime())) {
+    return activityEntry;
+  }
+  if (!linkedinLastAt) return null;
+  return {
+    type: LINKEDIN_LAST_ACTIVITY_TYPE,
+    label: formatLastActivityLabel({ type: LINKEDIN_LAST_ACTIVITY_TYPE, metadata: null }, dict),
+    createdAt: linkedinLastAt,
+  };
 }

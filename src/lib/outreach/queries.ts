@@ -3,10 +3,12 @@ import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { db } from "@/db";
 import { company, contact, conversation, message, person, personBdConnection, personIdMap } from "@/db/schema";
 import { isDormant } from "@/lib/queries";
+import { lastActivityRawSql } from "@/lib/contacts/lastActivityRawSql";
 import { lastContactAtSql } from "@/lib/outreach/lastContact";
 import { getHiringMatchIndex, type HiringMatch } from "@/lib/hiring/queries";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
+import type { InlineLastActivityRaw } from "@/lib/contacts/inlineDerivedColumns";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { OutreachHistoryMessage } from "./messagePrompt";
 import {
@@ -194,6 +196,7 @@ export async function listOutreachCandidates(
       roleGroup: (r.roleGroup ?? null) as RoleGroupKey | null,
       messageCount: r.messageCount,
       lastMessageAt,
+      lastActivityRaw: r.lastActivityRaw,
       reciprocal: r.reciprocal,
       dormant,
       isLeadership: isLeadershipRoleGroup(r.roleGroup),
@@ -274,6 +277,9 @@ export async function selectOutreachRows(
       messageCount: sql<number>`coalesce(max(${pbcAgg.messageCount}), 0)::int`,
       // Last contact of ANY kind (see lastContact.ts), not the LinkedIn-only date.
       lastMessageAt: sql<Date | null>`${lastContactAtSql(person.id, sql`max(${pbcAgg.lastMessageAt})`)}`,
+      // Named newest activity (same subquery as the contacts list). A scalar
+      // subquery keyed on person.id: one value per person, no fan-out.
+      lastActivityRaw: sql<InlineLastActivityRaw | null>`${lastActivityRawSql(person.id)}`,
       reciprocal: sql<boolean>`coalesce(bool_or(${pbcAgg.reciprocal}), false)`,
     })
     .from(person)

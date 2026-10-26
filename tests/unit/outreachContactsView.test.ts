@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { attachOutreachReasons } from "@/lib/contacts/outreachView";
 import type { OutreachRow } from "@/lib/outreach/ranking";
+import { resolveLastActivity } from "@/lib/contacts/lastActivity";
 import { t } from "@/lib/i18n/dictionaries";
 
 function row(overrides: Partial<OutreachRow> = {}): OutreachRow {
@@ -62,4 +63,53 @@ test("attachOutreachReasons is a pure superset of OutreachRow — no fields drop
   const [result] = attachOutreachReasons([source], relTime, dict);
   assert.equal(result.isStartup, true);
   assert.equal(result.startupReason, "seed");
+});
+
+test("attachOutreachReasons names the newest activity with the contacts-list label", () => {
+  const at = "2026-09-20T10:00:00Z";
+  const cases = [
+    { type: "email_sent", label: dict.contactList.lastActivityEmailSent },
+    { type: "reply_received", label: dict.contactList.lastActivityReplyReceived },
+    { type: "auto_reply_received", label: dict.contactList.lastActivityAutoReply },
+  ];
+  for (const c of cases) {
+    const [r] = attachOutreachReasons([row({ lastActivityRaw: { type: c.type, metadata: {}, createdAt: at } })], relTime, dict);
+    assert.equal(r.lastActivity?.label, c.label, c.type);
+  }
+  assert.notEqual(dict.contactList.lastActivityAutoReply, dict.contactList.lastActivityReplyReceived);
+});
+
+test("attachOutreachReasons gives no lastActivity when there is none", () => {
+  assert.equal(attachOutreachReasons([row()], relTime, dict)[0].lastActivity, null);
+  const nonTouch = row({ lastActivityRaw: { type: "task_updated", metadata: {}, createdAt: null } });
+  assert.equal(attachOutreachReasons([nonTouch], relTime, dict)[0].lastActivity, null);
+});
+
+test("a linkedin_message entry renders the unqualified LinkedIn label, never an 'enviado' variant", () => {
+  const [r] = attachOutreachReasons(
+    [row({ lastActivityRaw: { type: "linkedin_message", metadata: null, createdAt: "2026-09-20T10:00:00Z" } })],
+    relTime,
+    dict,
+  );
+  assert.equal(r.lastActivity?.label, "Mensaje de LinkedIn");
+});
+
+test("resolveLastActivity: newest wins, a tie goes to the activity, neither is null", () => {
+  const dec = new Date("2026-01-01T00:00:00Z");
+  const sep = new Date("2026-09-20T10:00:00Z");
+  const act = (createdAt: Date) => ({ type: "email_sent", label: dict.contactList.lastActivityEmailSent, createdAt });
+  // LinkedIn only.
+  const only = resolveLastActivity(null, sep, dict);
+  assert.equal(only?.label, dict.contactList.lastActivityLinkedin);
+  assert.equal(only?.createdAt.toISOString(), sep.toISOString());
+  // Activity newer than LinkedIn -> the activity.
+  const newerTouch = act(sep);
+  assert.equal(resolveLastActivity(newerTouch, dec, dict), newerTouch);
+  // LinkedIn newer than the activity -> LinkedIn (an old email must not read as the last activity).
+  assert.equal(resolveLastActivity(act(dec), sep, dict)?.label, dict.contactList.lastActivityLinkedin);
+  // Exact tie -> the activity.
+  const tie = act(sep);
+  assert.equal(resolveLastActivity(tie, new Date(sep.getTime()), dict), tie);
+  assert.equal(resolveLastActivity(null, null, dict), null);
+  assert.equal(resolveLastActivity(newerTouch, null, dict), newerTouch);
 });

@@ -10,6 +10,8 @@
  * `/outreach` goes away and this becomes the only ranking consumer.
  */
 import { outreachReasons, type OutreachFilters, type OutreachRow } from "@/lib/outreach/ranking";
+import { mapLastActivityRaw } from "@/lib/contacts/inlineDerivedColumns";
+import type { LastActivityEntry } from "@/lib/contacts/lastActivity";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 export type { OutreachFilters };
@@ -19,6 +21,8 @@ export interface OutreachContactRow extends OutreachRow {
   // pre-built strings, not re-derived by the page, so wording never drifts
   // between the two views.
   reasons: string[];
+  // Named newest activity ("Correo enviado"), same mapping as the contacts list.
+  lastActivity: LastActivityEntry | null;
 }
 
 /** Pure mapping step: attaches the same reason chips /outreach shows, in
@@ -28,5 +32,9 @@ export function attachOutreachReasons(
   relativeTime: (d: Date) => string,
   dict: Dictionary,
 ): OutreachContactRow[] {
-  return rows.map((r) => ({ ...r, reasons: outreachReasons(r, relativeTime, dict) }));
+  return rows.map((r) => ({
+    ...r,
+    reasons: outreachReasons(r, relativeTime, dict),
+    lastActivity: mapLastActivityRaw(r.lastActivityRaw, dict),
+  }));
 }
