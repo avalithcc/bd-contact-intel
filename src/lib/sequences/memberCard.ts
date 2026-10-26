@@ -94,3 +94,20 @@ function mapOwnCard(f: CardFacts, now: Date): CardView {
       return { ...base, kind: "discarded", tone: "discarded", actions: canTransition("discarded", "drafted", "readmit", { discardReason: f.discardReason }) ? [act("readmit", "ghost")] : [] };
   }
 }
+
+export type DiscardedView = {
+  badge: "discarded" | "bounced" | "optedOut";
+  badgeClass: "badge-discarded" | "badge-danger";
+  /** A bounce or opt-out on a member this Sequence never wrote to: the address was already burned elsewhere. */
+  neverSent: boolean;
+  /** Which meta line the card words. `removedAuto` is a discard nobody made by hand (`discarded_by_bd_id` null). */
+  meta: "bounced" | "bouncedUnsent" | "optedOut" | "optedOutUnsent" | "removedBy" | "removedAuto";
+};
+
+/** Bounce and opt-out keep the labels approved in contact-bounce.html and baja-opciones.html; every other reason stays "Descartado". */
+export function discardedView(f: { discardReason: string | null; sentAt: Date | null; discardedByBdId: string | null }): DiscardedView {
+  const unsent = f.sentAt === null;
+  if (f.discardReason === "bounce") return { badge: "bounced", badgeClass: "badge-danger", neverSent: unsent, meta: unsent ? "bouncedUnsent" : "bounced" };
+  if (f.discardReason === "opt_out") return { badge: "optedOut", badgeClass: "badge-discarded", neverSent: unsent, meta: unsent ? "optedOutUnsent" : "optedOut" };
+  return { badge: "discarded", badgeClass: "badge-discarded", neverSent: false, meta: f.discardedByBdId ? "removedBy" : "removedAuto" };
+}

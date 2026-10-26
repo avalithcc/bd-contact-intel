@@ -8,7 +8,7 @@ const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Sub
 const member = (id: string, over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: id, personId: `p-${id}`, state: "drafted", holdReason: null, firstName: "A", lastName: "B", jobTitle: null, company: "Acme", companyKey: "acme",
   email: "a@acme.test", emailVerified: true, openIt: 1, florida: false, leadership: false, lastContactAt: null, repliedAt: null, sentAt: null,
-  reminderDueAt: null, discardedAt: null, discardReason: null, draft: draft(), reminderDraft: null, ...over,
+  reminderDueAt: null, discardedAt: null, discardReason: null, discardedByBdId: null, draft: draft(), reminderDraft: null, ...over,
 });
 
 // --- never approve after a failed save --------------------------------------------------------------------------

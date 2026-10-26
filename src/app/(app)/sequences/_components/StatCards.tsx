@@ -15,9 +15,10 @@ export function StatCards({ stats, now, labels: l }: { stats: SequenceStats; now
     { tone: "accent", label: l.statQueued, value: stats.queued, foot: queuedFoot(stats.nextReleaseAt, now, l) },
     { tone: "neutral", label: l.statSent, value: stats.sent, foot: stats.awaitingReminder === 1 ? l.statSentFootOne : fill(l.statSentFoot, { n: stats.awaitingReminder }) },
     { tone: "success", label: l.statReplied, value: stats.replied, foot: l.statRepliedFoot },
+    { tone: "warn", label: l.statNotContactable, value: stats.notContactable, foot: fill(l.statNotContactableFoot, { pct: stats.notContactablePct }) },
   ];
   return (
-    <div className="grid-4 mb-lg">
+    <div className="grid-5 mb-lg">
       {cards.map((c) => (
         <div key={c.tone} className={`stat ${c.tone}`}>
           <div className="label">{c.label}</div>

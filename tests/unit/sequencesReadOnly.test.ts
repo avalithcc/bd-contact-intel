@@ -62,7 +62,7 @@ const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "S",
 const member = (over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "drafted", holdReason: null, firstName: "Test1", lastName: "Person",
   jobTitle: "Lead", company: "Acme 1", companyKey: "acme-1", email: "p1@example.test", emailVerified: true, openIt: 2, florida: false,
-  leadership: false, lastContactAt: null, repliedAt: null, sentAt: null, reminderDueAt: null, discardedAt: null, discardReason: null, draft: draft(), reminderDraft: null, ...over,
+  leadership: false, lastContactAt: null, repliedAt: null, sentAt: null, reminderDueAt: null, discardedAt: null, discardReason: null, discardedByBdId: null, draft: draft(), reminderDraft: null, ...over,
 });
 
 test("the review dialog is read-only for a foreign Sequence: no footer action, never marks the draft reviewed", () => {

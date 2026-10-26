@@ -90,7 +90,7 @@ test("the dialog states the scope BEFORE confirming: every Sequence, every BD, t
 });
 
 test("a replied card shows the prompt only when a phrase was detected, and the prompt does not suppress by itself", () => {
-  const m = { memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "replied", holdReason: null, firstName: "Test1", lastName: "Person", jobTitle: "Lead", company: "Acme", companyKey: "acme", email: "p1@example.test", emailVerified: true, openIt: 0, florida: false, leadership: false, lastContactAt: null, repliedAt: hours(2), sentAt: hours(50), reminderDueAt: null, discardedAt: null, discardReason: null, draft: null, reminderDraft: null } as const;
+  const m = { memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "replied", holdReason: null, firstName: "Test1", lastName: "Person", jobTitle: "Lead", company: "Acme", companyKey: "acme", email: "p1@example.test", emailVerified: true, openIt: 0, florida: false, leadership: false, lastContactAt: null, repliedAt: hours(2), sentAt: hours(50), reminderDueAt: null, discardedAt: null, discardReason: null, discardedByBdId: null, draft: null, reminderDraft: null } as const;
   const card = (phrase: string | null | undefined) => renderToStaticMarkup(createElement(MemberCard, { member: { ...m }, now: NOW, labels: es.sequences, onAction: () => {}, ownView: true, optOutPhrase: phrase, send: SEND, generation: IDLE_LOCK }));
   assert.ok(card("unsubscribe").includes("unsubscribe") && card("unsubscribe").includes("No contactar") && card("unsubscribe").includes("no se suprime"));
   assert.ok(!card(null).includes("No contactar") && !card(undefined).includes("No contactar"));
@@ -100,4 +100,19 @@ test("English mirrors every new Spanish key", () => {
   const keys = (o: object) => Object.keys(o).sort();
   assert.deepEqual(keys(en.sequences), keys(es.sequences));
   assert.deepEqual(keys(en.sequences.contextBadges), keys(es.sequences.contextBadges));
+});
+
+test("a discarded card words bounce, opt-out and automatic removal without claiming the BD acted", () => {
+  const base = { memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "discarded", holdReason: null, firstName: "Test1", lastName: "Person", jobTitle: "Lead", company: "Acme", companyKey: "acme", email: "p1@example.test", emailVerified: true, openIt: 0, florida: false, leadership: false, lastContactAt: null, repliedAt: null, sentAt: hours(50), reminderDueAt: null, discardedAt: hours(24), discardReason: "bounce", discardedByBdId: null, draft: null, reminderDraft: null } as const;
+  const html = (over: Record<string, unknown>) => renderToStaticMarkup(createElement(MemberCard, { member: { ...base, ...over }, now: NOW, labels: es.sequences, onAction: () => {}, ownView: true, send: SEND, generation: IDLE_LOCK }));
+  const bounced = html({});
+  assert.ok(bounced.includes("badge badge-danger") && bounced.includes("Rebotado") && !bounced.includes("nunca salió") && !bounced.includes("Lo quitaste"));
+  const optedOut = html({ discardReason: "opt_out" });
+  assert.ok(optedOut.includes("badge badge-discarded") && optedOut.includes("Pidió la baja") && optedOut.includes("de ningún BD"));
+  const burned = html({ sentAt: null });
+  assert.ok(burned.includes("Rebotado") && burned.includes("nunca salió") && burned.includes("esta secuencia nunca le escribió"));
+  const manual = html({ discardReason: "wrong_profile", discardedByBdId: "bd1" });
+  assert.ok(manual.includes("Descartado") && manual.includes("Lo quitaste hace"));
+  const auto = html({ discardReason: "wrong_profile" });
+  assert.ok(auto.includes("Salió de la secuencia hace") && !auto.includes("Lo quitaste"));
 });

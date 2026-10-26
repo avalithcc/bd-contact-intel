@@ -13,7 +13,7 @@ import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { approvedMoment, type ApprovedMoment } from "@/lib/sequences/approvedMoment";
 import type { GenerationLock } from "@/lib/sequences/generationLock";
-import { mapMemberCard, type CardActionId, type CardKind, type CardView } from "@/lib/sequences/memberCard";
+import { discardedView, mapMemberCard, type CardActionId, type CardKind, type CardView } from "@/lib/sequences/memberCard";
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
 import { clockLabel, whenLabel } from "@/lib/scheduledEmail/view";
 import type { OnAction } from "./actions";
@@ -59,9 +59,17 @@ function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels
     // not fetch who did.
     if (m.draft?.approvedAt) parts.push(fill(ownView ? l.approvedBy : l.approvedByOther, { ago: ago(m.draft.approvedAt) }));
   } else if (kind === "discarded") {
-    if (m.discardedAt) parts.push(fill(l.removedAgo, { ago: ago(m.discardedAt) }));
-    const known = m.discardReason ? (l.discardReasons as Record<string, string>)[m.discardReason] : null;
-    if (m.discardReason) parts.push(fill(l.reason, { reason: known ?? m.discardReason }));
+    const v = discardedView(m);
+    const date = m.discardedAt ? miamiWhen(m.discardedAt, now).ddmm : "";
+    if (v.meta === "bounced" || v.meta === "optedOut") {
+      parts.push(fill(v.meta === "bounced" ? l.metaBounced : l.metaOptedOut, { date }));
+    } else if (v.meta === "bouncedUnsent" || v.meta === "optedOutUnsent") {
+      parts.push(v.meta === "bouncedUnsent" ? l.metaBouncedUnsent : l.metaOptedOutUnsent);
+    } else {
+      if (m.discardedAt) parts.push(fill(v.meta === "removedBy" ? l.removedAgo : l.removedAutoAgo, { ago: ago(m.discardedAt) }));
+      const known = m.discardReason ? (l.discardReasons as Record<string, string>)[m.discardReason] : null;
+      if (m.discardReason) parts.push(fill(l.reason, { reason: known ?? m.discardReason }));
+    }
   } else {
     if (m.sentAt) parts.push(fill(l.emailSent, { ago: ago(m.sentAt) }));
     if (kind === "replied") {
@@ -162,6 +170,7 @@ export type CardSelection = { selected: boolean; onToggle: () => void };
 export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generation, send }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generation: GenerationLock; send: SequenceSendContext }) {
   const moment = m.state === "approved" && m.draft ? approvedMoment(m.draft, send.schedule, now) : null;
   const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, approvedMode: moment?.mode }, now, readOnly);
+  const discarded = card.kind === "discarded" ? discardedView(m) : null;
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   const title = m.jobTitle?.trim() || l.noTitle;
   const parts = metaParts(m, card.kind, now, l, ownView, moment);
@@ -180,7 +189,10 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
         <div className="stack-sm" style={{ flex: "1 1 320px", minWidth: 0 }}>
           <div className="row wrap">
             <Link className="strong" href={`/contacts/${m.personId}`}>{name}</Link>
-            <span className={`badge badge-${card.tone}`}>{l.badges[card.kind]}</span>
+            {discarded
+              ? <span className={`badge ${discarded.badgeClass}`} title={discarded.badge === "bounced" && discarded.neverSent ? l.bouncedUnsentTitle : undefined}>{discarded.badge === "bounced" ? l.badgeBounced : discarded.badge === "optedOut" ? l.badgeOptedOut : l.badges.discarded}</span>
+              : <span className={`badge badge-${card.tone}`}>{l.badges[card.kind]}</span>}
+            {discarded?.neverSent && <span className="badge badge-outline">{l.badgeNeverSent}</span>}
             {m.draft && showsReviewFlag(card.kind) && (m.draft.reviewedAt
               ? <span className="badge badge-success">{l.badgeReviewed}</span>
               : <span className="badge badge-warn">{l.badgeUnreviewed}</span>)}
