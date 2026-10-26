@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reportes · embudo primero · avalith. bd contact intel (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+<style>
+/* Local additions only. NOT in crm-hubspot-ux/mockups/styles.css. */
+
+/* The drop between two stages. Sits BETWEEN the bars, in the gap the stages
+   already leave, so it costs no vertical rhythm. Muted ink, not a status color:
+   a drop is the expected shape of a funnel, not an error. */
+.funnel-drop { display: flex; align-items: center; gap: .5rem; padding: .125rem 0 .125rem .75rem; }
+.funnel-drop .drop-rule { width: 2px; align-self: stretch; min-height: 1.1rem; background: var(--color-border); border-radius: 1px; }
+.funnel-drop .drop-text { font-size: .8125rem; color: var(--color-ink-muted, #6b7280); }
+.funnel-drop .drop-pct { font-family: "JetBrains Mono", monospace; font-weight: 700; }
+/* The worst drop in the funnel earns emphasis -- one per funnel, never more. */
+.funnel-drop.is-worst .drop-text { color: var(--color-ink, #111827); }
+.funnel-drop.is-worst .drop-rule { background: var(--color-accent-strong, #b45309); }
+
+/* A selected funnel stage, and the banner the table shows while one is on. */
+.funnel-row.is-selected { background: var(--color-surface-sunken, #f3f4f6); border-radius: 6px; }
+.filter-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .5rem .75rem; margin-bottom: .75rem; background: var(--color-surface-sunken, #f3f4f6); border-radius: 6px; font-size: .875rem; }
+
+/* Mockup scaffolding only -- never ships. */
+.spec { border-left: 3px solid var(--color-border, #e5e7eb); padding-left: .875rem; margin: .5rem 0 1.25rem; font-size: .875rem; color: var(--color-ink-muted, #6b7280); }
+.spec b { color: var(--color-ink, #111827); }
+.demoted { opacity: .55; }
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="sidenav" aria-label="Principal">
+<a class="logo" href="../../crm-hubspot-ux/mockups/contacts.html">avalith<span class="dot">.</span></a>
+<div class="nav-section"><div class="nav-title">Espacio de trabajo</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/contacts.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Contactos<span class="nav-count">16.642</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/companies.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>Empresas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tareas<span class="pill-count">4</span></a>
+<a class="nav-item" href="../../follow-up-queue/mockups/follow-up-queue.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></svg>Seguimientos<span class="pill-count">10</span></a>
+</div>
+<div class="nav-section"><div class="nav-title">Señales</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/hiring.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>Vacantes abiertas</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/whats-new.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8z"/></svg>Novedades</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/discovery.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36z"/></svg>Descubrimiento<span class="nav-count">12</span></a>
+</div>
+<div class="nav-section"><div class="nav-title"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Administración</div>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/duplicates.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>Duplicados<span class="pill-count">23</span></a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/migration-dry-run.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Migración</a>
+<a class="nav-item active" aria-current="page" href="reports.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Reportes</a>
+</div>
+<div class="sidenav-footer">
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+<a class="nav-item" href="../../bd-playbook/mockups/bd-playbook.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>Guía de roles</a>
+<a class="nav-item" href="../../crm-hubspot-ux/mockups/account.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.2.61.76 1 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Cuenta</a>
+</div></nav>
+<div class="main">
+<header class="topbar">
+<nav class="breadcrumbs" aria-label="Ruta de navegación"><span>Administración</span><span class="sep">/</span><span>Reportes</span></nav>
+<label class="search"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span class="sr-only">Buscar contactos</span><input type="search" placeholder="Buscar contactos por nombre, empresa o correo"><kbd>/</kbd></label>
+<div class="topbar-actions">
+<details class="dropdown">
+<summary class="btn btn-primary btn-sm"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Crear<svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/contacts.html#new-contact"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Contacto</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/tasks.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>Tarea</a>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/import.html"><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Importar contactos</a>
+</div>
+</details>
+<details class="dropdown">
+<summary class="btn btn-ghost btn-sm" aria-label="Menú de cuenta"><span class="avatar avatar-sm a3">CC</span><svg class="icon " viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+<div class="menu">
+<div class="menu-label">Sesión iniciada</div>
+<div class="menu-item"><span class="grow"><strong>Cristian Civita</strong><br><span class="meta">Administrador</span></span></div>
+<div class="menu-sep"></div>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/account.html">Cuenta</a>
+<a class="menu-item" href="../../crm-hubspot-ux/mockups/login.html">Cerrar sesión</a>
+</div>
+</details>
+</div>
+</header>
+<main class="page">
+
+
+
+<div class="spec">
+  <b>El problema.</b> La vista tiene 20 tarjetas con el mismo peso visual y 4 tablas con el modificador
+  <code>compact</code>. El embudo —lo más importante— vive en un <code>grid-2</code>, o sea a media página,
+  compartiendo fila con Pipeline. Más aire no lo arregla: 20 tarjetas espaciadas siguen siendo 20 tarjetas iguales.
+  <br><br>
+  <b>La propuesta.</b> Una sola narrativa descendente: <b>¿dónde se cae?</b> (embudo) → <b>¿quién lo explica?</b>
+  (actividad por BD). La segunda contesta a la primera, así que no compiten por el primer lugar: van en orden.
+</div>
+
+<h2 class="mt-2xl mb-lg">1 · Embudo a ancho completo, con la caída entre etapas</h2>
+
+<div class="spec">
+  Hoy cada etapa muestra <b>cuántos sobrevivieron</b> ("68% de los contactados respondió"). La pregunta
+  "¿dónde se cae?" se contesta con <b>lo contrario</b>, y hoy el lector la calcula de cabeza.
+  Acá la caída se escribe entre barra y barra, con su porcentaje y su número absoluto.
+  <br><br>
+  Una sola caída se destaca: <b>la peor</b>. Si se destacan todas, no se destaca ninguna.
+  Y se usa tinta apagada, no color de estado: que un embudo caiga es su forma esperada, no un error.
+</div>
+
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Embudo de contactos</h3>
+    <span class="actions"><span class="meta">Nuevo → Contactado → Respondió → Reunión · clic en una etapa para filtrar abajo</span></span>
+  </div>
+  <div class="card-body">
+    <div class="stack-sm">
+
+      <div class="row between funnel-row">
+        <span>Nuevo</span>
+        <span class="num strong">1.284</span>
+      </div>
+      <div class="bar-track"><span class="bar-neutral" style="width:100%"></span></div>
+
+      <div class="funnel-drop">
+        <span class="drop-rule"></span>
+        <span class="drop-text">se pierden <span class="drop-pct">41%</span> · 526 contactos nunca se contactaron</span>
+      </div>
+
+      <div class="row between funnel-row">
+        <span>Contactado</span>
+        <span class="num strong">758 <span class="soft small">(59%)</span></span>
+      </div>
+      <div class="bar-track"><span class="bar-info" style="width:59%"></span></div>
+
+      <div class="funnel-drop is-worst">
+        <span class="drop-rule"></span>
+        <span class="drop-text">se pierden <span class="drop-pct">79%</span> · 599 contactados no respondieron — <b>la caída más grande</b></span>
+      </div>
+
+      <div class="row between funnel-row">
+        <span>Respondió</span>
+        <span class="num strong">159 <span class="soft small">(21% de contactados)</span></span>
+      </div>
+      <div class="bar-track"><span class="bar-warn" style="width:12%"></span></div>
+
+      <div class="funnel-drop">
+        <span class="drop-rule"></span>
+        <span class="drop-text">se pierden <span class="drop-pct">74%</span> · 118 respondieron pero no agendaron</span>
+      </div>
+
+      <div class="row between funnel-row">
+        <span>Reunión</span>
+        <span class="num strong">41 <span class="soft small">(26% de los que respondieron)</span></span>
+      </div>
+      <div class="bar-track"><span class="bar-success" style="width:3%"></span></div>
+
+    </div>
+  </div>
+  <div class="card-footer meta">Aparte del embudo: 87 descartado(s) (7% de Nuevo) — no es una etapa de avance.</div>
+</div>
+
+<h2 class="mt-2xl mb-lg">2 · Actividad por BD, inmediatamente debajo, a ancho completo y sin <code>compact</code></h2>
+
+<div class="spec">
+  Es la respuesta al embudo, así que va pegada: se lee de arriba hacia abajo sin scroll intermedio.
+  Sin <code>compact</code>, porque la tabla dejó de competir por el ancho con Pipeline.
+  <br><br>
+  <b>Intentos va pegado a Llamadas</b> a propósito: separados no dicen nada, juntos se lee "marcó 12, habló 5".
+</div>
+
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Actividad por BD</h3>
+    <span class="actions"><span class="meta">En el período elegido</span></span>
+  </div>
+  <table class="data">
+    <thead>
+      <tr>
+        <th>BD</th>
+        <th class="right">Notas</th>
+        <th class="right">Intentos</th>
+        <th class="right">Llamadas</th>
+        <th class="right">Reuniones</th>
+        <th class="right">Correos</th>
+        <th class="right">Respuestas</th>
+        <th class="right">Tareas</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Mariel Meza</td><td class="right num">14</td><td class="right num">37</td><td class="right num">12</td><td class="right num">3</td><td class="right num">58</td><td class="right num">9</td><td class="right num">21</td></tr>
+      <tr><td>Macarena Dávila</td><td class="right num">9</td><td class="right num">4</td><td class="right num">2</td><td class="right num">1</td><td class="right num">71</td><td class="right num">14</td><td class="right num">18</td></tr>
+      <tr><td>Cristian Civita</td><td class="right num">2</td><td class="right num">0</td><td class="right num">0</td><td class="right num">2</td><td class="right num">33</td><td class="right num">6</td><td class="right num">5</td></tr>
+    </tbody>
+    <tfoot>
+      <tr><td class="strong">Total</td><td class="right num strong">25</td><td class="right num strong">41</td><td class="right num strong">14</td><td class="right num strong">6</td><td class="right num strong">162</td><td class="right num strong">29</td><td class="right num strong">44</td></tr>
+    </tfoot>
+  </table>
+  <div class="card-footer meta">Un intento es una marcada. Cuenta aunque después se haya convertido en llamada.</div>
+</div>
+
+<h2 class="mt-2xl mb-lg">3 · El vínculo: clic en una etapa filtra la tabla</h2>
+
+<div class="spec">
+  Acá se cierra la narrativa. Ves que la caída grande está entre <b>Contactado</b> y <b>Respondió</b>,
+  clickeás esa etapa, y la tabla de abajo pasa a mostrar <b>solo la actividad sobre esos contactos</b>.
+  <br><br>
+  El filtro se anuncia arriba de la tabla y se quita de un clic. Nunca cambia el período:
+  son dos filtros distintos y mezclarlos es cómo se pierde la confianza en un número.
+</div>
+
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Embudo de contactos</h3>
+    <span class="actions"><span class="meta">Etapa seleccionada: Contactado</span></span>
+  </div>
+  <div class="card-body">
+    <div class="stack-sm">
+      <div class="row between funnel-row"><span>Nuevo</span><span class="num strong">1.284</span></div>
+      <div class="bar-track"><span class="bar-neutral" style="width:100%"></span></div>
+      <div class="funnel-drop"><span class="drop-rule"></span><span class="drop-text">se pierden <span class="drop-pct">41%</span> · 526 contactos nunca se contactaron</span></div>
+      <div class="row between funnel-row is-selected"><span><b>Contactado</b></span><span class="num strong">758 <span class="soft small">(59%)</span></span></div>
+      <div class="bar-track"><span class="bar-info" style="width:59%"></span></div>
+      <div class="funnel-drop is-worst"><span class="drop-rule"></span><span class="drop-text">se pierden <span class="drop-pct">79%</span> · 599 contactados no respondieron — <b>la caída más grande</b></span></div>
+      <div class="row between funnel-row"><span>Respondió</span><span class="num strong">159 <span class="soft small">(21% de contactados)</span></span></div>
+      <div class="bar-track"><span class="bar-warn" style="width:12%"></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Actividad por BD</h3>
+  </div>
+  <div class="card-body" style="padding-bottom:0">
+    <div class="filter-banner">
+      <span>Filtrado por etapa del embudo: <b>Contactado</b> · 758 contactos</span>
+      <button type="button" class="btn btn-ghost btn-sm">Quitar filtro</button>
+    </div>
+  </div>
+  <table class="data">
+    <thead>
+      <tr><th>BD</th><th class="right">Notas</th><th class="right">Intentos</th><th class="right">Llamadas</th><th class="right">Reuniones</th><th class="right">Correos</th><th class="right">Respuestas</th><th class="right">Tareas</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Mariel Meza</td><td class="right num">11</td><td class="right num">31</td><td class="right num">10</td><td class="right num">2</td><td class="right num">44</td><td class="right num">7</td><td class="right num">16</td></tr>
+      <tr><td>Macarena Dávila</td><td class="right num">6</td><td class="right num">2</td><td class="right num">1</td><td class="right num">0</td><td class="right num">61</td><td class="right num">11</td><td class="right num">12</td></tr>
+      <tr><td>Cristian Civita</td><td class="right num">1</td><td class="right num">0</td><td class="right num">0</td><td class="right num">1</td><td class="right num">19</td><td class="right num">4</td><td class="right num">3</td></tr>
+    </tbody>
+  </table>
+  <div class="card-footer meta">Solo actividad sobre los 758 contactos que llegaron a «Contactado» en el período.</div>
+</div>
+
+<h2 class="mt-2xl mb-lg">4 · Todo lo demás, debajo y sin cambios</h2>
+
+<div class="spec">
+  No se rediseña nada más en esta tanda. Solo cambia <b>el orden</b> y <b>el ancho</b>.
+  Pipeline sale del <code>grid-2</code> que compartía con el embudo y pasa a ancho completo, debajo.
+  Descartes ya se movió al final en un cambio aparte.
+</div>
+
+<div class="demoted">
+  <div class="card mb-lg"><div class="card-header"><h3>Pipeline de empresas</h3><span class="actions"><span class="meta">Instantánea actual, no cambia con el período</span></span></div><div class="card-body"><p class="meta">Sin cambios de contenido. Se omite acá para no distraer.</p></div></div>
+  <div class="card mb-lg"><div class="card-header"><h3>Conversión</h3></div><div class="card-body"><p class="meta">Sin cambios de contenido.</p></div></div>
+  <div class="card mb-lg"><div class="card-header"><h3>Cola de seguimiento</h3></div><div class="card-body"><p class="meta">Sin cambios de contenido.</p></div></div>
+  <div class="card"><div class="card-header"><h3>Descartes por motivo</h3></div><div class="card-body"><p class="meta">Ya movido al final (PR #384).</p></div></div>
+</div>
+
+<div class="spec mt-2xl">
+  <b>Lo que este mockup NO propone, a propósito:</b> cambiar el tipo de gráfico del embudo, tocar los números,
+  ni rediseñar las tarjetas de abajo. El embudo con barras ya está aprobado y sus filas ya son clicables
+  (<code>reports-kpi-drilldown</code>). Lo único nuevo es la etiqueta de caída, el ancho, el orden,
+  y que la etapa seleccionada filtre la tabla de abajo en vez de abrir solo un diálogo de contactos.
+</div>
+
+
+</main>
+</div>
+</div>
+</body>
+</html>
