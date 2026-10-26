@@ -35,6 +35,8 @@ const SEEDS: Record<string, Seed & { expect: Expect; type?: string }> = {
   tie: { touches: [{ type: "email_sent", at: AT }], linkedin: AT, expect: "activity", type: "email_sent" },
   // Only non-touch rows (a task, a meeting reschedule): not a touch, so LinkedIn is the fallback.
   only_nontouch: { touches: [{ type: "task_created", at: new Date("2026-10-22T10:00:00Z") }], linkedin: new Date("2026-10-10T10:00:00Z"), expect: "linkedin" },
+  // A newer non-touch row must never shadow a real touch.
+  touch_with_newer_task: { touches: [{ type: "email_sent", at: AT }, { type: "task_created", at: new Date("2026-10-22T10:00:00Z") }], expect: "activity", type: "email_sent" },
   recent_linkedin_only: { linkedin: ago(2), expect: "linkedin" },
   old_linkedin_only: { linkedin: ago(200), expect: "linkedin" },
 };
