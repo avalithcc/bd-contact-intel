@@ -75,6 +75,8 @@ import { MARKETS } from "@/lib/hiring/markets";
 import { pickGenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import { GenerateMessageButton } from "../outreach/GenerateMessageButton";
 import { generateOutreachMessage } from "../outreach/actions";
+import { generatePersonOutreachMessageAction } from "./messageActions";
+import { outreachRowGenerateTarget } from "@/lib/outreach/generateTarget";
 import { TableIcon, BoardIcon, InfoIcon } from "@/components/icons";
 import styles from "./page.module.css";
 import { SubmitButton } from "@/components/forms/SubmitButton";
@@ -1024,16 +1026,27 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                       </div>
                     </td>
                     <td>
-                      {r.hasOwnContact ? (
-                        <GenerateMessageButton
-                          boundAction={generateOutreachMessage.bind(null, r.id, locale)}
-                          labels={messageLabels}
-                        />
-                      ) : (
-                        <span className="btn btn-secondary is-disabled" title={dict.outreach.unifiedRecordPending}>
-                          {messageLabels.generateMessage}
-                        </span>
-                      )}
+                      {(() => {
+                        const target = outreachRowGenerateTarget(r);
+                        if (target.kind === "none") {
+                          return (
+                            <>
+                              <span className="badge badge-danger">{dict.outreach.generateUnavailable}</span>
+                              <div className="meta">{dict.outreach.generateUnavailableReason}</div>
+                            </>
+                          );
+                        }
+                        return (
+                          <GenerateMessageButton
+                            boundAction={
+                              target.kind === "contact"
+                                ? generateOutreachMessage.bind(null, target.id, locale)
+                                : generatePersonOutreachMessageAction.bind(null, target.id, locale)
+                            }
+                            labels={messageLabels}
+                          />
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}

@@ -462,12 +462,11 @@ export const en = {
     tableLastContact: "Last contact",
     tableWhy: "Why",
     tableMessage: "Message",
-    // Shown instead of the "view"/"generate message" row actions for a
-    // teammate-exclusive Contact (fresh-review UX fix; see OutreachRow.
-    // hasOwnContact) — those two actions are still bdId-scoped and would
-    // 404 for a person with no legacy contact row of the calling BD's own,
-    // until Phase 9's unified /contacts/[id] record page.
-    unifiedRecordPending: "Available once the unified record page ships",
+    // Defensive only: every row of the outreach view carries a person id, so
+    // the generate control is always real. If a row ever has neither an own
+    // contact nor a person id, the reason is shown as visible text.
+    generateUnavailable: "Unavailable",
+    generateUnavailableReason: "This contact has no unified record yet, so a message can't be generated.",
     reasonDormantSince: (relTime: string, months: number) =>
       `Dormant since ${relTime} (${months}mo+ quiet)`,
     reasonDormant: "Dormant",

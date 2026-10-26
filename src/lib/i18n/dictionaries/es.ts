@@ -447,7 +447,11 @@ export const es: typeof en = {
     tableLastContact: "Último contacto",
     tableWhy: "Por qué",
     tableMessage: "Mensaje",
-    unifiedRecordPending: "Disponible cuando se habilite la ficha unificada",
+    // Defensivo: toda fila de la vista tiene id de persona, así que el control
+    // siempre es real. Si alguna fila no tuviera ni contacto propio ni id de
+    // persona, el motivo se muestra como texto visible.
+    generateUnavailable: "No disponible",
+    generateUnavailableReason: "Este contacto todavía no tiene ficha unificada, así que no podés generar el mensaje.",
     reasonDormantSince: (relTime, months) =>
       `Inactivo desde ${relTime} (${months}+ meses sin actividad)`,
     reasonDormant: "Inactivo",
