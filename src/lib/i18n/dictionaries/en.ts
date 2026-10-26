@@ -255,8 +255,9 @@ export const en = {
   leadStatuses,
 
   // App shell sidebar/topbar (design.md D9, fresh-review fix on tasks.md
-  // 8.2). The ROUTE and the internal name stay `outreach`; the LABEL is
-  // "Who to contact" (mirrors the Spanish "A quién contactar", see es.ts).
+  // 8.2). The NAV LABEL for the /outreach screen is "Who to contact" (mirrors
+  // the Spanish "A quién contactar", see es.ts). The route, the internal name
+  // and the Sequences/Scheduled section eyebrow stay "Outreach".
   nav: {
     workspaceSection: "CENTRAL",
     signalsSection: "AREAS",
@@ -1040,7 +1041,7 @@ export const en = {
     toastScheduleCancelled: "Send cancelled.",
     toastScheduleSaved: "Changes saved.",
     toastScheduleSendNow: "It goes out within the next minute.",
-    schedPageEyebrow: "Who to contact",
+    schedPageEyebrow: "Outreach",
     schedPageTitle: "Scheduled emails",
     schedPageIntro: "1:1 emails you wrote that go out later from your own Gmail account.",
     schedPageOnlyYours: "You only see your own",
@@ -3850,7 +3851,7 @@ export const en = {
     unitContactMany: "contacts",
     unitCompanyOne: "company",
     unitCompanyMany: "companies",
-    listEyebrow: "Who to contact",
+    listEyebrow: "Outreach",
     listTitle: "Sequences",
     listIntroLead: "Batches of 1:1 emails to contacts you picked by hand, sent from your own Gmail account.",
     listIntroStrong: "You only see your own",
