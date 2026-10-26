@@ -4,8 +4,11 @@ Neutral, professional Spanish. No regional slang, no voseo/tú. Actions use the
 infinitive ("Guardar", not "Guarda" or "Guardá").
 
 Product/brand names (Gmail, LinkedIn, Avalith) stay as-is. "BD" stays as the
-team's term. "Outreach" stays as the feature/route name (not translated),
-matching how the rest of the product refers to it.
+team's term. The `/outreach` route and the internal name `outreach` stay, but
+the screen's LABEL is "A quién contactar" (English: "Who to contact"), changed
+2026-10-26 because the team did not know what a screen called "Outreach" was.
+Do not revert it to "Outreach". The `/contacts` saved view "Listos para
+Outreach" is a filter, not the screen name, and is deliberately unchanged.
 
 | English | Spanish |
 |---|---|
