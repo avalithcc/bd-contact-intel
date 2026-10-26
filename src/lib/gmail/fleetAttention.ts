@@ -29,20 +29,30 @@ export function gmailAttentionCount(rows: readonly GmailFleetAccountJson[] | nul
   }
 }
 
+/**
+ * The one json-row to FleetAccount mapping: the pill counts with it, and the unit cross-check feeds the fleet screen's
+ * builder with it, so both sides of that test start from one fixture.
+ *
+ * `hasCursor` and `backfilling` are hardcoded because the badge statement does not read them (appShellBadgeCountsQuery.ts
+ * joins only bd and email_account). That is safe, and checked rather than assumed: the ONLY consumer of either field is
+ * fleetText.ts's cursor LINE — display text. `classifyAccount` never reads them, so they cannot change whether an account
+ * counts as needing attention, and the pill cannot disagree with the fleet screen over them. If a future classifier starts
+ * reading either one, this mapping becomes a real divergence and these two values must come from the query instead.
+ */
+export function fleetAccountFromJson(r: GmailFleetAccountJson): FleetAccount | null {
+  return r.has
+    ? {
+        status: r.status,
+        grantedScopes: r.grantedScopes,
+        syncError: r.syncError,
+        lastSyncedAt: toDate(r.lastSyncedAt),
+        connectedAt: toDate(r.connectedAt),
+        hasCursor: true,
+        backfilling: false,
+      }
+    : null;
+}
+
 function countRows(rows: readonly GmailFleetAccountJson[] | null | undefined, now: Date): number {
-  const accounts = (rows ?? []).map(
-    (r): FleetAccount | null =>
-      r.has
-        ? {
-            status: r.status,
-            grantedScopes: r.grantedScopes,
-            syncError: r.syncError,
-            lastSyncedAt: toDate(r.lastSyncedAt),
-            connectedAt: toDate(r.connectedAt),
-            hasCursor: true,
-            backfilling: false,
-          }
-        : null,
-  );
-  return countAttention(accounts, now);
+  return countAttention((rows ?? []).map(fleetAccountFromJson), now);
 }
