@@ -15,7 +15,7 @@ export function StatCards({ stats, now, labels: l }: { stats: SequenceStats; now
     { tone: "accent", label: l.statQueued, value: stats.queued, foot: queuedFoot(stats.nextReleaseAt, now, l) },
     { tone: "neutral", label: l.statSent, value: stats.sent, foot: stats.awaitingReminder === 1 ? l.statSentFootOne : fill(l.statSentFoot, { n: stats.awaitingReminder }) },
     { tone: "success", label: l.statReplied, value: stats.replied, foot: l.statRepliedFoot },
-    { tone: "warn", label: l.statNotContactable, value: stats.notContactable, foot: fill(l.statNotContactableFoot, { pct: stats.notContactablePct }) },
+    { tone: "warn", label: l.statNotContactable, value: stats.notContactable, foot: fill(l.statNotContactableFoot, { pct: stats.notContactablePct.toLocaleString(l.dateLocale) }) },
   ];
   return (
     <div className="grid-5 mb-lg">

@@ -3583,6 +3583,7 @@ export const en = {
     badgeBounced: "Bounced",
     badgeOptedOut: "Asked to opt out",
     badgeNeverSent: "never sent",
+    bouncedTitle: "Bounced on {date}",
     bouncedUnsentTitle: "The address bounced in another sequence",
     metaBounced: "Bounced on {date} · the address is now on the suppression list",
     metaBouncedUnsent: "The address was already bounced · this sequence never wrote to them",

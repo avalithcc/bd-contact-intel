@@ -190,7 +190,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
           <div className="row wrap">
             <Link className="strong" href={`/contacts/${m.personId}`}>{name}</Link>
             {discarded
-              ? <span className={`badge ${discarded.badgeClass}`} title={discarded.badge === "bounced" && discarded.neverSent ? l.bouncedUnsentTitle : undefined}>{discarded.badge === "bounced" ? l.badgeBounced : discarded.badge === "optedOut" ? l.badgeOptedOut : l.badges.discarded}</span>
+              ? <span className={`badge ${discarded.badgeClass}`} title={discarded.badge !== "bounced" ? undefined : discarded.neverSent ? l.bouncedUnsentTitle : m.discardedAt ? fill(l.bouncedTitle, { date: miamiWhen(m.discardedAt, now).ddmm }) : undefined}>{discarded.badge === "bounced" ? l.badgeBounced : discarded.badge === "optedOut" ? l.badgeOptedOut : l.badges.discarded}</span>
               : <span className={`badge badge-${card.tone}`}>{l.badges[card.kind]}</span>}
             {discarded?.neverSent && <span className="badge badge-outline">{l.badgeNeverSent}</span>}
             {m.draft && showsReviewFlag(card.kind) && (m.draft.reviewedAt

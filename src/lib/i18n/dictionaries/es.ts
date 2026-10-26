@@ -3583,6 +3583,7 @@ export const es: typeof en = {
     badgeBounced: "Rebotado",
     badgeOptedOut: "Pidió la baja",
     badgeNeverSent: "nunca salió",
+    bouncedTitle: "Rebotó el {date}",
     bouncedUnsentTitle: "La dirección rebotó en otra secuencia",
     metaBounced: "Rebotó el {date} · la dirección quedó en la lista de supresión",
     metaBouncedUnsent: "La dirección ya estaba rebotada · esta secuencia nunca le escribió",

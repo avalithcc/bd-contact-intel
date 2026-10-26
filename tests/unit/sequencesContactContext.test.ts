@@ -106,7 +106,7 @@ test("a discarded card words bounce, opt-out and automatic removal without claim
   const base = { memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "discarded", holdReason: null, firstName: "Test1", lastName: "Person", jobTitle: "Lead", company: "Acme", companyKey: "acme", email: "p1@example.test", emailVerified: true, openIt: 0, florida: false, leadership: false, lastContactAt: null, repliedAt: null, sentAt: hours(50), reminderDueAt: null, discardedAt: hours(24), discardReason: "bounce", discardedByBdId: null, draft: null, reminderDraft: null } as const;
   const html = (over: Record<string, unknown>) => renderToStaticMarkup(createElement(MemberCard, { member: { ...base, ...over }, now: NOW, labels: es.sequences, onAction: () => {}, ownView: true, send: SEND, generation: IDLE_LOCK }));
   const bounced = html({});
-  assert.ok(bounced.includes("badge badge-danger") && bounced.includes("Rebotado") && !bounced.includes("nunca salió") && !bounced.includes("Lo quitaste"));
+  assert.ok(bounced.includes("badge badge-danger") && bounced.includes("Rebotado") && bounced.includes('title="Rebotó el ') && !bounced.includes("nunca salió") && !bounced.includes("Lo quitaste"));
   const optedOut = html({ discardReason: "opt_out" });
   assert.ok(optedOut.includes("badge badge-discarded") && optedOut.includes("Pidió la baja") && optedOut.includes("de ningún BD"));
   const burned = html({ sentAt: null });
