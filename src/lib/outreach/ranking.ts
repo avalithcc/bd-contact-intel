@@ -92,10 +92,13 @@ export interface OutreachRow {
   id: string;
   // False for a teammate-exclusive Contact (see the `id` doc comment on
   // listOutreachCandidates in queries.ts): `id` then falls back to
-  // `person.id`, which the still-bdId-scoped `/contact/[id]` page and
-  // generateOutreachMessage don't resolve. UI callers use this explicit flag
-  // to hide/disable those two actions instead of re-deriving it by
-  // comparing ids.
+  // `person.id`, which the bdId-scoped `generateOutreachMessage` cannot
+  // resolve. It no longer means "no action available": the view link uses
+  // `personId` for every row, and the generate control picks the
+  // person-based action for these rows (outreachRowGenerateTarget in
+  // generateTarget.ts). This flag only says WHICH id space the row's `id`
+  // is in, so callers choose the matching action instead of re-deriving it
+  // by comparing ids.
   hasOwnContact: boolean;
   // The unified `person.id` (design D1) — the "view" link goes here for
   // every row now that `/contacts/[id]` (design D8) isn't `bdId`-scoped,
