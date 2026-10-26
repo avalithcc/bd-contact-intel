@@ -187,7 +187,16 @@ export function planUndo(
   if (meeting.status === "rescheduled" && next?.status !== "scheduled") throw new MeetingOutcomeError("meeting_undo_unavailable");
 }
 
-/** A task the save created is taken back only while nobody has touched it: open, and never edited since it was created. */
+/**
+ * A task the save created is taken back only while nobody has touched it: open, and never edited since it was created.
+ * The 1s allowance covers the create write stamping updatedAt a few milliseconds after createdAt.
+ *
+ * ABSOLUTE distance, not `updatedAt - createdAt`: a plain subtraction is negative whenever updatedAt sits BEFORE
+ * createdAt, and a negative number passes `<= 1000`, so a row whose updatedAt moved backwards (a clock skew, a restore,
+ * a caller writing a logical timestamp against a database-clock createdAt) read as untouched and the BD's edit was
+ * DELETED. Deleting someone's work is the expensive direction; keeping a task that was perhaps not edited costs them one
+ * dismissal. So the check fails safe: anything that is not plainly "written once" is treated as touched.
+ */
 export function canRemoveFollowUpTask(t: { status: string; createdAt: Date; updatedAt: Date }): boolean {
-  return t.status === "open" && t.updatedAt.getTime() - t.createdAt.getTime() <= 1000;
+  return t.status === "open" && Math.abs(t.updatedAt.getTime() - t.createdAt.getTime()) <= 1000;
 }
