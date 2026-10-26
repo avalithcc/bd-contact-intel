@@ -53,15 +53,26 @@ export function automaticSubjectPrefix(subject: string | null | undefined): stri
   return match ? match[0].trim().toLowerCase().replace(/\s+/g, " ") : null;
 }
 
+/**
+ * Does the message CLAIM to be a delivery report? Only the three DSN-specific signals of the list above: an
+ * X-Failed-Recipients header, a multipart/report envelope, a mailer-daemon@ / postmaster@ sender. A generic auto-reply
+ * (Auto-Submitted, Precedence, an "Automatic reply:" subject) must NOT match: an out-of-office is machine-generated and
+ * still not a notification, so the sync's "a notification yielded no bounce" log (syncAccount.ts) would be noise.
+ * isAutomatedMessage is built from this same function, so the two cannot disagree about what a DSN looks like.
+ */
+export function looksLikeDeliveryReport(headers: readonly GmailApiHeader[] | undefined, topLevelMimeType: string | undefined): boolean {
+  if (header(headers, "x-failed-recipients") !== "") return true;
+  const contentType = (topLevelMimeType || header(headers, "content-type")).toLowerCase();
+  if (contentType.startsWith("multipart/report")) return true;
+  const senderLocalPart = (extractEmailAddresses(header(headers, "from"))[0] ?? "").split("@")[0] ?? "";
+  return SYSTEM_SENDER_LOCAL_PART.has(senderLocalPart);
+}
+
 export function isAutomatedMessage(headers: readonly GmailApiHeader[] | undefined, topLevelMimeType: string | undefined): boolean {
   const autoSubmitted = header(headers, "auto-submitted").toLowerCase();
   if (autoSubmitted !== "" && autoSubmitted !== "no") return true;
   if (MARKER_HEADERS.some((name) => hasHeader(headers, name))) return true;
   if (AUTOMATIC_PRECEDENCE.has(header(headers, "precedence").toLowerCase())) return true;
-  if (header(headers, "x-failed-recipients") !== "") return true;
-  const contentType = (topLevelMimeType || header(headers, "content-type")).toLowerCase();
-  if (contentType.startsWith("multipart/report")) return true;
-  const senderLocalPart = (extractEmailAddresses(header(headers, "from"))[0] ?? "").split("@")[0] ?? "";
-  if (SYSTEM_SENDER_LOCAL_PART.has(senderLocalPart)) return true;
+  if (looksLikeDeliveryReport(headers, topLevelMimeType)) return true;
   return hasAutomaticSubjectPrefix(header(headers, "subject"));
 }

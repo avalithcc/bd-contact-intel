@@ -2,7 +2,8 @@
 // (task 10.3). Every case goes through the REAL parseGmailMessage so the verdict is the one the sync stores.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isAutomatedMessage } from "../../src/lib/gmail/automatedMessage";
+import { isAutomatedMessage, looksLikeDeliveryReport } from "../../src/lib/gmail/automatedMessage";
+import { outOfOffice } from "./bounceFixtures";
 import { parseGmailMessage, type GmailApiHeader } from "../../src/lib/gmail/parseMessage";
 
 function parsed(extra: GmailApiHeader[], o: { from?: string; subject?: string; body?: string; mimeType?: string } = {}) {
@@ -84,4 +85,24 @@ test("the existing protocol signals still hold", () => {
   assert.equal(parsed([{ name: "X-Failed-Recipients", value: "gone@guess.com" }]).automated, true);
   assert.equal(parsed([], { mimeType: "multipart/report" }).automated, true);
   assert.equal(isAutomatedMessage(undefined, undefined), false);
+});
+
+// --- looksLikeDeliveryReport: only the DSN-specific signals, never a generic auto-reply ---------------------------------
+
+const hdr = (name: string, value: string): GmailApiHeader[] => [{ name, value }];
+
+test("looksLikeDeliveryReport: each DSN signal alone is enough", () => {
+  assert.equal(looksLikeDeliveryReport(hdr("X-Failed-Recipients", "a@acme-ejemplo.test"), "text/plain"), true);
+  assert.equal(looksLikeDeliveryReport([], "multipart/report"), true);
+  assert.equal(looksLikeDeliveryReport(hdr("Content-Type", "multipart/report; report-type=delivery-status"), undefined), true);
+  assert.equal(looksLikeDeliveryReport(hdr("From", "Mail Delivery Subsystem <mailer-daemon@googlemail.com>"), "text/plain"), true);
+  assert.equal(looksLikeDeliveryReport(hdr("From", "postmaster@acme-ejemplo.test"), "text/plain"), true);
+});
+
+test("looksLikeDeliveryReport: an out-of-office and ordinary mail are not delivery reports", () => {
+  const ooo = outOfOffice().payload!;
+  assert.equal(isAutomatedMessage(ooo.headers, ooo.mimeType), true, "precondition: it is automated");
+  assert.equal(looksLikeDeliveryReport(ooo.headers, ooo.mimeType), false);
+  assert.equal(looksLikeDeliveryReport(hdr("From", "Jonathan <jonathan@guess.com>"), "text/plain"), false);
+  assert.equal(looksLikeDeliveryReport(hdr("From", "Mailer-Daemon Fan <jonathan@guess.com>"), "text/plain"), false, "the display name never counts");
 });
