@@ -1,6 +1,6 @@
 /**
  * The recipient-facing unsubscribe screens (mockups/baja-opciones.html, Option B: screens 2 and 3, plus the generic
- * invalid page), as an escaped HTML string. Rendered in the language the recipient's email was written in (their compliance
+ * invalid page), as an escaped HTML string. Rendered in the language the recipient's email was written in (the language chosen for the draft, else their compliance
  * audience: Spanish for Spanish-speaking countries, English otherwise). The invalid page is always English: see `pageLocale`.
  *
  * A string and not a React component on purpose: the screens are served by a route handler (/api/unsubscribe), and Next
