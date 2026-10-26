@@ -18,7 +18,7 @@ const AT = new Date("2026-10-23T16:41:00Z"); // 19 minutes before NOW
 const member = (state: DetailMember["state"], reviewedAt: Date | null, extra: Partial<DetailMember> = {}): DetailMember => ({
   memberId: "m1", personId: "p1", state, holdReason: null, firstName: "Nicolas", lastName: "Peralta", jobTitle: "Head of Digital", company: "Banco", companyKey: null,
   email: "n@x.com", emailVerified: true, openIt: 0, florida: false, leadership: false, lastContactAt: null, repliedAt: null, sentAt: null, reminderDueAt: null,
-  discardedAt: null, discardReason: null, reminderDraft: null,
+  discardedAt: null, discardReason: null, discardedByBdId: null, reminderDraft: null,
   draft: { subject: "s", body: "b", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt, approvedAt: state === "approved" ? AT : null, scheduledFor: null },
   ...extra,
 });

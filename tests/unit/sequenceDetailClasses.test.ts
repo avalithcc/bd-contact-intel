@@ -62,7 +62,7 @@ function member(i: number, over: Partial<DetailMember>): DetailMember {
     memberId: `m${i}`, personId: `00000000-0000-4000-8000-00000000000${i}`, state: "drafted", holdReason: null,
     firstName: `Test${i}`, lastName: "Person", jobTitle: "Engineering Lead", company: `Acme ${i}`, companyKey: `acme-${i}`,
     email: `p${i}@example.test`, emailVerified: true, openIt: 2, florida: true, leadership: true, lastContactAt: null,
-    repliedAt: null, sentAt: null, reminderDueAt: null, discardedAt: null, discardReason: null, draft: draft(), reminderDraft: null, ...over,
+    repliedAt: null, sentAt: null, reminderDueAt: null, discardedAt: null, discardReason: null, discardedByBdId: null, draft: draft(), reminderDraft: null, ...over,
   };
 }
 

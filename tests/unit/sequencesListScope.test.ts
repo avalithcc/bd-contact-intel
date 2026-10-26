@@ -56,7 +56,7 @@ test("an owner filter narrows Todas and names the chip; an unknown owner is igno
 });
 
 test("groupListRows carries the owner when the read selects it, and omits it otherwise", () => {
-  const base: ListDbRow = { id: "s1", name: "N", created_at: new Date(), daily_send_cap: 5, schedule: {}, state: null, has_draft: null, scheduled_for: null, company: null };
+  const base: ListDbRow = { id: "s1", name: "N", created_at: new Date(), daily_send_cap: 5, schedule: {}, state: null, has_draft: null, scheduled_for: null, sent_at: null, discard_reason: null, company: null };
   assert.equal(groupListRows([base])[0].owner, undefined);
   assert.deepEqual(groupListRows([{ ...base, owner_id: TOMAS, owner_name: "Tomás" }])[0].owner, { id: TOMAS, name: "Tomás" });
 });

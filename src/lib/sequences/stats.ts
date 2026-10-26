@@ -4,12 +4,16 @@
  * re-derived in a component.
  *
  * Two rules that are easy to get wrong:
- *  - "Enviados" counts every member whose step 1 went out, INCLUDING those who later replied or never answered, so a
- *    replied member is in both "Enviados" and "Respondieron". Only `sent` is still awaiting a reminder.
+ *  - "Enviados" counts every member whose step 1 went out (`sent_at` set), whatever happened to them afterwards: a
+ *    replied member is in both "Enviados" and "Respondieron", and a member who bounced or was discarded after the email
+ *    left is still an email that left. Only state `sent` is still awaiting a reminder.
+ *  - "No contactables" is a bounce or an opt-out THIS Sequence wrote to (`sent_at` set). A hard bounce discards the
+ *    member in every Sequence holding that address, so without the `sent_at` condition the tile would count people
+ *    this Sequence never wrote to and the rate would be fiction.
  *  - A discarded member is in the total (the progress line says "de 10") but is never "sin respuesta": the finished
  *    copy counts `no_reply` members, not total minus replied.
  */
-import { SENT_STATES, type MemberState } from "./memberState";
+import type { MemberState } from "./memberState";
 
 export type StatMember = {
   state: MemberState;
@@ -17,7 +21,18 @@ export type StatMember = {
   hasDraft: boolean;
   /** The step 1 draft's release instant; only read for approved members. */
   scheduledFor: Date | null;
+  /** When step 1 went out; null if it never did. Drives "Enviados" and "No contactables". */
+  sentAt: Date | null;
+  /** Why the member was discarded (`bounce`, `opt_out`, ...); null when it was not. */
+  discardReason: string | null;
 };
+
+/** The one mapping from a detail member to what the stats read, so the screen cannot drop `sentAt` or `discardReason`. */
+export function toStatMember(m: { state: MemberState; sentAt: Date | null; discardReason: string | null; draft: { scheduledFor: Date | null } | null }): StatMember {
+  return { state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null, sentAt: m.sentAt, discardReason: m.discardReason };
+}
+
+const UNCONTACTABLE_REASONS = ["bounce", "opt_out"];
 
 export type SequenceStats = {
   total: number;
@@ -26,6 +41,10 @@ export type SequenceStats = {
   nextReleaseAt: Date | null;
   sent: number;
   awaitingReminder: number;
+  /** Bounced or opted out after this Sequence wrote to them. */
+  notContactable: number;
+  /** Over what actually went out (`sent`), to one decimal so 1 of 300 does not read 0%; 0 when nothing went out. */
+  notContactablePct: number;
   replied: number;
   /** `empty`: members and no draft yet. `finished`: nothing drafted, approved or awaiting a reminder. */
   view: "empty" | "live" | "finished";
@@ -43,13 +62,16 @@ const pct = (n: number, total: number) => (total === 0 ? 0 : Math.round((n / tot
 export function sequenceStats(members: readonly StatMember[]): SequenceStats {
   const count = (pred: (m: StatMember) => boolean) => members.filter(pred).length;
   const total = members.length;
-  const sent = count((m) => (SENT_STATES as readonly string[]).includes(m.state));
+  const sent = count((m) => m.sentAt !== null);
+  const notContactable = count((m) => m.sentAt !== null && m.discardReason !== null && UNCONTACTABLE_REASONS.includes(m.discardReason));
   const queued = count((m) => m.state === "approved");
   const replied = count((m) => m.state === "replied");
   const noReply = count((m) => m.state === "no_reply");
   const live = count((m) => m.state === "drafted" || m.state === "approved" || m.state === "sent");
-  const sentPct = pct(sent, total);
-  const queuedPct = pct(queued, total);
+  // A readmitted member keeps its `sent_at` (clearing it would let the next release send a "first" email again), so it
+  // can be in `sent` AND `queued`. The counts stay true; only the bar is bounded so it never exceeds the track.
+  const sentPct = Math.min(pct(sent, total), 100);
+  const queuedPct = Math.min(pct(queued, total), 100 - sentPct);
   const release = members.filter((m) => m.state === "approved" && m.scheduledFor).map((m) => m.scheduledFor!.getTime());
 
   const view = total > 0 && !members.some((m) => m.hasDraft) ? "empty" : total > 0 && live === 0 && sent > 0 ? "finished" : "live";
@@ -60,10 +82,12 @@ export function sequenceStats(members: readonly StatMember[]): SequenceStats {
     nextReleaseAt: release.length ? new Date(Math.min(...release)) : null,
     sent,
     awaitingReminder: count((m) => m.state === "sent"),
+    notContactable,
+    notContactablePct: pct(notContactable, sent),
     replied,
     view,
     finished: { replied, noReply, total },
     // The remainder of the rounded parts, not a third rounding, so the three always add to exactly 100.
-    segments: { sentPct, queuedPct, restPct: total === 0 ? 0 : Math.round((100 - sentPct - queuedPct) * 10) / 10, rest: total - sent - queued },
+    segments: { sentPct, queuedPct, restPct: total === 0 ? 0 : Math.max(0, Math.round((100 - sentPct - queuedPct) * 10) / 10), rest: Math.max(0, total - sent - queued) },
   };
 }

@@ -23,7 +23,7 @@ const { RosterPicker } = require(`${C}/RosterPicker`) as typeof import("@/app/(a
 const NOW = new Date("2026-10-15T16:00:00Z");
 const l = es.sequences;
 const st = es.leadStatuses;
-const mem = (state: StatMember["state"], scheduledFor: Date | null = null): StatMember => ({ state, hasDraft: true, scheduledFor });
+const mem = (state: StatMember["state"], scheduledFor: Date | null = null): StatMember => ({ state, hasDraft: true, scheduledFor, sentAt: state === "sent" || state === "replied" || state === "no_reply" ? new Date("2026-10-14T13:00:00Z") : null, discardReason: null });
 const seq = (id: string, createdAt: string, members: StatMember[], over: Partial<SequenceListRow> = {}): SequenceListRow =>
   ({ id, name: `Seq ${id}`, createdAt: new Date(createdAt), dailySendCap: 5, schedule: DEFAULT_SCHEDULE, companies: ["Acme", "Bolt", "Core", "Dune"], members, ...over });
 const rows = [

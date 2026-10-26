@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secuencia · indicador de no contactables</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../crm-hubspot-ux/mockups/styles.css">
+</head>
+<body>
+<div class="shell"><div class="main"><main class="content">
+
+<div class="page-header"><div class="titles">
+<div class="eyebrow">Secuencia</div>
+<h1>Un quinto indicador: no contactables<span class="dot">.</span></h1>
+<p class="meta">Un rebote duro y una baja no comparten la causa, comparten la <strong>consecuencia</strong>: la dirección queda en la lista de supresión, de toda la empresa, para siempre, y <span class="mono">canTransition</span> prohíbe reincorporar en los dos casos. Por eso un solo número. El desglose vive en la tarjeta de cada contacto, como hoy.</p>
+</div></div>
+
+<div class="alert alert-info mb-xl"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div>
+<div class="title">El término no es inventado y la grilla no cuesta nada.</div>
+"No contactar" ya es vocabulario del CRM: <span class="mono">es.ts:3806</span> dice <em>"La dirección está en la lista de no contactar"</em> y la acción del BD se llama <em>"No contactar"</em>. Y <span class="mono">.grid-5</span> ya existe en <span class="mono">src/app/design-system.css:85</span> — era la copia de los mockups la que estaba vieja. Cinco tiles no requieren ningún cambio de diseño.
+</div></div>
+
+<hr class="hr">
+
+<h2 class="mt-2xl mb-sm">Los cinco tiles</h2>
+<p class="meta mb-lg">El quinto usa el tono <span class="mono">warn</span>, que ya existe. El pie es la tasa: eso es la variable que pediste.</p>
+
+<div class="grid-5 mb-lg">
+<div class="stat info"><div class="label">Borradores por revisar</div><div class="value">3</div><div class="foot">esperan tu aprobación</div></div>
+<div class="stat accent"><div class="label">Aprobados, en cola</div><div class="value">2</div><div class="foot">salen mañana 09:00</div></div>
+<div class="stat neutral"><div class="label">Enviados</div><div class="value">6</div><div class="foot">3 esperan recordatorio</div></div>
+<div class="stat success"><div class="label">Respondieron</div><div class="value">1</div><div class="foot">pasó a Seguimientos</div></div>
+<div class="stat warn"><div class="label">No contactables</div><div class="value">3</div><div class="foot">50% de los que salieron</div></div>
+</div>
+
+<div class="alert alert-warn mb-xl"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg><div>
+<div class="title">Ojo con "Enviados": hoy ese número miente por abajo.</div>
+Cuando un correo rebota, el miembro pasa a <span class="mono">discarded</span> y <strong>deja de contar como enviado</strong>. En la pantalla actual este caso diría <strong>Enviados 3</strong>, cuando salieron 6. Arriba dice 6 a propósito: si el denominador pierde a los rebotados, la tasa que vas a leer es falsa. Esto hay que corregirlo junto con el tile nuevo, no después.
+</div></div>
+
+<hr class="hr">
+
+<h2 class="mt-2xl mb-sm">El desglose, en la tarjeta del contacto</h2>
+<p class="meta mb-lg">Acá se ve si fue rebote o baja, como pediste. Las dos etiquetas <strong>ya estaban diseñadas y aprobadas</strong>: "Pidió la baja" en <span class="mono">baja-opciones.html</span> (implementada sólo en la ficha del contacto) y "Rebotado" en <span class="mono">bounce-detection/mockups/contact-bounce.html</span> (implementada en la ficha y en la lista). Falta traerlas a la secuencia.</p>
+
+<h3 class="mb-sm">Hoy: las dos causas comparten un badge genérico</h3>
+<div class="card mb-xl"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a2">AE</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Andy Ellis</a><span class="badge badge-discarded">Descartado</span></div>
+<p class="headline">VP of Engineering en <a href="../../crm-hubspot-ux/mockups/company-record.html">Cint</a></p>
+<div class="meta">Lo quitaste hace 1 d &middot; motivo: el correo rebotó</div>
+</div></div></div>
+
+<h3 class="mb-sm">Propuesto</h3>
+<div class="card mb-lg"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a2">AE</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Andy Ellis</a><span class="badge badge-danger" title="Rebotó el 14/10">Rebotado</span></div>
+<p class="headline">VP of Engineering en <a href="../../crm-hubspot-ux/mockups/company-record.html">Cint</a></p>
+<div class="meta">Rebotó el 14/10 &middot; la dirección quedó en la lista de supresión</div>
+</div></div></div>
+
+<div class="card mb-lg"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">BC</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Brian Casteel</a><span class="badge badge-discarded">Pidió la baja</span></div>
+<p class="headline">VP of Engineering en <a href="../../crm-hubspot-ux/mockups/company-record.html">Upshop</a></p>
+<div class="meta">Baja registrada el 15/10 &middot; no vuelve a entrar a ninguna secuencia, de ningún BD</div>
+</div></div></div>
+
+<div class="alert alert-info mb-lg"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div>
+<div class="title">Sin el código SMTP, a propósito.</div>
+El <span class="mono">5.1.1</span> no está en <span class="mono">sequence_member</span>: vive en el <span class="mono">metadata.statusCode</span> de la actividad del rebote, y traerlo acá costaría una consulta nueva en una pantalla que el equipo abre todo el día. La regla de esta pantalla es la que definió el dueño: el tile es la variable, la ficha del contacto es el detalle — y la ficha ya muestra el código.
+</div></div>
+<p class="meta mb-xl">Y se corrige una mentira chica que ya está hoy: la línea dice <em>"Lo quitaste"</em> también en los descartes automáticos, donde <span class="mono">discarded_by_bd_id</span> es NULL y nadie lo quitó.</p>
+
+<hr class="hr">
+
+<h2 class="mt-2xl mb-sm">El caso que no entra en la tasa</h2>
+<p class="meta mb-lg">Un rebote duro descarta al contacto en <strong>todas</strong> las secuencias que tengan esa dirección, incluso en las que nunca le escribieron. Se separan con <span class="mono">sent_at</span>, que ya está en la tabla: <span class="mono">sent_at ≠ null</span> es "esta secuencia escribió y rebotó" y cuenta; <span class="mono">sent_at = null</span> es "la dirección ya estaba quemada" y no cuenta, porque nunca salió un correo.</p>
+
+<div class="card mb-lg"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a3">MF</span><div class="grow stack-sm" style="min-width:0">
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Marina Fuentes</a><span class="badge badge-danger" title="La dirección rebotó en otra secuencia">Rebotado</span><span class="badge badge-outline">nunca salió</span></div>
+<p class="headline">Head of Data en <a href="../../crm-hubspot-ux/mockups/company-record.html">Cint</a></p>
+<div class="meta">La dirección ya estaba rebotada &middot; esta secuencia nunca le escribió</div>
+</div></div></div>
+<p class="meta mb-xl">Se marca igual —te sirve saber por qué quedó afuera— pero <strong>no entra en el 50%</strong> del tile.</p>
+
+<hr class="hr">
+
+<h2 class="mt-2xl mb-lg">Lo que no cambia</h2>
+<div class="card"><div class="card-body stack-sm">
+<div class="meta">&middot; No se agrega un estado ni una columna. Los dos números salen de <span class="mono">discard_reason</span> y <span class="mono">sent_at</span>, que ya están en <span class="mono">sequence_member</span>.</div>
+<div class="meta">&middot; "Reincorporar" sigue oculto para rebotes y bajas. Un rebote duro y una baja no se deshacen desde la secuencia.</div>
+<div class="meta">&middot; La supresión sigue siendo global por dirección, de toda la empresa. El indicador es de esta secuencia; la supresión no.</div>
+<div class="meta">&middot; Los informes de <span class="mono">/admin</span> no se tocan. Hoy el único agregado de rebotes es el de <span class="mono">/admin/gmail</span>, por BD y a 30 días (<span class="mono">fleetQueries.ts</span>), y mide otra cosa.</div>
+</div></div>
+
+</main></div></div>
+</body>
+</html>

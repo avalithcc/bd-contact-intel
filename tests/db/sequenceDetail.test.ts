@@ -22,7 +22,7 @@ const personIds: string[] = [];
 const memberIds: Record<string, string> = {};
 const companyKeys: string[] = [];
 
-async function mkMember(name: string, state: string, over: { roleGroup?: string; draft?: boolean; reminderDraft?: boolean; florida?: boolean; emailStatus?: string } = {}) {
+async function mkMember(name: string, state: string, over: { roleGroup?: string; draft?: boolean; reminderDraft?: boolean; florida?: boolean; emailStatus?: string; sentAt?: Date; discardReason?: string } = {}) {
   const { db } = await import("@/db");
   const { company, jobPosting, person, sequenceDraft, sequenceMember, targetCompany } = await import("@/db/schema");
   const ck = key(`co-${name}`);
@@ -36,7 +36,7 @@ async function mkMember(name: string, state: string, over: { roleGroup?: string;
   const email = `${key(name)}@example.test`;
   const [p] = await db.insert(person).values({ firstName: name, lastName: run, email, emailNormalized: email, emailStatus: over.emailStatus ?? "verified", emailSource: "apollo", jobTitle: "Role", company: ck, companyKey: ck, roleGroup: over.roleGroup ?? null }).returning();
   personIds.push(p.id);
-  const [m] = await db.insert(sequenceMember).values({ sequenceId, personId: p.id, state, holdReason: state === "approved" ? "sync_stale" : null }).returning();
+  const [m] = await db.insert(sequenceMember).values({ sequenceId, personId: p.id, state, holdReason: state === "approved" ? "sync_stale" : null, sentAt: over.sentAt ?? null, discardReason: over.discardReason ?? null }).returning();
   memberIds[name] = m.id;
   if (over.draft !== false) await db.insert(sequenceDraft).values({ sequenceMemberId: m.id, step: 1, subject: `Subject ${name}`, body: `Body ${name}` });
   if (over.reminderDraft) await db.insert(sequenceDraft).values({ sequenceMemberId: m.id, step: 2, subject: `Re ${name}`, body: `Reminder ${name}` });
@@ -65,6 +65,9 @@ before(async () => {
   await mkMember("appr1", "approved");
   await mkMember("rep1", "replied");
   await mkMember("disc1", "discarded", { draft: false });
+  // Discarded by the bounce handler (no actor): one that went out, one that was burned by another Sequence.
+  await mkMember("bounceSent", "discarded", { draft: false, sentAt: new Date("2026-10-14T13:00:00Z"), discardReason: "bounce" });
+  await mkMember("bounceUnsent", "discarded", { draft: false, discardReason: "bounce" });
 });
 
 after(async () => {
@@ -87,7 +90,7 @@ test("the owner reads their Sequence with every member, ordered drafted, approve
   assert.equal(d.name, key("seq"));
   assert.equal(d.ownerName, "ZZ owner");
   assert.equal(d.fromAddress, `zz-detail-sender-${run}@example.test`);
-  assert.deepEqual(d.members.map((m) => m.state), ["drafted", "approved", "replied", "sent", "discarded"]);
+  assert.deepEqual(d.members.map((m) => m.state), ["drafted", "approved", "replied", "sent", "discarded", "discarded", "discarded"]);
 });
 
 test("card facts: posting count, Florida, leadership, verified email, draft bodies, hold reason", async () => {
@@ -218,4 +221,15 @@ test("a member card shows the canonical company for a null free text, the free t
   assert.equal(by(free).company, `Free Text ${run}`);
   assert.equal(by(nullFree).company, `Canon Null ${run}`);
   assert.equal(by(dangling).company, null);
+});
+
+test("sent_at, discard_reason and the absent actor reach the view for a bounced member", async () => {
+  const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
+  const d = await getSequenceDetail({ id: ownerId, role: "bd" }, sequenceId);
+  const by = (s: string) => d!.members.find((m) => m.memberId === memberIds[s])!;
+  assert.equal(by("bounceSent").discardReason, "bounce");
+  assert.ok(by("bounceSent").sentAt instanceof Date);
+  assert.equal(by("bounceSent").discardedByBdId, null);
+  assert.equal(by("bounceUnsent").discardReason, "bounce");
+  assert.equal(by("bounceUnsent").sentAt, null);
 });

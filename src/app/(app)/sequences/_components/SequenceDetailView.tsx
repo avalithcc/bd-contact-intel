@@ -2,7 +2,7 @@ import { isReadOnlyView } from "@/lib/sequences/readOnly";
 import { fill } from "@/lib/sequences/viewText";
 import type { GenerationLock } from "@/lib/sequences/generationLock";
 import { EyeIcon } from "@/components/icons";
-import { sequenceStats } from "@/lib/sequences/stats";
+import { sequenceStats, toStatMember } from "@/lib/sequences/stats";
 import type { ReactNode } from "react";
 import type { SequenceDetail } from "@/lib/sequences/detailQueries";
 import type { SequenceLabels } from "@/lib/sequences/viewText";
@@ -30,7 +30,7 @@ export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, 
   // An admin reads another BD's Sequence (audited): the cards must not word its approvals as the reader's own.
   const readOnly = isReadOnlyView(viewerBdId, detail.ownerBdId);
   const ownView = !readOnly;
-  const stats = sequenceStats(detail.members.map((m) => ({ state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null })));
+  const stats = sequenceStats(detail.members.map(toStatMember));
   return (
     <>
       {readOnly && (

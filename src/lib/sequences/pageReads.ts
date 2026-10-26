@@ -23,6 +23,8 @@ export type ListDbRow = {
   state: string | null;
   has_draft: boolean | null;
   scheduled_for: Date | null;
+  sent_at: Date | null;
+  discard_reason: string | null;
   company: string | null;
   /** Only the all-owners read selects these. */
   owner_id?: string | null;
@@ -43,7 +45,7 @@ export function groupListRows(rows: readonly ListDbRow[]): SequenceListRow[] {
       bySequence.set(r.id, seq);
     }
     if (r.state === null) continue;
-    (seq.members as SequenceListRow["members"][number][]).push({ state: r.state as MemberState, hasDraft: r.has_draft === true, scheduledFor: r.scheduled_for });
+    (seq.members as SequenceListRow["members"][number][]).push({ state: r.state as MemberState, hasDraft: r.has_draft === true, scheduledFor: r.scheduled_for, sentAt: r.sent_at, discardReason: r.discard_reason });
     const company = r.company?.trim();
     if (company && !seq.companies.some((c) => c.toLowerCase() === company.toLowerCase())) seq.companies.push(company);
   }

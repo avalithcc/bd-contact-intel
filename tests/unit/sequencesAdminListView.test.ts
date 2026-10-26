@@ -17,7 +17,7 @@ const ME = "11111111-1111-4111-8111-111111111111";
 const TR = "22222222-2222-4222-8222-222222222222";
 const mk = (id: string, ownerId: string, ownerName: string): SequenceListRow => ({
   id, name: `Seq ${id}`, createdAt: new Date("2026-10-12T15:00:00Z"), dailySendCap: 5, schedule: DEFAULT_SCHEDULE, companies: ["Acme"],
-  members: [{ state: "drafted", hasDraft: true, scheduledFor: null }, { state: "replied", hasDraft: true, scheduledFor: null }], owner: { id: ownerId, name: ownerName },
+  members: [{ state: "drafted", hasDraft: true, scheduledFor: null, sentAt: null, discardReason: null }, { state: "replied", hasDraft: true, scheduledFor: null, sentAt: new Date("2026-10-14T13:00:00Z"), discardReason: null }], owner: { id: ownerId, name: ownerName },
 });
 const all = [mk("a", ME, "Lucía Ferrer"), mk("b", TR, "Tomás Rivas"), mk("c", TR, "Tomás Rivas")];
 const render = (req: Parameters<typeof scopeView>[2], rows = all) => {

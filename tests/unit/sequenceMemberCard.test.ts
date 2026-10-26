@@ -138,3 +138,39 @@ test("no state other than drafted or a due reminder ever offers approve", () => 
     assert.ok(!ids(c).includes("approve"), state);
   }
 });
+
+// The discarded card: bounce and opt-out get their own approved badges; everything else stays "Descartado".
+import { discardedView } from "@/lib/sequences/memberCard";
+
+const SENT = new Date("2026-10-14T13:00:00Z");
+
+test("discardedView: bounce -> Rebotado in the danger class", () => {
+  const v = discardedView({ discardReason: "bounce", sentAt: SENT, discardedByBdId: null });
+  assert.deepEqual([v.badge, v.badgeClass, v.neverSent, v.meta], ["bounced", "badge-danger", false, "bounced"]);
+});
+
+test("discardedView: opt-out -> Pidió la baja in the discarded class", () => {
+  const v = discardedView({ discardReason: "opt_out", sentAt: SENT, discardedByBdId: "bd1" });
+  assert.deepEqual([v.badge, v.badgeClass, v.neverSent, v.meta], ["optedOut", "badge-discarded", false, "optedOut"]);
+});
+
+test("discardedView: any other reason stays Descartado and keeps the reason in the meta line", () => {
+  for (const reason of ["merge_duplicate", "wrong_profile", null]) {
+    const v = discardedView({ discardReason: reason, sentAt: SENT, discardedByBdId: "bd1" });
+    assert.deepEqual([v.badge, v.badgeClass, v.neverSent, v.meta], ["discarded", "badge-discarded", false, "removedBy"]);
+  }
+});
+
+test("discardedView: the 'nunca salió' marker appears only on a bounce or opt-out with sent_at null", () => {
+  assert.equal(discardedView({ discardReason: "bounce", sentAt: null, discardedByBdId: null }).neverSent, true);
+  assert.equal(discardedView({ discardReason: "opt_out", sentAt: null, discardedByBdId: null }).neverSent, true);
+  assert.equal(discardedView({ discardReason: "bounce", sentAt: SENT, discardedByBdId: null }).neverSent, false);
+  assert.equal(discardedView({ discardReason: "wrong_profile", sentAt: null, discardedByBdId: "bd1" }).neverSent, false);
+  assert.equal(discardedView({ discardReason: "bounce", sentAt: null, discardedByBdId: null }).meta, "bouncedUnsent");
+  assert.equal(discardedView({ discardReason: "opt_out", sentAt: null, discardedByBdId: null }).meta, "optedOutUnsent");
+});
+
+test("discardedView: nobody claims a removal the BD did not make", () => {
+  assert.equal(discardedView({ discardReason: "wrong_profile", sentAt: SENT, discardedByBdId: null }).meta, "removedAuto");
+  assert.equal(discardedView({ discardReason: "wrong_profile", sentAt: SENT, discardedByBdId: "bd1" }).meta, "removedBy");
+});

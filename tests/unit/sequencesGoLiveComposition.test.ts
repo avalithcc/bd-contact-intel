@@ -20,7 +20,7 @@ const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Sub
 const member = (id: string, over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: id, personId: `00000000-0000-4000-8000-00000000000${id}`, state: "drafted", holdReason: null, firstName: `Test${id}`, lastName: "Person", jobTitle: "Lead",
   company: "Acme", companyKey: "acme", email: `p${id}@example.test`, emailVerified: true, openIt: 1, florida: false, leadership: false, lastContactAt: null,
-  repliedAt: null, sentAt: null, reminderDueAt: null, discardedAt: null, discardReason: null, draft: draft(), reminderDraft: null, ...over,
+  repliedAt: null, sentAt: null, reminderDueAt: null, discardedAt: null, discardReason: null, discardedByBdId: null, draft: draft(), reminderDraft: null, ...over,
 });
 const detail = (members: DetailMember[]): SequenceDetail => ({ id: "s1", name: "Synthetic", ownerBdId: "bd1", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members });
 
