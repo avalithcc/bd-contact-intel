@@ -48,6 +48,7 @@ import { activity, company, followUpQueueItem, person, personBdConnection } from
 import type { CallOutcomeCode } from "@/lib/contacts/call";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
+import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
 import { FOLLOW_UP_DAILY_CAP } from "@/lib/followUp/queueSelection";
 
 /**
@@ -111,6 +112,9 @@ export function fuqCandidatesCte() {
       where person.merged_into_id is null
         and person.owner_bd_id is not null
         and person.status in ('contacted', 'replied')
+        -- Owner decision 2026-10-26: no active clients in Seguimientos (inactive
+        -- ones stay). Shared with the readers: activeClientExclusion.ts.
+        and ${notActiveClientCompanySql(sql`person.company_key`)}
     ),
     fuq_due as (
       select *

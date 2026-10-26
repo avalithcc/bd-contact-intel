@@ -43,6 +43,7 @@
  * the same `call`-excluded, `email_sent`/`reply_received`-only rule.
  */
 import { sql } from "drizzle-orm";
+import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
 import { activity, bd, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, meeting, person, scheduledEmail, sequence, sequenceMember, task } from "@/db/schema";
 import { safeTimestamptzText } from "@/lib/contacts/effectiveActivityTime";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
@@ -129,6 +130,8 @@ export function buildAppShellBadgeCountsQuery({
             select 1 from ${person}
             where person.id = follow_up_queue_item.person_id
               and person.merged_into_id is null
+              -- Same exclusion as the page read (activeClientExclusion.ts).
+              and ${notActiveClientCompanySql(sql`person.company_key`)}
           )
           and not exists (
             select 1 from ${activity}

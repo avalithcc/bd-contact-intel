@@ -15,6 +15,7 @@ import { db } from "@/db";
 import { activity, company, followUpQueueItem, person } from "@/db/schema";
 import { addDaysToDateString, argentinaCalendarDate, argentinaInstantDayWindow } from "@/lib/tasks/argentinaDate";
 import { WORKED_ACTIVITY_TYPES, workedTodayAtSql } from "@/lib/followUp/queueSelection";
+import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
 import { buildFollowUpInsertQuery } from "@/lib/followUp/candidateQuery";
 
 export interface FollowUpQueueRow {
@@ -83,8 +84,14 @@ function workedTodayExists(now: Date) {
   );
 }
 
-async function readQueueRows(bdId: string, queueDate: string, now: Date): Promise<FollowUpQueueRow[]> {
-  const rows = await db
+/** Exported for tests, which pass a rolled-back transaction as `executor`. */
+export async function readQueueRows(
+  bdId: string,
+  queueDate: string,
+  now: Date,
+  executor: Pick<typeof db, "select"> = db,
+): Promise<FollowUpQueueRow[]> {
+  const rows = await executor
     .select({
       id: followUpQueueItem.id,
       personId: followUpQueueItem.personId,
@@ -111,6 +118,9 @@ async function readQueueRows(bdId: string, queueDate: string, now: Date): Promis
         // merged persons are hidden from every read in this app (design
         // D1/D6), including a day's already-materialized queue rows.
         isNull(person.mergedIntoId),
+        // Owner decision 2026-10-26: rows already materialized today for a
+        // company that is (now) an active client are hidden at read time.
+        notActiveClientCompanySql(sql`${person.companyKey}`),
       ),
     )
     .orderBy(asc(followUpQueueItem.position));

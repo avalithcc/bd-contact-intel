@@ -80,7 +80,7 @@ function feedFor(pathname: string): Feed | null {
     if (b === "gmail") return { kinds: set("email_account", "scheduled_email", "activity") };
     return null;
   }
-  if (a === "follow-ups") return { kinds: set("follow_up_queue_item", "activity", "task", "person") };
+  if (a === "follow-ups") return { kinds: set("follow_up_queue_item", "activity", "task", "person", "company") };
   if (a === "tasks") return { kinds: set("task") };
   if (a === "reuniones") return { kinds: set("meeting") };
   if (a === "scheduled") return { kinds: set("scheduled_email") };

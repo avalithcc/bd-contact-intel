@@ -35,7 +35,7 @@ test("a company record reacts only to its own company key", () => {
 test("list and queue screens react to the kinds that feed them", () => {
   const cases: [string, string[], string[]][] = [
     ["/contacts", ["person", "activity", "company", "task"], ["meeting", "scheduled_email", "sequence"]],
-    ["/follow-ups", ["follow_up_queue_item", "activity", "task", "person"], ["meeting", "company"]],
+    ["/follow-ups", ["follow_up_queue_item", "activity", "task", "person", "company"], ["meeting"]],
     ["/tasks", ["task"], ["activity", "meeting"]],
     ["/reuniones", ["meeting"], ["task", "activity"]],
     ["/scheduled", ["scheduled_email"], ["meeting", "task"]],
