@@ -1071,6 +1071,9 @@ export const auditLog = pgTable(
     // target_bd_id is the BD, actor_bd_id the admin, metadata { cap, previousCap }; null = no cap, 0 = blocked)
     // 'gmail_reminder_manual' (an admin pressed "Enviar recordatorio" on /admin/gmail: the next "connect your Gmail"
     // reminder went out now; target_bd_id is the BD, actor_bd_id the admin, metadata { reminderNumber, sentOn })
+    // 'suppress_calendar_notification' (scripts/suppress-calendar-notification.ts added a never-log rule for
+    // calendar-notification@google.com on every syncing BD and deleted that fake contact; metadata holds the
+    // person snapshot, the BD ids that got a rule and the cascaded row counts. email_message rows are kept)
     action: text("action").notNull(),
     personId: uuid("person_id").references(() => person.id, {
       onDelete: "set null",

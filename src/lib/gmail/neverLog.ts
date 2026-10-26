@@ -26,9 +26,15 @@ export async function listNeverLogEntries(bdId: string): Promise<EmailNeverLog[]
   return db.select().from(emailNeverLog).where(eq(emailNeverLog.bdId, bdId));
 }
 
-export async function addNeverLogEntry(bdId: string, kind: NeverLogKind, rawValue: string): Promise<void> {
+/** `executor` lets a caller run the insert inside its own transaction (all-or-nothing scripts); it defaults to the shared client. */
+export async function addNeverLogEntry(
+  bdId: string,
+  kind: NeverLogKind,
+  rawValue: string,
+  executor: Pick<typeof db, "insert"> = db,
+): Promise<void> {
   const value = normalizeNeverLogValue(kind, rawValue);
-  await db.insert(emailNeverLog).values({ bdId, kind, value }).onConflictDoNothing();
+  await executor.insert(emailNeverLog).values({ bdId, kind, value }).onConflictDoNothing();
 }
 
 export async function removeNeverLogEntry(bdId: string, id: string): Promise<void> {
