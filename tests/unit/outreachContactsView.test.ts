@@ -94,13 +94,22 @@ test("a linkedin_message entry renders the unqualified LinkedIn label, never an 
   assert.equal(r.lastActivity?.label, "Mensaje de LinkedIn");
 });
 
-test("resolveLastActivity: LinkedIn date is the fallback, a real activity always wins, neither is null", () => {
-  const li = new Date("2026-09-20T10:00:00Z");
-  const act = { type: "email_sent", label: dict.contactList.lastActivityEmailSent, createdAt: new Date("2026-01-01T00:00:00Z") };
-  const fallback = resolveLastActivity(null, li, dict);
-  assert.equal(fallback?.label, dict.contactList.lastActivityLinkedin);
-  assert.equal(fallback?.createdAt.toISOString(), li.toISOString());
-  // Precedence holds even when the LinkedIn date is NEWER than the activity.
-  assert.equal(resolveLastActivity(act, li, dict), act);
+test("resolveLastActivity: newest wins, a tie goes to the activity, neither is null", () => {
+  const dec = new Date("2026-01-01T00:00:00Z");
+  const sep = new Date("2026-09-20T10:00:00Z");
+  const act = (createdAt: Date) => ({ type: "email_sent", label: dict.contactList.lastActivityEmailSent, createdAt });
+  // LinkedIn only.
+  const only = resolveLastActivity(null, sep, dict);
+  assert.equal(only?.label, dict.contactList.lastActivityLinkedin);
+  assert.equal(only?.createdAt.toISOString(), sep.toISOString());
+  // Activity newer than LinkedIn -> the activity.
+  const newerTouch = act(sep);
+  assert.equal(resolveLastActivity(newerTouch, dec, dict), newerTouch);
+  // LinkedIn newer than the activity -> LinkedIn (an old email must not read as the last activity).
+  assert.equal(resolveLastActivity(act(dec), sep, dict)?.label, dict.contactList.lastActivityLinkedin);
+  // Exact tie -> the activity.
+  const tie = act(sep);
+  assert.equal(resolveLastActivity(tie, new Date(sep.getTime()), dict), tie);
   assert.equal(resolveLastActivity(null, null, dict), null);
+  assert.equal(resolveLastActivity(newerTouch, null, dict), newerTouch);
 });

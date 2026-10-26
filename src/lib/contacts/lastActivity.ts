@@ -129,20 +129,24 @@ export function buildLastActivityEntries(
 }
 
 /**
- * The "Última actividad" cell has a precedence: a real `activity` touch ALWAYS
- * beats the LinkedIn connection date, which is only the fallback when the
- * person has no usable touch (mockups/contacts.html: "Mensaje de LinkedIn ·
- * hace 5d"). `—` (null) when neither exists. A LinkedIn-only cell cannot show
- * direction; `relationshipTier` ("Contactado, sin respuesta" vs reciprocal)
- * carries that signal for the row as a whole. The SQL twin is
- * lastActivityRawSql.ts (same precedence); this is the batched-path version.
+ * The "Última actividad" cell shows the NEWEST of the newest `activity` touch
+ * and the LinkedIn connection date (mockups/contacts.html: "Mensaje de
+ * LinkedIn · hace 5d"). An exact tie goes to the activity: a specific fact
+ * beats a coarse aggregate with no direction. `—` (null) when neither exists.
+ * INVARIANT: the returned time equals `lastMessageAt` (lastContactAtSql:
+ * greatest(touch, LinkedIn)) for the same person. A LinkedIn-only cell cannot
+ * show direction; `relationshipTier` ("Contactado, sin respuesta" vs
+ * reciprocal) carries that signal for the row as a whole. The SQL twin is
+ * lastActivityRawSql.ts (same rule); this is the batched-path version.
  */
 export function resolveLastActivity(
   activityEntry: LastActivityEntry | null | undefined,
   linkedinLastAt: Date | null | undefined,
   dict: Dict,
 ): LastActivityEntry | null {
-  if (activityEntry) return activityEntry;
+  if (activityEntry && (!linkedinLastAt || activityEntry.createdAt.getTime() >= linkedinLastAt.getTime())) {
+    return activityEntry;
+  }
   if (!linkedinLastAt) return null;
   return {
     type: LINKEDIN_LAST_ACTIVITY_TYPE,

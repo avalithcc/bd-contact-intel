@@ -1,9 +1,11 @@
 /**
- * The Outreach view's "Último contacto" cell must name the newest activity exactly as the contacts list does.
- * The invariant pinned here: for the same seeded person, the label (and time) the Outreach row carries equals the
- * one `getContactListPage` gives. Also pins that the added subquery does not fan out the LinkedIn aggregate.
- * Opt-in and fail-closed: `npm run test:db`, DATABASE_URL a local `_e2e` database. Rows are committed (the list
- * read uses the shared pool) under a per-run suffix and removed afterwards.
+ * The "Última actividad" cell (contacts list) and the Outreach "Último contacto" cell show the NEWEST of the newest touch
+ * and the LinkedIn connection date (exact tie: the touch). Invariants pinned for the same seeded person:
+ *  - Outreach, the inline list path and the batched path (`getContactListRowsByIds`) render the same label and time;
+ *  - that time equals `lastMessageAt` (lastContactAtSql): one value, two renderings;
+ *  - the list sort and the `lastActivityDays` filter agree with the cell.
+ * Opt-in and fail-closed: `npm run test:db`, DATABASE_URL a local `_e2e` database. Rows are committed (the list read uses
+ * the shared pool) under a per-run suffix and removed afterwards.
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -14,52 +16,54 @@ assertScratchDatabaseUrl(process.env.DATABASE_URL);
 
 const run = randomUUID().slice(0, 8);
 const lastName = `NamedAct${run}`;
-const LI_AT = new Date("2026-10-10T10:00:00.000Z");
 const AT = new Date("2026-10-20T10:00:00.000Z");
-const KINDS = ["email_sent", "reply_received", "auto_reply_received", "none", "linkedin_only", "touch_and_linkedin"];
+const day = 24 * 60 * 60 * 1000;
+const ago = (days: number) => new Date(Date.now() - days * day);
+
+type Seed = { touches?: { type: string; at: Date }[]; linkedin?: Date };
+type Expect = "none" | "linkedin" | "activity";
+// Each person: what is seeded and which source the cell must show.
+const SEEDS: Record<string, Seed & { expect: Expect; type?: string }> = {
+  email_sent: { touches: [{ type: "email_sent", at: AT }, { type: "note", at: new Date("2026-09-01T10:00:00Z") }, { type: "meeting_logged", at: new Date("2026-08-01T10:00:00Z") }], linkedin: new Date("2026-01-02T00:00:00Z"), expect: "activity", type: "email_sent" },
+  reply_received: { touches: [{ type: "reply_received", at: AT }], expect: "activity", type: "reply_received" },
+  auto_reply_received: { touches: [{ type: "auto_reply_received", at: AT }], expect: "activity", type: "auto_reply_received" },
+  none: { expect: "none" },
+  linkedin_only: { linkedin: new Date("2026-10-10T10:00:00Z"), expect: "linkedin" },
+  // Email 12 days before the LinkedIn message: the LinkedIn message is the "Última actividad".
+  linkedin_newer: { touches: [{ type: "email_sent", at: new Date("2026-10-01T10:00:00Z") }], linkedin: new Date("2026-10-13T10:00:00Z"), expect: "linkedin" },
+  touch_newer: { touches: [{ type: "email_sent", at: AT }], linkedin: new Date("2026-10-10T10:00:00Z"), expect: "activity", type: "email_sent" },
+  tie: { touches: [{ type: "email_sent", at: AT }], linkedin: AT, expect: "activity", type: "email_sent" },
+  // Only non-touch rows (a task, a meeting reschedule): not a touch, so LinkedIn is the fallback.
+  only_nontouch: { touches: [{ type: "task_created", at: new Date("2026-10-22T10:00:00Z") }], linkedin: new Date("2026-10-10T10:00:00Z"), expect: "linkedin" },
+  recent_linkedin_only: { linkedin: ago(2), expect: "linkedin" },
+  old_linkedin_only: { linkedin: ago(200), expect: "linkedin" },
+};
 const ids: Record<string, string> = {};
 const bdIds: string[] = [];
 
 before(async () => {
   const { db } = await import("@/db");
   const { activity, bd, person, personBdConnection } = await import("@/db/schema");
-  const mkBd = async (n: string) =>
-    (await db.insert(bd).values({ email: `zz-na-${n}-${run}@example.test`, name: `ZZ ${n}` }).returning())[0]!;
-  const me = await mkBd("me");
-  const other = await mkBd("other");
-  bdIds.push(me.id, other.id);
-  ids.me = me.id;
-  const kinds = KINDS;
-  for (const kind of kinds) {
-    const [p] = await db.insert(person).values({ firstName: kind, lastName }).returning();
-    ids[kind] = p!.id;
-    if (kind === "linkedin_only") {
-      await db.insert(personBdConnection).values({ personId: p!.id, bdId: me.id, messageCount: 2, lastMessageAt: LI_AT, reciprocal: false });
-    } else if (kind === "touch_and_linkedin") {
-      // The LinkedIn date is NEWER than the activity: the real touch must still win.
-      await db.insert(activity).values({ personId: p!.id, actorBdId: me.id, type: "email_sent", metadata: {}, createdAt: AT });
-      await db.insert(personBdConnection).values({ personId: p!.id, bdId: me.id, messageCount: 2, lastMessageAt: new Date("2026-10-25T10:00:00Z"), reciprocal: false });
-    } else if (kind !== "none") {
-      await db.insert(activity).values({ personId: p!.id, actorBdId: me.id, type: kind, metadata: {}, createdAt: AT });
+  const [me] = await db.insert(bd).values({ email: `zz-na-me-${run}@example.test`, name: "ZZ me" }).returning();
+  bdIds.push(me!.id);
+  ids.me = me!.id;
+  for (const [name, seed] of Object.entries(SEEDS)) {
+    const [p] = await db.insert(person).values({ firstName: name, lastName }).returning();
+    ids[name] = p!.id;
+    for (const t of seed.touches ?? []) {
+      await db.insert(activity).values({ personId: p!.id, actorBdId: me!.id, type: t.type, metadata: {}, createdAt: t.at });
+    }
+    if (seed.linkedin) {
+      await db.insert(personBdConnection).values({ personId: p!.id, bdId: me!.id, messageCount: 2, lastMessageAt: seed.linkedin, reciprocal: false });
     }
   }
-  // Older touches under the newest one: the pick must be the newest, not any row.
-  await db.insert(activity).values([
-    { personId: ids.email_sent!, actorBdId: me.id, type: "note", metadata: {}, createdAt: new Date("2026-09-01T10:00:00Z") },
-    { personId: ids.email_sent!, actorBdId: me.id, type: "meeting_logged", metadata: {}, createdAt: new Date("2026-08-01T10:00:00Z") },
-  ]);
-  // Two BD connections + an activity: the aggregate must stay 3 + 4 = 7.
-  await db.insert(personBdConnection).values([
-    { personId: ids.email_sent!, bdId: me.id, messageCount: 3, lastMessageAt: new Date("2026-01-01T00:00:00Z"), reciprocal: false },
-    { personId: ids.email_sent!, bdId: other.id, messageCount: 4, lastMessageAt: new Date("2026-01-02T00:00:00Z"), reciprocal: false },
-  ]);
 });
 
 after(async () => {
   const { db } = await import("@/db");
   const { activity, bd, person, personBdConnection } = await import("@/db/schema");
   const { inArray } = await import("drizzle-orm");
-  const personIds = KINDS.map((k) => ids[k]!);
+  const personIds = Object.keys(SEEDS).map((k) => ids[k]!);
   await db.delete(activity).where(inArray(activity.personId, personIds));
   await db.delete(personBdConnection).where(inArray(personBdConnection.personId, personIds));
   await db.delete(person).where(inArray(person.id, personIds));
@@ -67,12 +71,13 @@ after(async () => {
   await db.$client.end();
 });
 
-async function outreachCell(personId: string) {
+async function outreach(personId: string) {
   const { db } = await import("@/db");
   const { person } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
   const { selectOutreachRows } = await import("@/lib/outreach/queries");
   const { attachOutreachReasons } = await import("@/lib/contacts/outreachView");
+  const { parseDbTimestamp } = await import("@/lib/db/timestamp");
   const { es } = await import("@/lib/i18n/dictionaries/es");
   const rows = await selectOutreachRows(db, ids.me!, eq(person.id, personId), true);
   assert.equal(rows.length, 1);
@@ -82,33 +87,57 @@ async function outreachCell(personId: string) {
     () => "x",
     es as never,
   );
-  return { row: r, lastActivity: mapped!.lastActivity };
+  return { row: r, lastActivity: mapped!.lastActivity, lastMessageAt: r.lastMessageAt == null ? null : parseDbTimestamp(r.lastMessageAt) };
 }
 
-for (const kind of KINDS) {
-  test(`outreach row and contacts list agree on the last activity of a person whose latest is ${kind}`, async () => {
-    const { getContactListPage } = await import("@/lib/contacts/listQueries");
+for (const [name, seed] of Object.entries(SEEDS)) {
+  test(`${name}: Outreach, inline list and batched list render the same cell, and its time is lastMessageAt`, async () => {
+    const { getContactListPage, getContactListRowsByIds } = await import("@/lib/contacts/listQueries");
     const { es } = await import("@/lib/i18n/dictionaries/es");
     const list = await getContactListPage({}, ids.me!, lastName, 1, 50, es as never);
-    const listed = list.rows.find((r) => r.id === ids[kind]);
-    assert.ok(listed, "person is in the contacts list");
-    const { lastActivity } = await outreachCell(ids[kind]!);
-    if (kind === "none") {
-      assert.equal(listed.lastActivity, null);
-      assert.equal(lastActivity, null);
-      return;
+    const inline = list.rows.find((r) => r.id === ids[name])?.lastActivity ?? null;
+    assert.ok(list.rows.some((r) => r.id === ids[name]), "person is in the contacts list");
+    const batched = (await getContactListRowsByIds([ids[name]!], es as never))[0]?.lastActivity ?? null;
+    const o = await outreach(ids[name]!);
+
+    for (const [path, cell] of [["inline", inline], ["batched", batched], ["outreach", o.lastActivity]] as const) {
+      if (seed.expect === "none") {
+        assert.equal(cell, null, path);
+        continue;
+      }
+      assert.ok(cell, `${path} has a cell`);
+      const expectedLabel = seed.expect === "linkedin" ? es.contactList.lastActivityLinkedin : undefined;
+      if (expectedLabel) assert.equal(cell.label, expectedLabel, path);
+      assert.equal(cell.type, seed.expect === "linkedin" ? "linkedin_message" : seed.type, path);
+      // The invariant, not a hard-coded date: the cell's time IS lastMessageAt.
+      assert.equal(cell.createdAt.toISOString(), o.lastMessageAt?.toISOString(), path);
     }
-    assert.ok(lastActivity);
-    assert.equal(lastActivity.label, listed.lastActivity?.label);
-    assert.equal(lastActivity.createdAt.toISOString(), listed.lastActivity?.createdAt.toISOString());
-    const expectedAt = kind === "linkedin_only" ? LI_AT : AT;
-    assert.equal(lastActivity.createdAt.toISOString(), expectedAt.toISOString());
-    if (kind === "linkedin_only") assert.equal(lastActivity.label, es.contactList.lastActivityLinkedin);
-    if (kind === "touch_and_linkedin") assert.equal(lastActivity.label, es.contactList.lastActivityEmailSent);
+    if (seed.expect === "none") assert.equal(o.lastMessageAt, null);
+    assert.equal(inline?.label, batched?.label);
+    assert.equal(inline?.label, o.lastActivity?.label);
   });
 }
 
+test("the contacts list sorts by the same value the cell shows", async () => {
+  const { getContactListPage } = await import("@/lib/contacts/listQueries");
+  const { es } = await import("@/lib/i18n/dictionaries/es");
+  const list = await getContactListPage({}, ids.me!, lastName, 1, 50, es as never, "lastActivity");
+  const times = list.rows.map((r) => r.lastActivity?.createdAt.getTime() ?? -Infinity);
+  assert.equal(times.length, Object.keys(SEEDS).length);
+  assert.deepEqual(times, [...times].sort((a, b) => b - a));
+});
+
+test("lastActivityDays matches a LinkedIn-only person exactly when the cell is inside the window", async () => {
+  const { getContactListPage } = await import("@/lib/contacts/listQueries");
+  const { es } = await import("@/lib/i18n/dictionaries/es");
+  const list = await getContactListPage({ lastActivityDays: 7 }, ids.me!, lastName, 1, 50, es as never);
+  const matched = new Set(list.rows.map((r) => r.id));
+  assert.ok(matched.has(ids.recent_linkedin_only!));
+  assert.ok(!matched.has(ids.old_linkedin_only!));
+  assert.ok(!matched.has(ids.none!));
+});
+
 test("adding the named-activity subquery leaves the LinkedIn message sum untouched", async () => {
-  const { row } = await outreachCell(ids.email_sent!);
-  assert.equal(row.messageCount, 7);
+  const o = await outreach(ids.email_sent!);
+  assert.equal(o.row.messageCount, 2);
 });

@@ -145,17 +145,32 @@ async function baseContactFilterConditions(
   // ArrayBuffer, so a bare `${since}` Date threw across every
   // `?lastActivityDays=` request. Explicitly cast on the SQL side too
   // (`::timestamptz`) rather than relying on implicit coercion.
+  // Same population as the "Última actividad" cell (newest of touch and
+  // LinkedIn date): a touch OR a LinkedIn message inside the window matches.
   if (filters.lastActivityDays) {
     const sinceIso = buildSinceIso(filters.lastActivityDays);
     where.push(
-      exists(
-        db
-          .select({ one: sql`1` })
-          .from(activity)
-          .where(
-            and(eq(activity.personId, person.id), sql`${effectiveActivityAtSql()} >= ${sinceIso}::timestamptz`),
-          ),
-      ),
+      or(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(activity)
+            .where(
+              and(eq(activity.personId, person.id), sql`${effectiveActivityAtSql()} >= ${sinceIso}::timestamptz`),
+            ),
+        ),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(personBdConnection)
+            .where(
+              and(
+                eq(personBdConnection.personId, person.id),
+                sql`${personBdConnection.lastMessageAt} >= ${sinceIso}::timestamptz`,
+              ),
+            ),
+        ),
+      )!,
     );
   }
   return where;
@@ -335,6 +350,17 @@ const lastActivityAgg = db
   .groupBy(activity.personId)
   .as("last_activity_agg");
 
+/** MAX(person_bd_connection.last_message_at) per person: the LinkedIn half of
+ * the cell's "newest wins" value, used by the sort below. */
+const linkedinLastAgg = db
+  .select({
+    personId: personBdConnection.personId,
+    linkedinLastAt: sql<Date>`max(${personBdConnection.lastMessageAt})`.as("linkedin_last_at"),
+  })
+  .from(personBdConnection)
+  .groupBy(personBdConnection.personId)
+  .as("linkedin_last_agg");
+
 export async function getContactListPage(
   filters: ContactFilters,
   meBdId: string,
@@ -370,7 +396,7 @@ export async function getContactListPage(
   // was nothing to preserve. The row SET and the total are unaffected.
   const orderBy =
     sort === "lastActivity"
-      ? [sql`${lastActivityAgg.lastActivityAt} desc nulls last`, asc(person.id)]
+      ? [sql`greatest(${lastActivityAgg.lastActivityAt}, ${linkedinLastAgg.linkedinLastAt}) desc nulls last`, asc(person.id)]
       : [asc(person.lastName), asc(person.firstName), asc(person.id)];
 
   // Perf fix (round trips; orchestrator measured ~1,395ms across 4 serialized
@@ -395,6 +421,7 @@ export async function getContactListPage(
       .from(person)
       .leftJoin(bd, eq(bd.id, person.ownerBdId))
       .leftJoin(lastActivityAgg, eq(lastActivityAgg.personId, person.id))
+      .leftJoin(linkedinLastAgg, eq(linkedinLastAgg.personId, person.id))
       .leftJoin(company, eq(company.companyKey, person.companyKey))
       .where(and(...where))
       .orderBy(...orderBy)
