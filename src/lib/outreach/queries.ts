@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { db } from "@/db";
 import { company, contact, conversation, message, person, personBdConnection, personIdMap } from "@/db/schema";
 import { isDormant } from "@/lib/queries";
+import { lastContactAtSql } from "@/lib/outreach/lastContact";
 import { getHiringMatchIndex, type HiringMatch } from "@/lib/hiring/queries";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
@@ -166,63 +167,7 @@ export async function listOutreachCandidates(
     where.push(outreachNameCondition(name));
   }
 
-  // Aliases are pbc_-prefixed: drizzle references CTE columns unqualified,
-  // and `contact` (joined below) has message_count/last_message_at/reciprocal.
-  // Pre-aggregated to one row per person BEFORE the (fan-out-prone) join to
-  // person_id_map/contact below — see the fresh-review fix comment above.
-  const pbcAgg = db.$with("pbc_agg").as(
-    db
-      .select({
-        personId: personBdConnection.personId,
-        messageCount: sql<number>`sum(${personBdConnection.messageCount})`.as("pbc_message_count"),
-        lastMessageAt: sql<Date | null>`max(${personBdConnection.lastMessageAt})`.as("pbc_last_message_at"),
-        reciprocal: sql<boolean>`bool_or(${personBdConnection.reciprocal})`.as("pbc_reciprocal"),
-      })
-      .from(personBdConnection)
-      .groupBy(personBdConnection.personId),
-  );
-
-  let query = db // query 3
-    .with(pbcAgg)
-    .select({
-      // Postgres has no max(uuid): aggregate the id as text.
-      id: sql<string>`coalesce(max(case when ${contact.bdId} = ${bdId} then ${contact.id}::text end), ${person.id}::text)`,
-      hasOwnContact: sql<boolean>`coalesce(bool_or(${contact.bdId} = ${bdId}), false)`,
-      personId: person.id,
-      firstName: person.firstName,
-      lastName: person.lastName,
-      company: person.company,
-      // max(): `company.company_key` is the PK (1:1 with the join
-      // predicate), but this query is grouped by person.id, and Postgres
-      // only infers functional dependency for columns of the SAME table as
-      // the GROUP BY key — a joined table's column still needs an aggregate
-      // wrapper (bug fix: Empresa recovery, same join every other
-      // person-company render now shares, see companyDisplayName.ts).
-      companyCanonicalName: sql<string | null>`max(${company.displayName})`,
-      companyKey: person.companyKey,
-      position: person.jobTitle,
-      roleGroup: person.roleGroup,
-      messageCount: sql<number>`coalesce(max(${pbcAgg.messageCount}), 0)::int`,
-      lastMessageAt: sql<Date | null>`max(${pbcAgg.lastMessageAt})`,
-      reciprocal: sql<boolean>`coalesce(bool_or(${pbcAgg.reciprocal}), false)`,
-    })
-    .from(person)
-    .leftJoin(pbcAgg, eq(pbcAgg.personId, person.id))
-    .leftJoin(
-      personIdMap,
-      and(eq(personIdMap.personId, person.id), eq(personIdMap.legacyTable, "contact")),
-    )
-    .leftJoin(contact, eq(contact.id, personIdMap.legacyId))
-    .leftJoin(company, eq(company.companyKey, person.companyKey))
-    .where(and(...where))
-    .groupBy(person.id)
-    .$dynamic();
-
-  if (!includeNeverMessaged) {
-    query = query.having(sql`coalesce(max(${pbcAgg.messageCount}), 0) > 0`);
-  }
-
-  const rows = await query;
+  const rows = await selectOutreachRows(db, bdId, and(...where)!, includeNeverMessaged); // query 3
 
   const scored: OutreachRow[] = rows.map((r) => {
     // A raw-SQL aggregate comes back from the driver as a possibly
@@ -278,5 +223,75 @@ export async function listOutreachCandidates(
     totalPages,
     hiringCompanyCount,
   };
+}
+
+/**
+ * Query 3 of listOutreachCandidates, split out so a db test can run it inside a
+ * rolled-back transaction. `where` is the already-built person filter.
+ */
+export async function selectOutreachRows(
+  database: typeof db,
+  bdId: string,
+  where: SQL,
+  includeNeverMessaged: boolean,
+) {
+  // Aliases are pbc_-prefixed: drizzle references CTE columns unqualified,
+  // and `contact` (joined below) has message_count/last_message_at/reciprocal.
+  // Pre-aggregated to one row per person BEFORE the (fan-out-prone) join to
+  // person_id_map/contact below — see the fresh-review fix comment above.
+  const pbcAgg = database.$with("pbc_agg").as(
+    database
+      .select({
+        personId: personBdConnection.personId,
+        messageCount: sql<number>`sum(${personBdConnection.messageCount})`.as("pbc_message_count"),
+        lastMessageAt: sql<Date | null>`max(${personBdConnection.lastMessageAt})`.as("pbc_last_message_at"),
+        reciprocal: sql<boolean>`bool_or(${personBdConnection.reciprocal})`.as("pbc_reciprocal"),
+      })
+      .from(personBdConnection)
+      .groupBy(personBdConnection.personId),
+  );
+
+  let query = database
+    .with(pbcAgg)
+    .select({
+      // Postgres has no max(uuid): aggregate the id as text.
+      id: sql<string>`coalesce(max(case when ${contact.bdId} = ${bdId} then ${contact.id}::text end), ${person.id}::text)`,
+      hasOwnContact: sql<boolean>`coalesce(bool_or(${contact.bdId} = ${bdId}), false)`,
+      personId: person.id,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      company: person.company,
+      // max(): `company.company_key` is the PK (1:1 with the join
+      // predicate), but this query is grouped by person.id, and Postgres
+      // only infers functional dependency for columns of the SAME table as
+      // the GROUP BY key — a joined table's column still needs an aggregate
+      // wrapper (bug fix: Empresa recovery, same join every other
+      // person-company render now shares, see companyDisplayName.ts).
+      companyCanonicalName: sql<string | null>`max(${company.displayName})`,
+      companyKey: person.companyKey,
+      position: person.jobTitle,
+      roleGroup: person.roleGroup,
+      messageCount: sql<number>`coalesce(max(${pbcAgg.messageCount}), 0)::int`,
+      // Last contact of ANY kind (see lastContact.ts), not the LinkedIn-only date.
+      lastMessageAt: sql<Date | null>`${lastContactAtSql(person.id, sql`max(${pbcAgg.lastMessageAt})`)}`,
+      reciprocal: sql<boolean>`coalesce(bool_or(${pbcAgg.reciprocal}), false)`,
+    })
+    .from(person)
+    .leftJoin(pbcAgg, eq(pbcAgg.personId, person.id))
+    .leftJoin(
+      personIdMap,
+      and(eq(personIdMap.personId, person.id), eq(personIdMap.legacyTable, "contact")),
+    )
+    .leftJoin(contact, eq(contact.id, personIdMap.legacyId))
+    .leftJoin(company, eq(company.companyKey, person.companyKey))
+    .where(where)
+    .groupBy(person.id)
+    .$dynamic();
+
+  if (!includeNeverMessaged) {
+    query = query.having(sql`coalesce(max(${pbcAgg.messageCount}), 0) > 0`);
+  }
+
+  return await query;
 }
 
