@@ -225,11 +225,12 @@ export const es: typeof en = {
   },
 
   // App shell sidebar/topbar (design.md D9, fresh-review fix on tasks.md
-  // 8.2). The NAV LABEL for the /outreach screen is "A quién contactar": the
-  // team did not know what a screen called "Outreach" was (owner decision
-  // 2026-10-26, see mockups/GLOSSARY.md). The route, the internal name and the
-  // section eyebrow on Sequences/Scheduled (listEyebrow, schedPageEyebrow,
-  // per their mockups) stay "Outreach".
+  // 8.2). The nav item labelled "A quién contactar" opens the contacts saved
+  // view /contacts?view=outreach (Sidebar.tsx); its internal key stays
+  // `nav.outreach`. The team did not know what "Outreach" meant (owner
+  // decision 2026-10-26, see mockups/GLOSSARY.md). The separate /outreach
+  // route is not linked from the nav. The Sequences/Scheduled eyebrow is
+  // "Envíos" (listEyebrow, schedPageEyebrow), also not "Outreach".
   // "discovery" uses the short nav form per GLOSSARY.md — the full phrase
   // ("Descubrimiento de portales") overflows the fixed-width sidebar row.
   nav: {
@@ -976,7 +977,7 @@ export const es: typeof en = {
     toastScheduleCancelled: "Envío cancelado.",
     toastScheduleSaved: "Cambios guardados.",
     toastScheduleSendNow: "Sale en el próximo minuto.",
-    schedPageEyebrow: "Outreach",
+    schedPageEyebrow: "Envíos",
     schedPageTitle: "Correos programados",
     schedPageIntro: "Correos 1:1 que redactaste y salen más tarde desde tu propia cuenta de Gmail.",
     schedPageOnlyYours: "Sólo ves los tuyos",
@@ -3863,7 +3864,7 @@ export const es: typeof en = {
     unitContactMany: "contactos",
     unitCompanyOne: "empresa",
     unitCompanyMany: "empresas",
-    listEyebrow: "Outreach",
+    listEyebrow: "Envíos",
     listTitle: "Secuencias",
     listIntroLead: "Tandas de correos 1:1 a contactos que elegiste a mano, enviados desde tu propia cuenta de Gmail.",
     listIntroStrong: "Sólo ves las tuyas",

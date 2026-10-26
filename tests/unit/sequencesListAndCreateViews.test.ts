@@ -64,7 +64,7 @@ const at = (html: string, ...needles: string[]) => {
 };
 
 test("list: header, four cards, columns and footer appear in the mockup's order", () => {
-  at(list, "Outreach", "Secuencias", "Sólo ves las tuyas", "Nueva secuencia", "stat neutral", "stat info", "stat accent", "stat success", "Estado de los contactos", "Tope diario", "Cadencia", "Creada", "2 secuencias · sólo se muestran las tuyas", "Ordenadas por fecha de creación");
+  at(list, "Envíos", "Secuencias", "Sólo ves las tuyas", "Nueva secuencia", "stat neutral", "stat info", "stat accent", "stat success", "Estado de los contactos", "Tope diario", "Cadencia", "Creada", "2 secuencias · sólo se muestran las tuyas", "Ordenadas por fecha de creación");
   assert.ok(list.includes('href="/sequences/new"') && list.includes('href="/sequences/a"'));
 });
 

@@ -4,13 +4,18 @@ Neutral, professional Spanish. No regional slang, no voseo/tú. Actions use the
 infinitive ("Guardar", not "Guarda" or "Guardá").
 
 Product/brand names (Gmail, LinkedIn, Avalith) stay as-is. "BD" stays as the
-team's term. The `/outreach` screen's NAV LABEL is "A quién contactar"
-(English: "Who to contact"), changed 2026-10-26 because the team did not know
-what a screen called "Outreach" was; do not revert it. The route, the internal
-name `outreach` and the section eyebrow "Outreach" above the Sequences and
-Scheduled page titles stay as they are (their mockups carry it). The
-`/contacts` saved view "Listos para Outreach" is a filter, not the screen name,
-and is unchanged.
+team's term. The sidebar item labelled "A quién contactar" (English: "Who to
+contact") opens the contacts saved view `/contacts?view=outreach`; its internal
+key stays `nav.outreach`. Changed 2026-10-26 because the team did not know what
+"Outreach" meant; do not revert it. The separate `/outreach` route exists but
+is not linked from the nav (its fate is undecided). The `/contacts` saved view
+"Listos para Outreach" is a filter and is unchanged.
+
+The section eyebrow above the Sequences and Scheduled titles is "Envíos"
+(English: "Sends"). This deliberately deviates from `secuencias-lista.html`,
+`envio-programado.html` and `secuencias-lista-admin.html`, which still say
+"Outreach": the team did not recognise the word, and it names no real section
+(the sidebar has only "Espacio de trabajo" and "Señales").
 
 | English | Spanish |
 |---|---|
