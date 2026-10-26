@@ -55,9 +55,9 @@ Cuando un correo rebota, el miembro pasa a <span class="mono">discarded</span> y
 
 <h3 class="mb-sm">Propuesto</h3>
 <div class="card mb-lg"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a2">AE</span><div class="grow stack-sm" style="min-width:0">
-<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Andy Ellis</a><span class="badge badge-danger" title="Rebotó el 14 oct · casilla inexistente (5.1.1)">Rebotado</span></div>
+<div class="row wrap" style="gap:.5rem"><a class="strong" href="../../crm-hubspot-ux/mockups/contact-record.html">Andy Ellis</a><span class="badge badge-danger" title="Rebotó el 14/10">Rebotado</span></div>
 <p class="headline">VP of Engineering en <a href="../../crm-hubspot-ux/mockups/company-record.html">Cint</a></p>
-<div class="meta">Rebotó el 14/10 &middot; casilla inexistente (5.1.1) &middot; la dirección quedó en la lista de supresión</div>
+<div class="meta">Rebotó el 14/10 &middot; la dirección quedó en la lista de supresión</div>
 </div></div></div>
 
 <div class="card mb-lg"><div class="card-body row" style="gap:var(--space-lg)"><span class="avatar a1">BC</span><div class="grow stack-sm" style="min-width:0">
@@ -66,6 +66,10 @@ Cuando un correo rebota, el miembro pasa a <span class="mono">discarded</span> y
 <div class="meta">Baja registrada el 15/10 &middot; no vuelve a entrar a ninguna secuencia, de ningún BD</div>
 </div></div></div>
 
+<div class="alert alert-info mb-lg"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><div>
+<div class="title">Sin el código SMTP, a propósito.</div>
+El <span class="mono">5.1.1</span> no está en <span class="mono">sequence_member</span>: vive en el <span class="mono">metadata.statusCode</span> de la actividad del rebote, y traerlo acá costaría una consulta nueva en una pantalla que el equipo abre todo el día. La regla de esta pantalla es la que definió el dueño: el tile es la variable, la ficha del contacto es el detalle — y la ficha ya muestra el código.
+</div></div>
 <p class="meta mb-xl">Y se corrige una mentira chica que ya está hoy: la línea dice <em>"Lo quitaste"</em> también en los descartes automáticos, donde <span class="mono">discarded_by_bd_id</span> es NULL y nadie lo quitó.</p>
 
 <hr class="hr">
