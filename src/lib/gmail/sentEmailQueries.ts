@@ -13,6 +13,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, emailMessage, emailMessagePerson, type NewActivity } from "@/db/schema";
 import { recomputePersonStatuses } from "@/lib/status/recompute";
+import { isOwnerTouchType } from "@/lib/identity/ownerOnTouch";
+import { transferOwnersOnTouch } from "@/lib/identity/ownerOnTouchDb";
 import { createActivityInTx } from "@/lib/activity/queries";
 import { extractEmailAddresses, shouldStoreClassifiedMessage, type ClassifiedMessage } from "./classify";
 import { getKnownPersonsForAddresses } from "./syncQueries";
@@ -115,4 +117,6 @@ async function insertActivities(tx: DbTransaction, acts: NewActivity[]): Promise
   }
   await tx.insert(activity).values(acts);
   await recomputePersonStatuses(tx, acts.map((a) => a.personId!));
+  const touched = acts.filter((a) => isOwnerTouchType(a.type));
+  if (touched.length) await transferOwnersOnTouch(tx, touched.map((a) => a.personId!), touched[0]!.actorBdId ?? null);
 }

@@ -6,6 +6,8 @@ import { isIdentityDualWriteEnabled } from "@/lib/identity/resolve";
 import { personIdLookupSql } from "@/lib/identity/resolveDb";
 import { resolvePersonIdLookup } from "@/lib/identity/referenceWrite";
 import { recomputePersonStatus } from "@/lib/status/recompute";
+import { isOwnerTouchType } from "@/lib/identity/ownerOnTouch";
+import { transferOwnersOnTouch } from "@/lib/identity/ownerOnTouchDb";
 import { buildTimelineEntry, type TimelineEntry } from "@/lib/activity/timelineEntry";
 import { notFoldedAttemptSql } from "@/lib/activity/callAttemptFold";
 import { timelineOrderBySql } from "@/lib/activity/timelineOrder";
@@ -185,7 +187,11 @@ export async function createActivityInTx(tx: DbTransaction, input: NewActivity):
   const values =
     lookup && isIdentityDualWriteEnabled() ? { ...input, personId: personIdLookupSql(lookup) } : input;
   const [row] = await tx.insert(activity).values(values).returning();
-  if (row!.personId) await recomputePersonStatus(tx, row!.personId);
+  if (row!.personId) {
+    await recomputePersonStatus(tx, row!.personId);
+    // The BD who contacts becomes the owner, in this same transaction.
+    if (isOwnerTouchType(row!.type)) await transferOwnersOnTouch(tx, [row!.personId], row!.actorBdId);
+  }
   return row!;
 }
 
