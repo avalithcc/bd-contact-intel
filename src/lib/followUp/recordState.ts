@@ -22,6 +22,8 @@ export interface RecordActivity {
   type: string;
   createdAt: Date;
   metadata: unknown;
+  /** Soft-deleted notes only. The entry clock ignores them; the closing clock keeps them unless they predate the cycle row. */
+  deletedAt?: Date | null;
 }
 
 export type FollowUpRecordState =
@@ -34,19 +36,22 @@ const NO_PROGRESS = new Set<string>(NO_PROGRESS_ACTIVITY_TYPES);
 
 const CLOSING = new Set<string>(CYCLE_CLOSING_ACTIVITY_TYPES);
 
-function timeOf(a: RecordActivity): Date | null {
+function timeOf(a: RecordActivity, countDeleted: boolean): Date | null {
   const metadata = a.metadata && typeof a.metadata === "object" ? (a.metadata as Record<string, unknown>) : {};
-  return resolveEffectiveActivityAt({ id: a.id, type: a.type, createdAt: a.createdAt, metadata });
+  return resolveEffectiveActivityAt({ id: a.id, type: a.type, createdAt: a.createdAt, metadata, deletedAt: countDeleted ? null : a.deletedAt });
 }
 
 /** Any touch that moves the queue-entry clock (everything but NO_PROGRESS / NON_TOUCH): what a dropped contact needs to come back. */
 function touchTime(a: RecordActivity): Date | null {
-  return NO_PROGRESS.has(a.type) ? null : timeOf(a);
+  return NO_PROGRESS.has(a.type) ? null : timeOf(a, false);
 }
 
 /** Only the owner's worked set plus a reply closes an open cycle (openCycle.ts); a Hunter lookup or a status change does not. */
-function closingTime(a: RecordActivity): Date | null {
-  return CLOSING.has(a.type) ? timeOf(a) : null;
+function closingTime(a: RecordActivity, cycle: RecordCycle | null): Date | null {
+  if (!CLOSING.has(a.type)) return null;
+  // Same as notBornClosed in openCycle.ts: a note already deleted when the cycle row was written does not close it.
+  if (a.deletedAt && cycle && a.createdAt < cycle.createdAt) return null;
+  return timeOf(a, true);
 }
 
 export function deriveFollowUpRecordState(input: {
@@ -73,7 +78,7 @@ export function deriveFollowUpRecordState(input: {
 
   const { cycle } = input;
   if (!cycle) return null;
-  const closes = input.activities.map(closingTime).filter((t): t is Date => t !== null);
+  const closes = input.activities.map((a) => closingTime(a, cycle)).filter((t): t is Date => t !== null);
   if (input.connectionLastMessageAt) closes.push(input.connectionLastMessageAt);
   if (closes.some((t) => t > cycle.lastTouchAt)) return null;
   const days = daysInQueue(cycle.cycleStartedOn, input.today);

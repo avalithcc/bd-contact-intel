@@ -44,6 +44,13 @@ test("only the owner's worked set closes the cycle: a Hunter lookup or a status 
   }
 });
 
+test("a note deleted AFTER the cycle opened still closes it; one deleted BEFORE does not (same rule as the SQL)", () => {
+  const after = [{ ...act("note", "2026-10-21T10:00:00Z"), deletedAt: at("2026-10-22T10:00:00Z") }];
+  assert.equal(deriveFollowUpRecordState({ cycle: cycle(), activities: after, connectionLastMessageAt: null, today: "2026-10-23" }), null);
+  const before = [{ ...act("note", "2026-10-19T10:00:00Z"), deletedAt: at("2026-10-19T11:00:00Z") }];
+  assert.equal(deriveFollowUpRecordState({ cycle: cycle(), activities: before, connectionLastMessageAt: null, today: "2026-10-23" })?.kind, "overdue");
+});
+
 test("a drop by a BD or by the system makes the contact 'out' until a newer touch", () => {
   const dropped = [act("follow_up_dropped", "2026-10-24T15:00:00Z", { reason: "no_response" })];
   assert.deepEqual(deriveFollowUpRecordState({ cycle: cycle(), activities: dropped, connectionLastMessageAt: null, today: "2026-10-25" }), {

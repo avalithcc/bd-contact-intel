@@ -201,7 +201,7 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
     // uses (src/lib/status/recompute.ts), so the reason can never disagree
     // with `person.status`.
     db
-      .select({ id: activity.id, type: activity.type, createdAt: activity.createdAt, metadata: activity.metadata })
+      .select({ id: activity.id, type: activity.type, createdAt: activity.createdAt, metadata: activity.metadata, deletedAt: activity.deletedAt })
       .from(activity)
       .where(eq(activity.personId, row.id)),
     // Bounded to this one person (task instruction): the "Origen" row's
