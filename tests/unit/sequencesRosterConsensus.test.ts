@@ -34,11 +34,16 @@ test("one colleague is not a consensus", () => {
   assert.equal(e.colleaguesDisagree, undefined);
 });
 
-test("exactly half is not a strict majority: colleagues disagree and the company country is not used", () => {
+test("exactly half is not a strict majority: the company country still decides, and the dissent is flagged", () => {
   const e = explainComplianceAudience({ ...base, companyCountry: "United States", rosterCountries: roster(["Argentina", 2], ["Chile", 2]) });
-  assert.deepEqual(e.audience, null);
-  assert.equal(e.reason, null);
+  assert.equal(e.reason, "company_country");
+  assert.deepEqual(e.audience, MIAMI_EN);
   assert.equal(e.colleaguesDisagree, true);
+});
+
+test("without a company country a split roster answers nothing by itself", () => {
+  const e = explainComplianceAudience({ ...base, rosterCountries: roster(["Argentina", 2], ["Chile", 2]) });
+  assert.deepEqual(e, { audience: null, reason: null, evidence: null, colleaguesDisagree: true });
 });
 
 test("filed spellings of one country are tallied together", () => {
@@ -67,8 +72,28 @@ test("one colleague that agrees with the company leaves the company country in c
   assert.equal(e.colleaguesDisagree, undefined);
 });
 
-test("a colleague who contradicts the company country takes the company link out, and the chain falls through", () => {
-  const input = { ...base, companyCountry: "United States", rosterCountries: roster(["Argentina", 1]) };
+test("a colleague who contradicts the company country does not take it away: no majority, so the company decides, flagged", () => {
+  const e = explainComplianceAudience({ ...base, companyCountry: "United States", mobilePhone: "+54 223 632 4960", postingMarkets: ["latam"], rosterCountries: roster(["Argentina", 1]) });
+  assert.equal(e.reason, "company_country");
+  assert.deepEqual(e.audience, MIAMI_EN);
+  assert.equal(e.colleaguesDisagree, true);
+});
+
+test("the Rappi shape: company Colombia, two colleagues elsewhere and apart, stays Spanish via the company, flagged", () => {
+  const e = explainComplianceAudience({ ...base, companyCountry: "Colombia", rosterCountries: roster(["Argentina", 1], ["Mexico", 1]) });
+  assert.equal(e.reason, "company_country");
+  assert.deepEqual(e.audience, { address: "miami", language: "es" });
+  assert.equal(e.evidence, "Colombia");
+  assert.equal(e.colleaguesDisagree, true);
+});
+
+test("a company country that is a sanctioned jurisdiction still holds even when colleagues dissent", () => {
+  const e = explainComplianceAudience({ ...base, companyCountry: "Cuba", rosterCountries: roster(["Argentina", 1]) });
+  assert.deepEqual(e, { audience: null, reason: "company_country", evidence: "Cuba", colleaguesDisagree: true });
+});
+
+test("only a split roster WITHOUT a company country falls through to postings, then phone, and says the colleagues disagree", () => {
+  const input = { ...base, rosterCountries: roster(["Argentina", 1], ["Chile", 1]) };
   const held = explainComplianceAudience(input);
   assert.equal(held.audience, null);
   assert.equal(held.reason, null);

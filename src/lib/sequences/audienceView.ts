@@ -18,8 +18,8 @@ export interface MemberAudience extends ComplianceAudienceExplained {
   /** The Spanish name of `iso`, resolved on the server (see ColleagueIso); null when `iso` is. */
   readonly isoName: string | null;
   /**
-   * The company country as filed, only when the card has to say it was NOT used: the roster outvoted it, or the colleagues split
-   * and contradicted it. Null when the company country decided or was never filed.
+   * The company country as filed, only when the card has to say it was NOT used: the colleagues' majority outvoted it. Null when
+   * the company country decided (even with dissent: see `colleaguesDisagree`) or was never filed.
    */
   readonly companyIgnored: string | null;
   /** A phone is on file but is not what decided: its number and the country its dial code places. */
@@ -48,6 +48,6 @@ export function buildMemberAudience(raw: ComplianceAudienceInputs): MemberAudien
 
   const colleagueCountries = rosterBreakdown(raw.rosterCountries).map((c) => ({ ...c, name: countryNameEs(c.iso) }));
   const filed = raw.companyCountry?.trim() || null;
-  const companyIgnored = filed && ((reason === "roster_consensus" && resolveCountry(filed) !== iso) || explained.colleaguesDisagree) ? filed : null;
+  const companyIgnored = filed && reason === "roster_consensus" && resolveCountry(filed) !== iso ? filed : null;
   return { ...explained, iso, isoName: iso ? countryNameEs(iso) : null, companyIgnored, unusedPhone, colleagueCountries, colleaguesKnown: colleagueCountries.reduce((sum, c) => sum + c.n, 0) };
 }

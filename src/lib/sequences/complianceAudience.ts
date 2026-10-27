@@ -23,8 +23,10 @@
  *     with at least 2 of them. `company.country` describes one filing, not where a multinational's people sit (Globant was
  *     filed "United States" with an all-Argentine roster); measured leave-one-out, the company country predicts the draft
  *     language 85.2% of the time and the roster majority 97.8%. A sanctioned majority HOLDS like any sanctioned country.
- *   - company country: used only while no colleague with a recognized country contradicts it. A contradicted company country
- *     with no majority to replace it is NOT used: the chain falls through, and `colleaguesDisagree` tells the screen why.
+ *   - company country: with no majority (a split roster, or fewer than 2 recognized colleagues) it is still used when filed,
+ *     even if some colleague contradicts it (owner decision 2026-10-27: a thin or split roster must not revoke a usable
+ *     country and hold the contact); `colleaguesDisagree` tells the screen the colleagues do not back it. Only with no
+ *     company country at all does a split roster fall through to postings, phone and HOLD.
  *
  * Free text -> country. `person.country` / `company.country` are free text and `classifyMarket` is a lossy substring matcher
  * (it files "New Mexico" under latam). It must not be reused here. `resolveCountry` matches the WHOLE normalized string
@@ -269,8 +271,9 @@ export interface ComplianceAudienceExplained {
   /** Only with `roster_consensus`: how many recognized colleagues hold the winning country (`evidence` is its ISO), out of how many are recognized. */
   readonly colleagues?: { readonly agree: number; readonly of: number };
   /**
-   * Only when true: the recognized colleagues disagree among themselves (no strict majority) or with the company country, so
-   * the company link was not used. Whoever decided afterwards (postings, phone, or nobody) did so without a country.
+   * Only when true, and only without a strict majority: some recognized colleague has a different country than the company
+   * (the company country still decided), or the recognized colleagues split among themselves with no company country (postings,
+   * phone or nobody decided).
    */
   readonly colleaguesDisagree?: true;
 }
@@ -320,17 +323,16 @@ export function explainComplianceAudience(input: ComplianceAudienceInputs): Comp
   if (majority) {
     return { audience: audienceOfCountry(majority.iso), reason: "roster_consensus", evidence: majority.iso, colleagues: { agree: majority.agree, of: tally.total } };
   }
-  // No majority: either too few colleagues to say, or they split. A split is worth telling the screen about.
-  let disagree = tally.total >= ROSTER_MIN_COLLEAGUES;
+  // No majority. A filed company country decides, as it always did, whoever dissents; the dissent is only reported. Unrecognized
+  // text cannot be compared with anyone, so it keeps deciding (and holding).
   const company = input.companyCountry?.trim();
   if (company) {
     const companyIso = resolveCountry(company);
-    // Unrecognized company text cannot be compared with anyone, so it keeps deciding (and holding), as it always did.
-    const contradicted = companyIso !== null && [...tally.byIso.keys()].some((iso) => iso !== companyIso);
-    if (!contradicted) return { audience: audienceOfIso(companyIso), reason: "company_country", evidence: company };
-    disagree = true;
+    const dissent = companyIso !== null && [...tally.byIso.keys()].some((iso) => iso !== companyIso);
+    return { audience: audienceOfIso(companyIso), reason: "company_country", evidence: company, ...(dissent ? { colleaguesDisagree: true as const } : {}) };
   }
-  const flag = disagree ? { colleaguesDisagree: true as const } : {};
+  // No company country: a roster that splits (two or more recognized colleagues, no majority) is worth telling the screen about.
+  const flag = tally.total >= ROSTER_MIN_COLLEAGUES ? { colleaguesDisagree: true as const } : {};
   const posted = fromPostingBucket(input.postingMarkets);
   if (posted) return { audience: posted, reason: "posting_markets", evidence: fromPostings(input.postingMarkets), ...flag };
   const iso = phoneCountryIso(input.mobilePhone, input.phone);

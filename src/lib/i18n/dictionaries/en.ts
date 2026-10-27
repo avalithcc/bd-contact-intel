@@ -3627,7 +3627,7 @@ export const en = {
       companyUncontradicted: "No colleague with a country filed contradicts it.",
       rosterSplitTitle: "Your colleagues at {company} are in {k} countries.",
       rosterSplitBody: "{breakdown}: none has a majority, so we do not decide for them.",
-      rosterSplitCompany: "We do not use the company country ({filed}) either, because they contradict it.",
+      companyDespiteSplit: "We use the country of {company} ({filed}), but your colleagues do not agree: {breakdown}.",
       rosterSplitToPhone: "That is why the phone was read. If you prefer another country, set it on {name}'s record.",
       rosterListAnd: "and",
       holdSplitRoster: "We do not know where they are: no country, no phone on file, no open IT postings, and their colleagues at {company} are in {k} countries with no majority: {breakdown}. Without that there is no language or legal address, and the email cannot be sent. Your call: set {name}'s country.",

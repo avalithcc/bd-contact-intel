@@ -3626,7 +3626,7 @@ export const es: typeof en = {
       companyUncontradicted: "Ningún colega con país cargado la contradice.",
       rosterSplitTitle: "Tus colegas en {company} están en {k} países.",
       rosterSplitBody: "{breakdown}: ninguno tiene mayoría, así que no decidimos por ellos.",
-      rosterSplitCompany: "Tampoco usamos el país de la empresa ({filed}) porque lo contradicen.",
+      companyDespiteSplit: "Usamos el país de {company} ({filed}), pero tus colegas no coinciden: {breakdown}.",
       rosterSplitToPhone: "Por eso se miró el teléfono. Si preferís otro país, cargalo en la ficha de {name}.",
       rosterListAnd: "y",
       holdSplitRoster: "No sabemos dónde está: no tiene país, no cargó ningún teléfono, no hay vacantes IT abiertas y sus colegas en {company} están en {k} países sin una mayoría: {breakdown}. Sin eso no hay idioma ni dirección legal, y el correo no se puede mandar. Elegí vos: cargá el país de {name}.",

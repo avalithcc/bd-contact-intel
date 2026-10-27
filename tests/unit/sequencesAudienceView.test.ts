@@ -24,6 +24,14 @@ test("roster consensus names its country and its colleagues, and never surfaces 
   assert.equal(buildMemberAudience({ ...base, companyCountry: "Argentina", rosterCountries: roster(["Argentina", 3]) }).companyIgnored, null, "a company country the roster agrees with was not set aside");
 });
 
+test("a company country that decides despite dissenting colleagues is kept, flagged, with the breakdown to quote", () => {
+  const a = buildMemberAudience({ ...base, companyCountry: "Colombia", rosterCountries: roster(["Mexico", 1], ["Argentina", 1]) });
+  assert.equal(a.reason, "company_country");
+  assert.equal(a.colleaguesDisagree, true);
+  assert.equal(a.companyIgnored, null, "the company country was used, not set aside");
+  assert.deepEqual(a.colleagueCountries.map((c) => c.name), ["Argentina", "México"]);
+});
+
 test("company country with colleagues that agree reports how many colleagues know a country", () => {
   const a = buildMemberAudience({ ...base, companyCountry: "United States", rosterCountries: roster(["USA", 1]) });
   assert.equal(a.reason, "company_country");
@@ -32,10 +40,10 @@ test("company country with colleagues that agree reports how many colleagues kno
 });
 
 test("a split roster carries its breakdown by ISO, biggest first, unrecognised texts left out", () => {
-  const a = buildMemberAudience({ ...base, companyCountry: "United States", mobilePhone: "+54 223 632 4960", rosterCountries: roster(["Mexico", 4], ["Argentina", 4], ["Greater Buenos Aires", 9], ["Chile", 3]) });
+  const a = buildMemberAudience({ ...base, mobilePhone: "+54 223 632 4960", rosterCountries: roster(["Mexico", 4], ["Argentina", 4], ["Greater Buenos Aires", 9], ["Chile", 3]) });
   assert.equal(a.reason, "phone");
   assert.equal(a.colleaguesDisagree, true);
-  assert.equal(a.companyIgnored, "United States");
+  assert.equal(a.companyIgnored, null, "no company country was filed, so none was set aside");
   assert.deepEqual(a.colleagueCountries, [{ iso: "AR", n: 4, name: "Argentina" }, { iso: "MX", n: 4, name: "México" }, { iso: "CL", n: 3, name: "Chile" }]);
 });
 
@@ -97,8 +105,14 @@ test("menu: company country is unchanged (person, company, phone) when nobody co
   assert.deepEqual(items({ ...base, companyCountry: "United States", mobilePhone: "+54 223 632 4960" }), ["person", "company"], "the shipped rule: a phone already on file is not asked for again");
 });
 
+test("menu: company country despite dissent offers person, company, phone (shipped rule) and the colleagues", () => {
+  const raw = { ...base, companyCountry: "Colombia", rosterCountries: roster(["Argentina", 1], ["Mexico", 1]) };
+  assert.deepEqual(items(raw), ["person", "company", "phone", "colleagues"]);
+  assert.deepEqual(items({ ...raw, mobilePhone: "+54 223 632 4960" }), ["person", "company", "colleagues"], "a phone already on file is not asked for again");
+});
+
 test("menu: phone after a split roster offers person, company and the colleagues, not the phone", () => {
-  assert.deepEqual(items({ ...base, companyCountry: "United States", mobilePhone: "+54 223 632 4960", rosterCountries: roster(["Argentina", 4], ["Mexico", 4]) }), ["person", "company", "colleagues"]);
+  assert.deepEqual(items({ ...base, mobilePhone: "+54 223 632 4960", rosterCountries: roster(["Argentina", 4], ["Mexico", 4]) }), ["person", "company", "colleagues"]);
 });
 
 test("menu: a HOLD with a split roster offers all three fixes and the colleagues", () => {

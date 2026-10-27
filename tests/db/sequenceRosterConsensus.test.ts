@@ -69,11 +69,17 @@ before(async () => {
   await mkPerson("m-target", miami);
   for (const n of [1, 2, 3]) await mkPerson(`m-ar${n}`, miami, { country: "Argentina" });
 
-  // Colleagues split down the middle, company filed: no majority, the company is contradicted, nothing else answers.
-  const nodo = await mkCompany("nodo", "United States");
+  // Colleagues split down the middle and NO company country: no majority, nothing else answers, so it holds.
+  const nodo = await mkCompany("nodo", null);
   await mkPerson("n-target", nodo);
   for (const n of [1, 2]) await mkPerson(`n-ar${n}`, nodo, { country: "Argentina" });
   for (const n of [1, 2]) await mkPerson(`n-mx${n}`, nodo, { country: "Mexico" });
+
+  // Thin, split roster against a filed company country (the Rappi shape): the company country still decides, flagged.
+  const rappi = await mkCompany("rappi", "Colombia");
+  await mkPerson("r-target", rappi);
+  await mkPerson("r-ar", rappi, { country: "Argentina" });
+  await mkPerson("r-mx", rappi, { country: "Mexico" });
 
   void company;
 });
@@ -126,11 +132,11 @@ test("the detail card reads the roster: the colleagues' country, not the company
   assert.deepEqual(a.colleagues, { agree: 3, of: 4 });
 });
 
-test("the add guard admits a contact only the roster can place, and refuses a split roster", async () => {
+test("the add guard admits a contact only the roster can place, keeps a dissented company country, and refuses a split roster with no company country", async () => {
   const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
-  const added = await addMembersToSequence(ownerId, sequenceId, [ids.get("m-target")!, ids.get("n-target")!]);
+  const added = await addMembersToSequence(ownerId, sequenceId, [ids.get("m-target")!, ids.get("r-target")!, ids.get("n-target")!]);
   assert.ok(added.ok);
-  assert.deepEqual(added.accepted, [ids.get("m-target")!]);
+  assert.deepEqual(added.accepted.sort(), [ids.get("m-target")!, ids.get("r-target")!].sort());
   assert.deepEqual(added.rejected, [{ personId: ids.get("n-target")!, reason: "unmapped_market" }]);
 });
 

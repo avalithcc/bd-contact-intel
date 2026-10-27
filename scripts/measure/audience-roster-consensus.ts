@@ -75,7 +75,7 @@ function summarize(title: string, rows: { row: Row; before: ReturnType<typeof ex
 /** Hide the contact's own country and predict it; compare the predicted language/address with the truth. */
 function leaveOneOut(rows: Row[]) {
   const stat = (name: string) => ({ name, n: 0, held: 0, wrongLang: 0, wrongAddr: 0 });
-  const oldS = stat("old chain (company, postings, phone)"), newS = stat("new chain (roster, company-if-uncontradicted, postings, phone)");
+  const oldS = stat("old chain (company, postings, phone)"), newS = stat("new chain (roster majority, company, postings, phone)");
   for (const row of rows) {
     const full = audienceInputsFromRow(row);
     const own = full.personCountry?.trim();
