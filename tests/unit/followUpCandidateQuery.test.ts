@@ -165,6 +165,14 @@ test("the insert opens a cycle on its own queue date and gives the cap to days 1
   assert.match(text, /follow_up_queue_item\.cycle_started_on > \$\d+::date - \$\d+::int\s*\)/);
 });
 
+test("the pre-migration measurement variant never mentions cycle_started_on; every default render does", () => {
+  const measured = dialect.sqlToQuery(buildFollowUpVerificationQuery(10, { includeCycles: false })).sql;
+  assert.doesNotMatch(measured, /cycle_started_on/);
+  assert.match(measured, /interval '5 days'/, "same entry rule");
+  assert.match(renderVerification(), /cycle_started_on/);
+  assert.match(renderInsert(), /cycle_started_on/);
+});
+
 test("the re-entry statement fires only while the latest follow-up activity is a drop", () => {
   const { sql: text, params } = dialect.sqlToQuery(buildFollowUpReentryQuery("00000000-0000-0000-0000-000000000001", "2026-10-27"));
   assert.match(text, /insert into "activity" \(person_id, type, metadata\)/);

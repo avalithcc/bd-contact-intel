@@ -75,7 +75,16 @@ const WRONG_NUMBER_OUTCOME: CallOutcomeCode = "wrong_number";
 
 /** `with` body only (no leading `with` keyword) so callers can splice in
  * their own additional CTEs/final SELECT around it. */
-export function fuqCandidatesCte() {
+export interface CandidateOptions {
+  /**
+   * Skip the "open cycle" exclusion, which reads `follow_up_queue_item.cycle_started_on`. Only the read-only pre-migration
+   * measurement (scripts/measure/follow-up-expiry-day0.ts) sets it false: before the column exists there are no cycles, so
+   * the exclusion would exclude nobody. Every production caller leaves it on.
+   */
+  includeCycles?: boolean;
+}
+
+export function fuqCandidatesCte({ includeCycles = true }: CandidateOptions = {}) {
   return sql`
     fuq_activity as (
       select activity.person_id as fuq_activity_person_id,
@@ -149,13 +158,17 @@ export function fuqCandidatesCte() {
             and activity.created_at > fuq_last_touch
         )
         -- A contact whose cycle is still open (no touch since its row was written) is carried, never re-added as new.
-        and not exists (
+        ${
+          includeCycles
+            ? sql`and not exists (
           select 1 from ${followUpQueueItem} fuq_cycle
           where fuq_cycle.bd_id = fuq_owner_bd_id
             and fuq_cycle.person_id = fuq_person_id
             and fuq_cycle.cycle_started_on is not null
             and fuq_cycle.last_touch_at >= fuq_last_touch
-        )
+        )`
+            : sql``
+        }
     )
   `;
 }
@@ -263,9 +276,9 @@ export function buildFollowUpReentryQuery(bdId: string, queueDate: string) {
  * postponed/skipped rows; the real materialization is always the source of
  * truth.
  */
-export function buildFollowUpVerificationQuery(cap: number = FOLLOW_UP_DAILY_CAP) {
+export function buildFollowUpVerificationQuery(cap: number = FOLLOW_UP_DAILY_CAP, options: CandidateOptions = {}) {
   return sql`
-    with ${fuqCandidatesCte()}
+    with ${fuqCandidatesCte(options)}
     select fuq_owner_bd_id as owner_bd_id, count(*)::int as eligible_count,
       least(count(*), ${cap})::int as queue_count
     from fuq_due
