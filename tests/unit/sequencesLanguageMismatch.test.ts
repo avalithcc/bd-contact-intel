@@ -10,7 +10,7 @@ import { buildUnsubscribeUrl, generateUnsubscribeToken } from "@/lib/sequences/u
 import { bulkApprovalGate } from "@/lib/sequences/bulkApprovalGate";
 import { bulkBarView } from "@/lib/sequences/bulkBar";
 import { gateRows, mismatchedNames, nameList, readyMemberIds } from "@/lib/sequences/detailFlow";
-import { evaluatePreSendChecks, HOLD_REASONS } from "@/lib/sequences/preSendChecks";
+import { DRAFT_HOLD_REASONS, evaluatePreSendChecks, HOLD_REASONS } from "@/lib/sequences/preSendChecks";
 import { buildMemberAudience } from "@/lib/sequences/audienceView";
 import type { DetailDraft, DetailMember } from "@/lib/sequences/detailQueries";
 import type { AudienceLanguage, ComplianceAudienceInputs } from "@/lib/sequences/complianceAudience";
@@ -136,4 +136,9 @@ test("mismatchedNames names only the unapproved drafts in another language, by p
   const more = (n: number) => `+${n} more`;
   assert.equal(nameList(["A", "B"], more), "A, B");
   assert.equal(nameList(["A", "B", "C", "D", "E"], more), "A, B, C, +2 more");
+});
+
+test("the draft-driven holds are exactly the three that describe the draft's own text, and each is a real hold reason", () => {
+  assert.deepEqual([...DRAFT_HOLD_REASONS].sort(), ["missing_footer", "unmapped_market", "wrong_language"]);
+  for (const r of DRAFT_HOLD_REASONS) assert.ok((HOLD_REASONS as readonly string[]).includes(r), r);
 });

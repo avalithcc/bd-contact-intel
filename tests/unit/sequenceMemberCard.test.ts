@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MEMBER_STATES } from "@/lib/sequences/memberState";
-import { HOLD_REASONS } from "@/lib/sequences/preSendChecks";
+import { DRAFT_HOLD_REASONS, HOLD_REASONS } from "@/lib/sequences/preSendChecks";
 import { mapMemberCard, type CardFacts } from "@/lib/sequences/memberCard";
 
 const NOW = new Date("2026-10-15T14:00:00Z"); // 10:00 in Miami
@@ -97,13 +97,17 @@ test("an opted-out member offers no 'Reincorporar': the state machine forbids it
   assert.deepEqual(ids(mapMemberCard(facts({ state: "discarded", discardReason: "opt_out" }), NOW)), []);
 });
 
-test("every hold reason reaches the card, in every state and kind, except an unapproved draft's: a hold belongs to an approval", () => {
+test("every hold reason reaches the card, except the holds about an unapproved draft's own text on a draft card", () => {
   for (const state of MEMBER_STATES) {
     for (const holdReason of HOLD_REASONS) {
       const card = mapMemberCard(facts({ state, holdReason }), NOW);
-      assert.equal(card.holdReason, card.kind === "draft" ? null : holdReason, `${state}/${holdReason}`);
+      const hidden = card.kind === "draft" && DRAFT_HOLD_REASONS.includes(holdReason);
+      assert.equal(card.holdReason, hidden ? null : holdReason, `${state}/${holdReason}`);
     }
   }
+  // A send-side hold stays on a drafted card (a Gmail 5xx may have delivered the email); a draft-driven one goes.
+  assert.equal(mapMemberCard(facts({ state: "drafted", holdReason: "manual_check" }), NOW).holdReason, "manual_check");
+  assert.equal(mapMemberCard(facts({ state: "drafted", holdReason: "wrong_language" }), NOW).holdReason, null);
   // A drafted member with NO draft still shows its hold (unmapped_market is written there), and so does an approved one.
   assert.equal(mapMemberCard(facts({ state: "drafted", hasDraft: false, holdReason: "unmapped_market" }), NOW).holdReason, "unmapped_market");
   assert.equal(mapMemberCard(facts({ state: "approved", holdReason: "wrong_language" }), NOW).holdReason, "wrong_language");

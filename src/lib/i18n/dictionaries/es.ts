@@ -3572,6 +3572,7 @@ export const es: typeof en = {
     generateBulkWaitTitle: "Esperá a que termine el borrador en curso",
     approveReady: "Aprobar los {n} listos",
     approveReadyOne: "Aprobar el listo",
+    approveReadyNone: "Nada listo para aprobar",
     statReview: "Borradores por revisar",
     statReviewFoot: "esperan tu aprobación",
     statQueued: "Aprobados, en cola",

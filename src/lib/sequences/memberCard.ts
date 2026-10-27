@@ -14,7 +14,7 @@
  */
 import { miamiCalendarDate } from "./miamiTime";
 import { canTransition, type MemberState } from "./memberState";
-import type { HoldReason } from "./preSendChecks";
+import { DRAFT_HOLD_REASONS, type HoldReason } from "./preSendChecks";
 
 export type CardKind = "draft" | "noDraft" | "approved" | "scheduled" | "sent" | "reminderToday" | "noReply" | "replied" | "discarded";
 export type CardTone = "info" | "brand" | "contacted" | "warn" | "replied" | "discarded" | "neutral";
@@ -70,8 +70,8 @@ function mapOwnCard(f: CardFacts, now: Date): CardView {
   switch (f.state) {
     case "drafted":
       if (!f.hasDraft) return { ...base, kind: "noDraft", tone: "neutral", actions: [act("generate", "primary")], menu: ["openContact", "remove"] };
-      // No hold line on a draft: a hold belongs to an approval (or to a missing draft, below), and the audience alert covers the no-audience case.
-      return { ...base, holdReason: null, kind: "draft", tone: "info", florida: f.florida, actions: [act("reviewDraft", "secondary"), act("approve", "primary")], menu: ["regenerate", "openContact", "remove"] };
+      // A draft card hides only the holds about the DRAFT (it is being fixed: DRAFT_HOLD_REASONS; the audience alert covers the no-audience case). A send-side hold stays visible.
+      return { ...base, holdReason: f.holdReason && DRAFT_HOLD_REASONS.includes(f.holdReason) ? null : f.holdReason, kind: "draft", tone: "info", florida: f.florida, actions: [act("reviewDraft", "secondary"), act("approve", "primary")], menu: ["regenerate", "openContact", "remove"] };
     case "approved":
       // "Cambiar" and "Enviar ahora" are on both approved cards (send-now-or-schedule); only the cancel wording differs.
       return {

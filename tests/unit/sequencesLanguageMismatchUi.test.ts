@@ -119,7 +119,7 @@ const { SequenceDetailView } = require("@/app/(app)/sequences/_components/Sequen
 const detailOf = (members: DetailMember[]) => ({ id: "s1", name: "Seq", ownerBdId: "bd1", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members });
 const header = (members: DetailMember[]) => {
   const html = renderToStaticMarkup(createElement(SequenceDetailView, { detail: detailOf(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId: "bd1", lock: IDLE_LOCK, send: SEND }));
-  return /<button[^>]*>(Aprobar (?:los \d+ listos|el listo))<\/button>/.exec(html)?.[0] ?? "";
+  return /<button[^>]*>(Aprobar (?:los \d+ listos|el listo)|Nada listo para aprobar)<\/button>/.exec(html)?.[0] ?? "";
 };
 const withId = (id: string, m: DetailMember): DetailMember => ({ ...m, memberId: id, personId: `00000000-0000-4000-8000-00000000000${id}` });
 
@@ -131,7 +131,7 @@ test("the header button counts only the drafts the click will select: 5 drafts, 
 
 test("when every draft is in another language the header button is disabled instead of doing nothing", () => {
   const html = header([withId("1", member("en")), withId("2", member("en"))]);
-  assert.match(html, /disabled=""[^>]*>Aprobar los 0 listos</);
+  assert.match(html, /disabled=""[^>]*>Nada listo para aprobar</);
 });
 
 test("the hold line is shown on an approved card and never on an unapproved draft, where a stale hold would contradict the card", () => {

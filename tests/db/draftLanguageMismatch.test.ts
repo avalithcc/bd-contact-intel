@@ -285,30 +285,55 @@ test("the release re-check holds a REMINDER that is not in step 1's language, an
   assert.notEqual((await memberRow(pinned.memberId)).holdReason, "wrong_language", "held for something else (no thread headers in this fixture), not for language");
 });
 
-// --- a hold belongs to the approval it was written against ---------------------------------------------------------------
+// --- a hold belongs to what it describes ---------------------------------------------------------------------------------
 
-test("withdrawing the approval clears the release hold: cancel, edit and regenerate each return the card to a clean draft", async () => {
+/**
+ * Every way an approval or a draft is withdrawn, against EVERY hold reason: only the holds about the draft itself (DRAFT_HOLD_REASONS) go with
+ * it. A send-side hold, above all manual_check (a Gmail 5xx that may have delivered the email), must survive an edit, a cancel and a regenerate.
+ */
+test("withdrawing an approval clears a hold about the DRAFT and keeps every send-side hold, on every path", async () => {
   const { cancelApproval } = await import("@/lib/sequences/approvalQueries");
-  const { regenerateDrafts, saveDraftEdit } = await import("@/lib/sequences/draftQueries");
-  const held = () => mkMember(`hold-${randomUUID().slice(0, 4)}`, { state: "approved", approved: true, hold: "wrong_language" });
-  const cancelled = await held();
-  assert.deepEqual(await cancelApproval(bdId, cancelled.memberId), { ok: true });
-  const edited = await held();
-  assert.equal((await saveDraftEdit(bdId, edited.memberId, { subject: "S", body: "B" })).ok, true);
-  const regenerated = await held();
-  await regenerateDrafts(bdId, sequenceId, [regenerated.memberId], deps);
-  for (const m of [cancelled, edited, regenerated]) {
-    const row = await memberRow(m.memberId);
-    assert.deepEqual([row.state, row.holdReason, row.holdAt], ["drafted", null, null]);
+  const { regenerateDrafts, regenerateReminderDraft, saveDraftEdit } = await import("@/lib/sequences/draftQueries");
+  const { cancelScheduledSend } = await import("@/lib/sequences/mergeQueries");
+  const { HOLD_REASONS, DRAFT_HOLD_REASONS } = await import("@/lib/sequences/preSendChecks");
+  const { db } = await import("@/db");
+  const approved = (reason: string) => mkMember(`hold-${randomUUID().slice(0, 6)}`, { state: "approved", approved: true, hold: reason });
+  const reminder = (reason: string) => mkMember(`holdr-${randomUUID().slice(0, 6)}`, { reminder: true, approved: true, hold: reason });
+  const paths: Record<string, { make: typeof approved; run: (m: { memberId: string }) => Promise<unknown>; state: string }> = {
+    "cancel": { make: approved, run: (m) => cancelApproval(bdId, m.memberId), state: "drafted" },
+    "edit": { make: approved, run: (m) => saveDraftEdit(bdId, m.memberId, { subject: "S", body: "B" }), state: "drafted" },
+    "regenerate": { make: approved, run: (m) => regenerateDrafts(bdId, sequenceId, [m.memberId], deps), state: "drafted" },
+    "merge-warning cancel": { make: approved, run: (m) => cancelScheduledSend(db, m.memberId), state: "drafted" },
+    "reminder cancel": { make: reminder, run: (m) => cancelApproval(bdId, m.memberId, 2), state: "sent" },
+    "reminder edit": { make: reminder, run: (m) => saveDraftEdit(bdId, m.memberId, { subject: "S", body: "B" }, 2), state: "sent" },
+    "reminder regenerate": { make: reminder, run: (m) => regenerateReminderDraft(bdId, sequenceId, m.memberId, deps), state: "sent" },
+  };
+  for (const [name, path] of Object.entries(paths)) {
+    for (const reason of HOLD_REASONS) {
+      const m = await path.make(reason);
+      await path.run(m);
+      const row = await memberRow(m.memberId);
+      const drivenByDraft = (DRAFT_HOLD_REASONS as readonly string[]).includes(reason);
+      assert.equal(row.state, path.state, `${name}/${reason}: state`);
+      assert.deepEqual([row.holdReason, row.holdAt === null], drivenByDraft ? [null, true] : [reason, false], `${name}/${reason}`);
+    }
   }
 });
 
-test("withdrawing a reminder's approval clears its hold too, and the member stays sent", async () => {
-  const { cancelApproval } = await import("@/lib/sequences/approvalQueries");
-  const m = await mkMember("hold-rem", { reminder: true, approved: true, hold: "wrong_language" });
-  assert.deepEqual(await cancelApproval(bdId, m.memberId, 2), { ok: true });
-  const row = await memberRow(m.memberId);
-  assert.deepEqual([row.state, row.holdReason], ["sent", null]);
+test("after an edit a manual_check hold is still on the card of the drafted member, and a draft-driven one is not", async () => {
+  const { saveDraftEdit } = await import("@/lib/sequences/draftQueries");
+  const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
+  const { mapMemberCard } = await import("@/lib/sequences/memberCard");
+  const unconfirmed = await mkMember("card-manual", { state: "approved", approved: true, hold: "manual_check" });
+  const stale = await mkMember("card-lang", { state: "approved", approved: true, hold: "wrong_language" });
+  for (const m of [unconfirmed, stale]) await saveDraftEdit(bdId, m.memberId, { subject: "S", body: "B" });
+  const detail = await getSequenceDetail({ id: bdId, role: "bd" }, sequenceId);
+  const cardOf = (id: string) => {
+    const d = detail!.members.find((x) => x.memberId === id)!;
+    return mapMemberCard({ state: d.state, hasDraft: d.draft !== null, holdReason: d.holdReason, reminderDueAt: d.reminderDueAt, florida: d.florida, discardReason: d.discardReason }, NOW);
+  };
+  assert.deepEqual([cardOf(unconfirmed.memberId).kind, cardOf(unconfirmed.memberId).holdReason], ["draft", "manual_check"]);
+  assert.deepEqual([cardOf(stale.memberId).kind, cardOf(stale.memberId).holdReason], ["draft", null]);
 });
 
 // --- the unsubscribe page follows the same pin ---------------------------------------------------------------------------

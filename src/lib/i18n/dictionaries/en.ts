@@ -3576,6 +3576,7 @@ export const en = {
     generateBulkWaitTitle: "Wait for the draft in progress to finish",
     approveReady: "Approve the {n} ready",
     approveReadyOne: "Approve the ready one",
+    approveReadyNone: "Nothing ready to approve",
     statReview: "Drafts to review",
     statReviewFoot: "awaiting your approval",
     statQueued: "Approved, queued",

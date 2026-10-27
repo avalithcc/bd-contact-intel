@@ -19,6 +19,7 @@ import { REGENERABLE_STATES } from "./detailFlow";
 import { blocksEditedOverwrite, composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult, type EditConfirmations, type SkippedEdit } from "./draftCompose";
 import { buildSequenceDraftInput, draftSignals, resolveDraftCompliance, senderIdentity } from "@/lib/sequences/draftInput";
 import { parseLanguageChoice, resolveDraftLanguage, type DraftLanguageOverrides } from "./languageChoice";
+import { clearDraftHold } from "./draftHold";
 import { languageMismatch, pinToStep1 } from "./languageMismatch";
 import type { AudienceLanguage } from "./complianceAudience";
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
@@ -165,13 +166,13 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
       });
       await tx.insert(auditLog).values(sequenceAuditRow("regenerate", { actorBdId: bdId, personId: r.person_id as string, memberId, sequenceId, step }));
     }
-    // A regenerate withdraws the approval, so a hold the release re-check wrote against that approval (wrong_language, missing_footer ...) is moot: clear it.
+    // A regenerate withdraws the approval, so a hold about the draft (wrong_language, missing_footer, unmapped_market) is moot: clear it. A send-side hold stays.
     if (reminder) {
-      if (mode === "regenerate") await tx.update(sequenceMember).set({ holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));
+      if (mode === "regenerate") await tx.update(sequenceMember).set(clearDraftHold()).where(eq(sequenceMember.id, memberId));
       return "generated";
     }
     if (m.state === "approved") assertTransition("approved", "drafted", "regenerate");
-    await tx.update(sequenceMember).set({ state: "drafted" as MemberState, holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));
+    await tx.update(sequenceMember).set({ state: "drafted" as MemberState, ...clearDraftHold() }).where(eq(sequenceMember.id, memberId));
     return "generated";
   });
 }
@@ -338,9 +339,9 @@ export async function saveDraftEdit(bdId: string, memberId: string, input: { sub
     if (!current) return false;
     const now = new Date();
     await tx.update(sequenceDraft).set({ subject, body: input.body, editedAt: now, editedByBdId: bdId, ...reviewAfterEdit(current, bdId, now) }).where(draftKey);
-    // The edit withdraws the approval (reviewAfterEdit), and with it any hold the release re-check wrote against it.
+    // The edit withdraws the approval (reviewAfterEdit), and with it a hold about the draft; a send-side hold (manual_check ...) stays.
     if (step === STEP && m.state === "approved") assertTransition("approved", "drafted", "edit");
-    await tx.update(sequenceMember).set({ ...(step === STEP && m.state === "approved" ? { state: "drafted" } : {}), holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));
+    await tx.update(sequenceMember).set({ ...(step === STEP && m.state === "approved" ? { state: "drafted" } : {}), ...clearDraftHold() }).where(eq(sequenceMember.id, memberId));
     return true;
   });
   return saved ? { ok: true, footerWarning: facts.audience ? footerRemovedOnSave(input.body, facts.audience.address) : false } : { ok: false, error: "not_editable" };

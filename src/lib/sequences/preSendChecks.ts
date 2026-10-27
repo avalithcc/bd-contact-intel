@@ -38,6 +38,13 @@ export const HOLD_REASONS = [
 ] as const;
 export type HoldReason = (typeof HOLD_REASONS)[number];
 
+/**
+ * The holds that only describe the DRAFT: its address, its footer, its language. Regenerating, editing or cancelling the approval removes
+ * what they were about, so those operations clear them (draftHold.ts) and an unapproved draft card does not show them. Every other reason is
+ * about the send or the recipient (an unconfirmed Gmail send, a suppression, a client company ...) and survives all of those.
+ */
+export const DRAFT_HOLD_REASONS: readonly HoldReason[] = ["unmapped_market", "missing_footer", "wrong_language"];
+
 export interface PreSendFacts {
   step: 1 | 2;
   memberState: string;

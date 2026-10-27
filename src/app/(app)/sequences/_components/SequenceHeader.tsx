@@ -16,7 +16,7 @@ export function SequenceHeader({ name, memberCount, readyCount, labels, onAction
       <div className="row">
         {readOnly ? <Link className="btn btn-ghost btn-sm" href="/sequences?scope=all">{labels.readOnlyBack}</Link> : <>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => onAction({ type: "editSequence" })}>{labels.editSequence}</button>
-          <button type="button" className="btn btn-primary btn-sm" disabled={readyCount === 0 || lock.bulkApproveDisabled} title={lock.bulkApproveDisabled ? labels.generateBulkWaitTitle : undefined} onClick={() => onAction({ type: "approveReady" })}>{readyCount === 1 ? labels.approveReadyOne : fill(labels.approveReady, { n: readyCount })}</button>
+          <button type="button" className="btn btn-primary btn-sm" disabled={readyCount === 0 || lock.bulkApproveDisabled} title={lock.bulkApproveDisabled ? labels.generateBulkWaitTitle : undefined} onClick={() => onAction({ type: "approveReady" })}>{readyCount === 0 ? labels.approveReadyNone : readyCount === 1 ? labels.approveReadyOne : fill(labels.approveReady, { n: readyCount })}</button>
         </>}
       </div>
     </div>
