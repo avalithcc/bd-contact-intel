@@ -158,7 +158,22 @@ The English body and footer shown in B1 are prospect-facing sample text copied f
 5. A draft whose language cannot be known is not flagged (recommended): never mark what cannot be proved. The alternative (flag every unknown) would mark every legacy draft.
 6. "Aprobar los N listos" leaves mismatched drafts out of N (drawn). Alternative: count them and block. Recommended: leave out, as drawn, so one stale draft never hides the rest.
 
-Approved:
+Approved: 2026-10-27 by Cristian (owner)
+
+Decisions recorded with the approval (the owner did not object to the defaults stated before building):
+
+1. Override is option B: there is NO "Aprobar igual". The exits are "Regenerar en {now}" (opens the existing language dialog, one contact at a time, never a bulk regenerate)
+   and "Mantener en {draft}" (writes the existing one-off `sequence_member.draft_language` with who and when; the draft then matches and approves normally).
+2. The step 2 reminder is PINNED to the language step 1 was written in, so a thread never mixes languages (nothing is flagged instead). "Regenerar" on a reminder follows the pin too.
+3. ONE pure predicate, reason code `wrong_language` next to `missing_footer`, used by the card, the review dialog, single approval, bulk approval and the pre-send re-check
+   (`preSendChecks.ts`), so approved-but-unsent drafts are held too. "Today's language" comes only from `resolveDraftLanguage` / `memberLanguage`.
+4. A draft whose language is unknown is not flagged.
+5. Bulk: a mismatched draft cannot be selected and is left out of "Aprobar los N listos"; a selected draft that turns mismatched blocks the whole bulk on the server (all-or-nothing, like
+   `unreviewed`). The bulk review gate is only extended, never weakened. The reason stays visible on the item, not only in the sticky bar.
+6. Data: nullable `sequence_draft.language` ('es' | 'en'), written by the generate, regenerate and reminder paths from the language the draft is composed with. NULL = unknown = not flagged,
+   and no backfill. Measured read-only against production on 2026-10-27 (`scripts/measure/draft-language-mismatch.ts`, counts only): 21 drafts exist, 12 can still be sent
+   (all 12 unapproved, none approved-but-unsent). Inferring from the opt-out sentence would flag 2 of those 12 on day 1 and both are false: the body is Spanish and the
+   sentence is the English one stored before it was translated (`complianceFooter.ts:43-47`). Zero false flags is the bar, so no inference.
 
 ## Data question for the builder (not decided)
 
