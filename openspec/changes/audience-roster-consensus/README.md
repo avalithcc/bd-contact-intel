@@ -38,8 +38,12 @@ The table at the bottom lists the resolution order and what the card says at eac
 
 ## Notes for the owner
 
-- The `alert-warn` "Esta empresa decide a N contactos" (`companyImpact`) is only reachable today when a colleague contradicts the company. Under the new order that case is decided by the roster, so the alert disappears from the resolved card (panel D, right). It stays in the "Hoy" side for comparison. Removing it from the component is implied by approval.
-- The `corregir` menu keeps its three shipped items and adds "Ver los colegas de {company}" (link to the company roster). Under roster consensus, correcting the company country or loading a phone does not change this contact's answer (only loading the person's own country does). They are kept to honour "keep the existing affordances"; **owner decision: hide them in this state?**
+Resolved decisions (2026-10-27):
+
+- `corregir` items are limited in the roster-consensus state: only "Cargar el país de {name}" and "Ver los colegas de {company}" remain. "Corregir el país de {company}" and "Cargar un teléfono" are hidden because they cannot change the answer there.
+- `companyImpact` ("Esta empresa decide a N contactos") is removed from the component: it was only reachable when a colleague contradicted the company, and the roster now decides that case. It stays on the "Hoy" side of panel D for comparison only.
+- The `unusedPhone` hint is NOT shown in the roster-consensus state: the phone cannot change the answer there (same rule as the hidden items).
+
 - The "idioma" menu (language override) shown by the real component when the viewer can edit is not drawn, as in the approved mockup.
 - Names and numbers in panels A, C and D are invented placeholders (Valentina Rojas, Tomás Giménez, Lucía Benítez, Despegar, Nodo Labs, 12 of 14, 4 + 4, 103 of 110, 41). Federico Biskupovich / Lemon Cash comes from the approved mockup. The "103 colegas" figure is a count of colleagues WITH a country; it must be re-measured against production before it is quoted anywhere.
 - The count shown is the size of the winning group; the denominator is the colleagues with a known country. Colleagues without a country do not count either way.
