@@ -64,9 +64,16 @@ test("an admin reading another BD's sequence sees why, with no button to change 
   assert.ok(html.includes("El correo no se puede aprobar así.") && !html.includes("Mantener en") && !html.includes("Regenerar en español"));
 });
 
-test("a hand-edited draft in the wrong language warns that regenerating loses the text and points at Mantener", () => {
+test("a hand-edited draft in the wrong language warns after a line break, with the lead in bold (mockup A3)", () => {
   const html = card(member("en", { draft: draft("en", { edited: true, editedAt: new Date("2026-10-22T09:00:00Z") }) }));
-  assert.ok(html.includes("Lo editaste a mano: regenerarlo reemplaza tu texto y no se puede recuperar. Si el texto está bien, mantenelo en inglés."), html);
+  assert.ok(html.includes("El correo no se puede aprobar así.<br/><strong>Lo editaste a mano:</strong> regenerarlo reemplaza tu texto y no se puede recuperar. Si el texto está bien, mantenelo en inglés."), html);
+});
+
+test("the card alert puts the two buttons in a div.row at the right, with the mockup's inline style and no icons", () => {
+  const html = card(member("en"));
+  const alert = html.slice(html.indexOf('class="alert alert-warn"'));
+  assert.match(alert, /<div class="row" style="gap:\.25rem;flex:none"><button type="button" class="btn btn-secondary btn-sm">Regenerar en español<\/button><button type="button" class="btn btn-ghost btn-sm">Mantener en inglés<\/button><\/div><\/div>/);
+  assert.ok(alert.startsWith('class="alert alert-warn" role="note" style="padding:var(--space-sm) var(--space-md)"'));
 });
 
 test("an approved draft shows no exits: the release re-check holds it and the hold is worded", () => {
@@ -74,23 +81,31 @@ test("an approved draft shows no exits: the release re-check holds it and the ho
   for (const needle of NOTHING) assert.ok(!html.includes(needle), needle);
 });
 
-test("the review dialog carries the mockup's lead and body, the badge by the body label, the exits and a disabled approve", () => {
+test("the review dialog follows mockup B1: bold lead and language, the buttons BELOW the sentence, then what each one does with the verbs in bold", () => {
   const html = dialog(member("en"));
-  assert.ok(html.includes("<strong>Este borrador está en inglés.</strong> Ahora le escribiríamos en español ("), html);
-  assert.ok(html.includes("Si lo aprobás así, el correo sale en inglés, por eso no se puede aprobar todavía."));
-  assert.match(html, /Cuerpo<span[^>]*> <span class="badge badge-warn">en inglés<\/span>|Cuerpo <span class="badge badge-warn">en inglés<\/span>/);
-  assert.ok(html.includes("Regenerar en español") && html.includes("Mantener en inglés"));
-  assert.ok(html.includes("Regenerar abre el diálogo de idioma, con español elegido, y reemplaza este texto."));
+  const alert = html.slice(html.indexOf('class="alert alert-warn" role="alert"'));
+  const lead = alert.indexOf("<strong>Este borrador está en inglés.</strong> Ahora le escribiríamos en <strong>español</strong> (");
+  const body = alert.indexOf("). Si lo aprobás así, el correo sale en inglés, por eso no se puede aprobar todavía.");
+  const buttons = alert.indexOf('<div class="row wrap mt-md" style="gap:var(--space-sm)">');
+  const how = alert.indexOf('<p class="mt-md" style="margin-bottom:0"><strong>Regenerar</strong> abre el diálogo de idioma, con español elegido, y reemplaza este texto. <strong>Mantener</strong> no toca el texto:');
+  assert.ok(lead >= 0 && body > lead && buttons > body && how > buttons, `order lead/body/buttons/how: ${[lead, body, buttons, how]}`);
+  const row = alert.slice(buttons, how);
+  assert.match(row, /class="btn btn-secondary btn-sm"><svg[^>]*class="icon"[^>]*>.*<\/svg>Regenerar en español<\/button><button type="button" class="btn btn-ghost btn-sm">Mantener en inglés<\/button>/, "the regenerate button carries the sparkle icon, keep is a ghost button");
+  assert.match(html, /Cuerpo <span class="badge badge-warn">en inglés<\/span>/);
   assert.match(html, /<button[^>]*class="btn btn-primary"[^>]*disabled=""[^>]*>(?:<svg.*?<\/svg>)?Aprobar y enviar ahora/);
 });
 
-test("the help line is inside the footer, so it stays with the disabled approve, and the approve points at it", () => {
+test("the help line is inside the footer, so it stays with the disabled approve, and the left-aligned Regenerar keeps its place", () => {
   const html = dialog(member("en"));
   const footer = html.slice(html.indexOf('class="dialog-footer"'));
   const help = /<p class="help" id="([^"]+)">Aprobar se habilita cuando el idioma del borrador coincide con el que usaríamos hoy\.<\/p>/.exec(footer);
   assert.ok(help, "the help line is in the footer");
   assert.ok(footer.includes(`aria-describedby="${help[1]}"`), "the disabled approve is described by it");
   assert.equal(html.split("Aprobar se habilita").length - 1, 1, "and only there");
+  // `.dialog-footer .left` (margin-right:auto) matches at any depth: the button row keeps the footer's own flex gap and the left button comes first.
+  const row = footer.slice(footer.indexOf('<div class="row"'));
+  assert.ok(row.indexOf('class="btn btn-ghost left"') >= 0 && row.indexOf('class="btn btn-ghost left"') < row.indexOf("Guardar sin aprobar") && row.indexOf("Guardar sin aprobar") < row.indexOf("Aprobar y enviar ahora"), row.slice(0, 200));
+  assert.ok(!footer.slice(0, footer.indexOf('<div class="row"')).includes("<button"), "no button outside the row");
 });
 
 test("role=alert is only for the dialog: the card's alert is a note", () => {

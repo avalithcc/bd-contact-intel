@@ -68,11 +68,12 @@ test("an empty selection renders nothing", () => {
   assert.equal(render([]), "");
 });
 
-test("a selected draft in another language blocks the bulk, and the reason names it inside the sticky bar, not the review reason", () => {
+test("a selected draft in another language blocks the bulk: the bold reason names it inside the sticky bar, with the gate's own sentence after it", () => {
   const html = render([{ id: "m1", reviewed: true }, { id: "m2", reviewed: true, wrongLanguage: true }], { m2: "Ana Gómez" });
-  const reason = "1 de los seleccionados está en otro idioma: Ana Gómez. Sacalo de la selección o corregilo para aprobar.";
-  assert.ok(barOf(html).includes(`<p class="note">${reason}</p>`), html);
-  assert.match(html, new RegExp(`title="${reason}"`));
+  const note = '<p class="note"><strong>1 de los seleccionados está en otro idioma</strong>: Ana Gómez. Sacalo de la selección o corregilo para aprobar. Aprobar a ciegas en bloque es exactamente lo que este bloqueo evita.</p>';
+  assert.ok(barOf(html).includes(note), html);
+  assert.match(html, /title="1 de los seleccionados está en otro idioma: Ana Gómez\. Sacalo de la selección o corregilo para aprobar\."/, "the title is the plain sentence");
+  assert.match(html, /aria-label="Acciones masivas, hay borradores en otro idioma"/);
   assert.match(html, /<button[^>]*class="btn btn-primary btn-sm"[^>]*disabled=""/);
   assert.ok(!html.includes("por abrir"), "every draft was opened: the review reason must not appear");
   assert.ok(!html.includes("Quedó afuera"), "a selected mismatched draft is blocked, not left out");
@@ -81,11 +82,11 @@ test("a selected draft in another language blocks the bulk, and the reason names
 test("the review gate is untouched when a language block joins it: both reasons show, and the review reason is not replaced", () => {
   const html = render([{ id: "m1", reviewed: false }, { id: "m2", reviewed: true, wrongLanguage: true }, { id: "m3", reviewed: true, wrongLanguage: true }], { m2: "Ana", m3: "Beto" });
   assert.ok(barOf(html).includes("<strong>Falta 1 borrador</strong> por abrir."));
-  assert.ok(barOf(html).includes("2 de los seleccionados están en otro idioma: Ana, Beto."));
+  assert.ok(barOf(html).includes("<strong>2 de los seleccionados están en otro idioma</strong>: Ana, Beto."));
 });
 
-test("drafts left out of the selection are named in the bar so the reason travels with the button, with the rest counted", () => {
-  assert.ok(barOf(render(rows(true), { x: "Ana Gómez" })).includes("Quedó afuera 1 borrador en otro idioma: Ana Gómez. Regeneralo"));
-  assert.ok(barOf(render(rows(true), { a: "A", b: "B", c: "C", d: "D", e: "E" })).includes("Quedaron afuera 5 borradores en otro idioma: A, B, C, +2 más."));
+test("drafts left out of the selection are named in the bar with the bold count, and the rest are counted", () => {
+  assert.ok(barOf(render(rows(true), { x: "Ana Gómez" })).includes('<p class="note">Quedó afuera <strong>1 borrador en otro idioma</strong>: Ana Gómez. Regeneralo o mantenelo en su idioma para incluirlo.</p>'));
+  assert.ok(barOf(render(rows(true), { a: "A", b: "B", c: "C", d: "D", e: "E" })).includes("Quedaron afuera <strong>5 borradores en otro idioma</strong>: A, B, C, +2 más."));
   assert.ok(!render(rows(true)).includes("afuera"));
 });

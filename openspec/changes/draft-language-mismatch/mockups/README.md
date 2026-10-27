@@ -113,17 +113,19 @@ Internal CRM copy, voseo. `{draft}` and `{now}` are "español" / "inglés" (`aud
 | `regenerate` | Regenerar en {now} |
 | `keep` | Mantener en {draft} |
 | `approveTitle` | El borrador está en {draft}. Regeneralo en {now} o mantenelo en {draft} antes de aprobar. |
-| `editedWarning` | Lo editaste a mano: regenerarlo reemplaza tu texto y no se puede recuperar. Si el texto está bien, mantenelo en {draft}. |
+| `editedStrong` + `editedRest` | **Lo editaste a mano:** regenerarlo reemplaza tu texto y no se puede recuperar. Si el texto está bien, mantenelo en {draft}. (after a line break; the lead is bold) |
 | `editedWarningOther` | Se editó a mano: regenerarlo reemplaza el texto editado y no se puede recuperar. |
 | `dialogLead` | Este borrador está en {draft}. |
 | `dialogBody` | Ahora le escribiríamos en {now} ({reason}). Si lo aprobás así, el correo sale en {draft}, por eso no se puede aprobar todavía. |
-| `dialogHowRegenerate` | Regenerar abre el diálogo de idioma, con {now} elegido, y reemplaza este texto. |
-| `dialogHowKeep` | Mantener no toca el texto: guarda que elegiste {draft} para este contacto en esta secuencia (queda en la tarjeta con tu nombre) y el recordatorio también sale en {draft}. |
+| `dialogHowRegenerate` + `verbRegenerate` | **Regenerar** abre el diálogo de idioma, con {now} elegido, y reemplaza este texto. (the verb is bold) |
+| `dialogHowKeep` + `verbKeep` | **Mantener** no toca el texto: guarda que elegiste {draft} para este contacto en esta secuencia (queda en la tarjeta con tu nombre) y el recordatorio también sale en {draft}. |
 | `dialogBodyBadge` | en {draft} |
 | `dialogApproveHelp` | Aprobar se habilita cuando el idioma del borrador coincide con el que usaríamos hoy. |
 | `selectTitle` | Está en {draft} y hoy le escribiríamos en {now}: regeneralo o mantenelo para poder aprobarlo en bloque |
-| `barLeftOut` / `barLeftOutMany` | Quedó afuera 1 borrador en otro idioma: {names}. Regeneralo o mantenelo en su idioma para incluirlo. / Quedaron afuera {n} borradores en otro idioma: {names}. Regeneralos o mantenelos en su idioma para incluirlos. |
-| `barBlocked` / `barBlockedMany` | 1 de los seleccionados está en otro idioma: {names}. Sacalo de la selección o corregilo para aprobar. / {n} de los seleccionados están en otro idioma: {names}. Sacalos de la selección o corregilos para aprobar. |
+| `barLeftOut` / `barLeftOutMany` (+ `barLeftOutWhat` / `barLeftOutWhatMany`, the bold phrase) | Quedó afuera **1 borrador en otro idioma**: {names}. Regeneralo o mantenelo en su idioma para incluirlo. / Quedaron afuera **{n} borradores en otro idioma**: {names}. Regeneralos o mantenelos en su idioma para incluirlos. |
+| `barBlocked` / `barBlockedMany` (+ `barBlockedWhat` / `barBlockedWhatMany`, the bold phrase) | **1 de los seleccionados está en otro idioma**: {names}. Sacalo de la selección o corregilo para aprobar. / **{n} de los seleccionados están en otro idioma**: {names}. Sacalos de la selección o corregilos para aprobar. Then the existing `bulkBlockedWhy`: Aprobar a ciegas en bloque es exactamente lo que este bloqueo evita. |
+| `barAria` | Acciones masivas, hay borradores en otro idioma |
+| `approveReadyNone` (added at build time, not in the mockup) | Nada listo para aprobar (the header button at 0 ready drafts, disabled; it used to read "Aprobar los 0 listos") |
 | `reviewErrors.wrong_language` | Este borrador está en otro idioma que el que usaríamos hoy. Regeneralo o mantenelo en su idioma antes de aprobar. |
 | `toastKept` | Listo: este borrador queda en {draft}. |
 
@@ -199,3 +201,11 @@ carry an opt-out sentence different from `resolveDraftLanguage`: not measured, n
 ## Not covered
 
 Bulk regenerate (removed on purpose), notifying a BD that a draft became stale outside this screen, and the contacts list. The sequence list counters are unchanged.
+
+## Built, with two parts of the mockup left out (2026-10-27)
+
+- A2 history ("antes figuraba Mexico y lo corrigió Cristian Civita el 27 oct") is not built. The detail read has history only for the preferred language
+  (one correlated subselect on `person_property_history`); the country's history is not read, and adding it would be a new per-member lookup in the
+  Sequence detail statement for a sentence that is only decoration. The card names the reason (the same "↳" fragments) without it.
+- `reasonReset` ("se volvió al idioma resuelto, por el país de ...", A3) is not built. "Volver al idioma resuelto" clears the one-off together with its who and
+  when (`clearDraftLanguage`), so nothing records that a reset happened and the card cannot tell it from a draft that was always in the other language.

@@ -1,4 +1,4 @@
-import { WarningIcon } from "@/components/icons";
+import { GenerateIcon, WarningIcon } from "@/components/icons";
 import { memberLanguage, preferredStamp } from "@/lib/sequences/audienceCard";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { fillStrong } from "@/lib/sequences/fillStrong";
@@ -28,21 +28,30 @@ function Reason({ m, name, l }: { m: DetailMember; name: string; l: SequenceLabe
 export function LanguageMismatchAlert({ m, mismatch, name, l, ownView, explain = false, busy = false, locked = false, lockTitle, onRegenerate, onKeep }: { m: DetailMember; mismatch: LanguageMismatch; name: string; l: SequenceLabels; ownView: boolean; explain?: boolean; busy?: boolean; locked?: boolean; lockTitle?: string; onRegenerate?: () => void; onKeep?: () => void }) {
   const t = l.languageMismatch;
   const vars = { draft: languageWord(mismatch.draft, l), now: languageWord(mismatch.now, l) };
-  // The dialog says it in the mockup's longer words; the card says it short. `role="alert"` only in the dialog, where it opens on top of the page.
-  const [bodyBefore = "", bodyAfter = ""] = t.dialogBody.split("{reason}");
   const reason = <Reason m={m} name={name} l={l} />;
+  const edited = m.draft?.edited && ownView && <><br /><strong>{t.editedStrong}</strong> {fill(t.editedRest, vars)}</>;
+  const regenerate = onRegenerate && <button type="button" className="btn btn-secondary btn-sm" disabled={busy || locked} title={lockTitle} onClick={onRegenerate}>{explain && <GenerateIcon className="icon" />}{fill(t.regenerate, vars)}</button>;
+  const keep = onKeep && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={onKeep}>{fill(t.keep, vars)}</button>;
+  if (!explain) {
+    // The card: one sentence, the reason in parentheses, the two buttons at the right (mockup A1 to A3).
+    return (
+      <div className="alert alert-warn" role="note" style={{ padding: "var(--space-sm) var(--space-md)" }}>
+        <WarningIcon className="icon" />
+        <div className="grow"><strong>{fill(t.lead, vars)}</strong> ({reason}). {t.blocked}{edited}</div>
+        {(regenerate || keep) && <div className="row" style={{ gap: ".25rem", flex: "none" }}>{regenerate}{keep}</div>}
+      </div>
+    );
+  }
+  // The review dialog (mockup B1): the lead and the reason, the buttons BELOW them, then what each button does. `role="alert"` only here.
+  const [bodyBefore = "", bodyAfter = ""] = t.dialogBody.split("{reason}");
   return (
-    <div className="alert alert-warn" role={explain ? "alert" : "note"} style={{ padding: "var(--space-sm) var(--space-md)" }}>
+    <div className="alert alert-warn" role="alert">
       <WarningIcon className="icon" />
       <div className="grow">
-        {explain
-          ? <><strong>{fill(t.dialogLead, vars)}</strong> {fill(bodyBefore, vars)}{reason}{fill(bodyAfter, vars)}</>
-          : <><strong>{fill(t.lead, vars)}</strong> ({reason}). {t.blocked}</>}
-        {m.draft?.edited && ownView && <> {fill(t.editedWarning, vars)}</>}
-        {explain && <><br />{fill(t.dialogHowRegenerate, vars)} {fill(t.dialogHowKeep, vars)}</>}
+        <strong>{fill(t.dialogLead, vars)}</strong> {fillStrong(bodyBefore, vars, ["now"])}{reason}{fillStrong(bodyAfter, vars, ["now"])}{edited}
+        {(regenerate || keep) && <div className="row wrap mt-md" style={{ gap: "var(--space-sm)" }}>{regenerate}{keep}</div>}
+        <p className="mt-md" style={{ marginBottom: 0 }}>{fillStrong(t.dialogHowRegenerate, { ...vars, verb: t.verbRegenerate }, ["verb"])} {fillStrong(t.dialogHowKeep, { ...vars, verb: t.verbKeep }, ["verb"])}</p>
       </div>
-      {onRegenerate && <button type="button" className="btn btn-secondary btn-sm" disabled={busy || locked} title={lockTitle} onClick={onRegenerate}>{fill(t.regenerate, vars)}</button>}
-      {onKeep && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={onKeep}>{fill(t.keep, vars)}</button>}
     </div>
   );
 }
