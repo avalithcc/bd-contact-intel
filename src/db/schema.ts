@@ -751,6 +751,9 @@ export const person = pgTable(
     city: text("city"),
     region: text("region"),
     country: text("country"),
+    // Migration 0063: the language a BD said this person wants to be written to ('es' | 'en'). NULL = "Automático": the draft
+    // language is decided by the audience chain. Free text in the DB, validated at the write boundary (languageChoice.ts); no CHECK.
+    preferredLanguage: text("preferred_language"),
     ownerBdId: uuid("owner_bd_id").references(() => bd.id, {
       onDelete: "set null",
     }),

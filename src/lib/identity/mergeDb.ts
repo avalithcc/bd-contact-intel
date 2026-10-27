@@ -71,6 +71,7 @@ export function toMergeFields(row: typeof person.$inferSelect): MergePersonField
     ownerBdId: row.ownerBdId,
     sourceKey: row.sourceKey,
     contactType: row.contactType,
+    preferredLanguage: row.preferredLanguage,
   };
 }
 

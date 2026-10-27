@@ -208,6 +208,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
     value: p.value,
     ...(p.key === "contactType" ? { displayValue: contactTypeLabel(p.value, l.emptyValue, dict.contactTypes) } : {}),
     ...(p.key === "seniority" ? { displayValue: seniorityLabel(p.value, dict.seniorities, l.emptyValue) } : {}),
+    ...(p.key === "preferredLanguage" ? { displayValue: p.value === "es" ? l.preferredLanguageEs : p.value === "en" ? l.preferredLanguageEn : l.preferredLanguageAuto } : {}),
     lastUpdatedLabel: p.lastEdit
       ? `${l.lastUpdatedByPrefix} ${p.lastEdit.bdName ?? "—"} · ${formatArgentinaDayMonth(p.lastEdit.at)}`
       : null,

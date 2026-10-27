@@ -110,23 +110,23 @@ export async function suppressByToken(tokenHash: string): Promise<{ email: strin
 /**
  * What the unsubscribe page needs about the recipient: the postal address AND the language their own email carried, i.e.
  * their compliance audience (complianceAudience.ts) found from the token (person country, company country, postings, phone),
- * UNLESS a person recorded the draft's language on the member (sequence_member.draft_language), which wins for the language
- * only: the address is always the audience's. Both come from the one statement below; unsubscribePageAudience decides. One
+ * UNLESS a person recorded the draft's language on the member (sequence_member.draft_language) or on the contact
+ * (person.preferred_language), which win for the language only: the address is always the audience's. Both come from the one statement below; unsubscribePageAudience decides. One
  * read, no writes: the GET path is typed read-only on purpose. Undefined for an unknown token or a contact with neither an
  * audience nor a chosen language: English and no address (never another country's). A chosen language with no audience
  * gives that language and no address.
  */
 export async function unsubscribeAudienceForToken(tokenHash: string): Promise<UnsubscribePageAudience | undefined> {
   const rows = (await db.execute(sql`
-    select sm.draft_language, ${audienceFactsSql}
+    select sm.draft_language, p.preferred_language, ${audienceFactsSql}
     from sequence_unsubscribe_token t
     join sequence_member sm on sm.id = t.sequence_member_id
     join person p on p.id = sm.person_id
     where t.token_hash = ${tokenHash}
-    limit 1`)) as unknown as ({ draft_language: string | null } & Record<string, unknown>)[];
+    limit 1`)) as unknown as ({ draft_language: string | null; preferred_language: string | null } & Record<string, unknown>)[];
   const row = rows[0];
   if (!row) return undefined;
-  return unsubscribePageAudience(audienceInputsFromRow(row), row.draft_language);
+  return unsubscribePageAudience(audienceInputsFromRow(row), { chosen: row.draft_language, preferred: row.preferred_language });
 }
 
 /** The port the unsubscribe route (PR 13) is given. */

@@ -13,6 +13,7 @@ import { normalizePhoneForWrite } from "@/lib/phoneNormalize";
 import {
   EDITABLE_PERSON_PROPERTIES,
   InvalidContactTypeError,
+  InvalidPreferredLanguageError,
   InvalidEmailError,
   InvalidNameError,
   InvalidPhoneError,
@@ -39,6 +40,7 @@ const BASE_PERSON = {
   city: null,
   region: null,
   country: null,
+  preferredLanguage: null as string | null,
   industry: null,
   phone: "+54 11 4000-0000",
   mobilePhone: null,
@@ -583,4 +585,39 @@ test("names with control characters or beyond 200 characters are rejected", () =
   assert.throws(() => planPropertyEdit(BASE_PERSON, "lastName", "Ed\u0007itor", "bd-1"), InvalidNameError);
   assert.throws(() => planPropertyEdit(BASE_PERSON, "lastName", "x".repeat(201), "bd-1"), InvalidNameError);
   assert.equal(planPropertyEdit(BASE_PERSON, "lastName", "x".repeat(200), "bd-1").changed, true);
+});
+
+// --- preferredLanguage (preferred-language): closed set es | en, empty = Automático ---------------------
+
+test("preferredLanguage is editable and sits right after country, so the row renders after Ubicación", () => {
+  assert.equal(isEditablePersonProperty("preferredLanguage"), true);
+  assert.equal(EDITABLE_PERSON_PROPERTIES[EDITABLE_PERSON_PROPERTIES.indexOf("country") + 1], "preferredLanguage");
+});
+
+test("setting preferredLanguage writes the value and one history row naming the actor", () => {
+  const plan = planPropertyEdit(BASE_PERSON, "preferredLanguage", " es ", "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal(plan.personUpdate?.preferredLanguage, "es");
+  assert.equal(plan.personUpdate?.updatedByBdId, "bd-1");
+  assert.deepEqual(plan.historyRows, [{ personId: BASE_PERSON.id, property: "preferredLanguage", oldValue: null, newValue: "es", changedByBdId: "bd-1", source: "edit" }]);
+});
+
+test("choosing Automático (blank) clears the preference and records the old value", () => {
+  const plan = planPropertyEdit({ ...BASE_PERSON, preferredLanguage: "en" }, "preferredLanguage", "", "bd-2");
+  assert.equal(plan.personUpdate?.preferredLanguage, null);
+  assert.deepEqual(plan.historyRows.map((r) => [r.oldValue, r.newValue, r.changedByBdId]), [["en", null, "bd-2"]]);
+});
+
+test("a value outside es / en never reaches the column, and saving the same value writes nothing", () => {
+  for (const bad of ["pt", "ES", "english", "es-AR"]) {
+    assert.throws(() => planPropertyEdit(BASE_PERSON, "preferredLanguage", bad, "bd-1"), InvalidPreferredLanguageError, bad);
+  }
+  assert.deepEqual(planPropertyEdit({ ...BASE_PERSON, preferredLanguage: "es" }, "preferredLanguage", "es", "bd-1"), { changed: false, personUpdate: null, historyRows: [] });
+});
+
+test("correcting the contact's own country does not touch the preferred language", () => {
+  const plan = planLocationEdit({ ...BASE_PERSON, preferredLanguage: "es", country: "Argentina" }, { city: "", region: "", country: "United States" }, "bd-1");
+  assert.equal(plan.changed, true);
+  assert.equal("preferredLanguage" in (plan.personUpdate ?? {}), false);
+  assert.deepEqual(plan.historyRows.map((r) => r.property), ["country"]);
 });

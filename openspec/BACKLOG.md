@@ -2347,6 +2347,26 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   `scripts/backfill-role-groups.ts` targets `contact` only.
 - ~~There is no lint script, and unused imports are not caught.~~ Fixed 2026-10-18: `npm run lint` (`tsc --noEmit --noUnusedLocals`, no new dependency; not wired into the Vercel build). Unused parameters are not checked.
 
+### Preferred language: nothing flags an unapproved draft written in the old language (found 2026-10-27)
+After a contact's preferred language changes (`person.preferred_language`, branch `feat/preferred-language`), a step 1 draft that
+already exists and has not been approved stays in the language it was generated in, and nothing says so. Evidence from the code,
+read 2026-10-27: the approval gate is `complianceRefusal` in `src/lib/sequences/complianceGate.ts:22`, which calls `bodyHasFooter`
+(`src/lib/sequences/complianceFooter.ts:48-51`); that checks the postal address of the CURRENT audience and that ANY opt-out
+sentence is present (`ALL_OPT_OUT_TEXTS.some`), so an English body for a contact who now prefers Spanish passes and can be approved
+and sent. `approvalQueries.addressesNow` (`src/lib/sequences/approvalQueries.ts:75-85`) recomputes only the address. The owner rule
+for the feature was to reuse an existing mismatch flag and not invent one; none exists, so none was built. Possible fix, not
+decided: compare the draft's footer language with `resolveDraftLanguage` at approval time and refuse or warn. Not measured against
+production: no query was run.
+
+### Preferred language: a step 2 reminder follows the preference at the time it is generated, not the language step 1 went out in (found 2026-10-27)
+`sequence_draft` has no language column (`src/db/schema.ts`, `sequence_draft` table: subject, body, review and approval stamps
+only), so nothing records the language of step 1. The reminder is generated later through the same `loadFacts` ->
+`resolveDraftCompliance` path (`src/lib/sequences/draftQueries.ts`, `generateReminderDraft`), which reads the preference as it is
+then. If a BD sets or changes a contact's preferred language between the step 1 send and the reminder, the reminder goes out in the
+new language after step 1 went out in the old one. Reproduced 2026-10-27 on the scratch database, `tests/db/preferredLanguage.test.ts`
+("PRODUCER step 2 reminder"): step 1 `en`, preference set to `es`, reminder `es`. Possible fix, not decided: store the draft language on
+`sequence_draft` and have the reminder reuse step 1's. Not measured against production.
+
 ## Deferred from crm-hubspot-ux
 
 Status re-checked 2026-10-01 against `main`:

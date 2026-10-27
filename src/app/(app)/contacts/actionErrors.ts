@@ -18,6 +18,7 @@ import {
   InvalidEmailError,
   InvalidNameError,
   InvalidPhoneError,
+  InvalidPreferredLanguageError,
   InvalidProfileKeyError,
   PropertyBatchEditError,
   type LocationProperty,
@@ -46,6 +47,7 @@ export type ContactActionErrorReason =
   // carries that contact (see ContactActionResult.conflict).
   | "profile_key_taken"
   | "invalid_contact_type"
+  | "invalid_preferred_language"
   | "not_editable"
   | "gmail_not_connected"
   | "gmail_reauth"
@@ -174,6 +176,7 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof InvalidProfileKeyError) return "invalid_profile_key";
   if (err instanceof ProfileKeyTakenError) return "profile_key_taken";
   if (err instanceof InvalidContactTypeError) return "invalid_contact_type";
+  if (err instanceof InvalidPreferredLanguageError) return "invalid_preferred_language";
   if (err instanceof PropertyNotEditableError) return "not_editable";
   if (err instanceof GmailSendError) {
     if (err.kind === "invalid_recipient") return err.header === "multiple" ? "multiple_recipients" : "invalid_email";

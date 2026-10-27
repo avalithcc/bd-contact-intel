@@ -2,9 +2,9 @@
  * The ONE place the language of a Sequence draft is decided, and the only function the drafting code may use to build
  * generator input. The live generator (runGenerateOutreachMessage) writes Spanish unless told "en"
  * (DEFAULT_MESSAGE_LANGUAGE is "es"), so the language may never be an incidental caller argument: it is the `language`
- * field of the recipient's compliance audience (complianceAudience.ts), UNLESS a person explicitly chose another one for
- * this contact. That choice is a recorded fact about the member (sequence_member.draft_language, with who and when), read
- * by the drafting code and handed in through the distinct, typed `chosenLanguage` parameter; it is never smuggled inside
+ * field of the recipient's compliance audience (complianceAudience.ts), UNLESS a person said otherwise: a one-off choice for
+ * this member (sequence_member.draft_language, with who and when) or the contact's preferred language (person.preferred_language).
+ * Both are recorded facts, read by the drafting code and handed in through the distinct, typed `overrides` parameter; never smuggled inside
  * `args` (SequenceDraftInputArgs still omits `language`), so a forgotten or forged value cannot draft a US contact in Spanish.
  * Address and language are two fields of ONE resolution, not one value read twice, so neither can be inferred from the
  * other: a Mexican contact is Spanish AND under the Miami address. A choice changes the language and NOTHING ELSE: the
@@ -17,6 +17,7 @@
  * is reused untouched, so its anti-hallucination and prompt-injection rules apply to Sequence drafts as everywhere.
  */
 import type { AudienceLanguage, ComplianceAddress, ComplianceAudience } from "@/lib/sequences/complianceAudience";
+import { resolveDraftLanguage, type DraftLanguageOverrides } from "@/lib/sequences/languageChoice";
 import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
 import type { BuildOutreachMessagePromptInput, OutreachPurpose } from "@/lib/outreach/messagePrompt";
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
@@ -25,29 +26,30 @@ import { buildPersonMessageInput, type BuildPersonMessageInputArgs } from "@/lib
 export type SequenceDraftInputArgs = Omit<BuildPersonMessageInputArgs, "language" | "channel">;
 
 /**
- * The address and language a draft is composed with. The address is ALWAYS the audience's; the language is the recorded
- * human choice when there is one, the audience's otherwise. Null when the contact has no audience (a HOLD).
+ * The address and language a draft is composed with. The address is ALWAYS the audience's; the language comes from
+ * resolveDraftLanguage (languageChoice.ts): the member's one-off choice, else the contact's preferred language, else the
+ * audience's. Null when the contact has no audience (a HOLD): no language, one-off or preferred, can unblock it.
  */
 export function resolveDraftCompliance(
   audience: ComplianceAudience | null,
-  chosenLanguage?: AudienceLanguage | null,
+  overrides: DraftLanguageOverrides,
 ): { address: ComplianceAddress; language: AudienceLanguage } | null {
   if (!audience) return null;
-  return { address: audience.address, language: chosenLanguage ?? audience.language };
+  return { address: audience.address, language: resolveDraftLanguage(audience.language, overrides)!.language };
 }
 
 /**
  * Null when the contact has no audience: the caller must hold the member instead of generating. `purpose` picks
- * the first email or the step 2 reminder; it never touches the language. `chosenLanguage` is the human choice stored on
- * the member (null when nobody chose), never a per-call preference.
+ * the first email or the step 2 reminder; it never touches the language. `overrides` are the recorded human statements about
+ * the language (the member's one-off choice and the contact's preferred language), never a per-call preference.
  */
 export function buildSequenceDraftInput(
   args: SequenceDraftInputArgs,
   audience: ComplianceAudience | null,
   purpose: OutreachPurpose = "first",
-  chosenLanguage?: AudienceLanguage | null,
+  overrides: DraftLanguageOverrides = {},
 ): BuildOutreachMessagePromptInput | null {
-  const compliance = resolveDraftCompliance(audience, chosenLanguage);
+  const compliance = resolveDraftCompliance(audience, overrides);
   if (!compliance) return null;
   const { language } = compliance;
   // Spread first so a stray `language`/`channel` on the args can never win.

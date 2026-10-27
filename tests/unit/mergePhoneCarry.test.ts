@@ -33,6 +33,7 @@ function p(id: string, o: Partial<MergePersonFields> = {}): MergePersonFields {
     ownerBdId: null,
     sourceKey: null,
     contactType: null,
+    preferredLanguage: null,
     ...o,
   };
 }

@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, sequence, sequenceMember } from "@/db/schema";
 import { resolveComplianceAudience, type ComplianceAddress } from "./complianceAudience";
+import { resolveDraftCompliance } from "./draftInput";
 import { audienceFactsSql, clientStatusSql, sameCompanyAs } from "./rosterQuery";
 import { audienceInputsFromRow } from "./audienceInputs";
 import { DEFAULT_SCHEDULE } from "./schedule";
@@ -90,7 +91,7 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
   for (const entry of roster) {
     const rows = rowsOf<Row>(
       await tx.execute(sql`
-        select p.id::text as person_id, p.email, p.email_status, p.email_source, p.merged_into_id::text as merged_into_id,
+        select p.id::text as person_id, p.preferred_language, p.email, p.email_status, p.email_source, p.merged_into_id::text as merged_into_id,
                p.company_key, ${clientStatusSql} as client_status,
                ${audienceFactsSql},
                exists (select 1 from job_posting jp where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
@@ -119,7 +120,8 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
       // No audience = no footer could be written; the plan rejects it as unmapped_market instead of letting the draft step hold it.
       marketMapped: audience !== null,
     };
-    return { candidate, address: audience?.address ?? null, language: audience?.language ?? null };
+    // The language the draft will really be written in: the contact's preferred language over the audience's (a seed has no one-off yet).
+    return { candidate, address: audience?.address ?? null, language: resolveDraftCompliance(audience, { preferred: r.preferred_language })?.language ?? null };
   });
 }
 

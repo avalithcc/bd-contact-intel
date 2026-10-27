@@ -17,6 +17,7 @@
 import type { NewPerson, NewPersonPropertyHistory, Person } from "@/db/schema";
 import { classifyPosition, type RoleGroupKey } from "@/lib/roleGroups";
 import { isContactType } from "@/lib/contacts/contactType";
+import { parseLanguageChoice } from "@/lib/sequences/languageChoice";
 import { splitEmail } from "@/lib/emailPatterns";
 import { isValidPhoneFormat } from "@/lib/phone";
 import type { PhoneContext } from "@/lib/phoneNormalize";
@@ -77,6 +78,17 @@ export class InvalidContactTypeError extends Error {
   }
 }
 
+/**
+ * Thrown by planPropertyEdit when `preferredLanguage` is set to anything but "es" or "en" (languageChoice.ts is the one
+ * vocabulary). Clearing (blank, "Automático") is always allowed.
+ */
+export class InvalidPreferredLanguageError extends Error {
+  constructor() {
+    super("Invalid preferred language: not es or en");
+    this.name = "InvalidPreferredLanguageError";
+  }
+}
+
 export type InvalidNameReason = "required" | "too_long" | "control_chars";
 
 /**
@@ -121,6 +133,7 @@ export const EDITABLE_PERSON_PROPERTIES = [
   "city",
   "region",
   "country",
+  "preferredLanguage",
   "industry",
 ] as const;
 
@@ -242,6 +255,10 @@ export function planPropertyEdit(
 
   if (property === "contactType" && newValue !== null && !isContactType(newValue)) {
     throw new InvalidContactTypeError();
+  }
+
+  if (property === "preferredLanguage" && newValue !== null && parseLanguageChoice(newValue) === null) {
+    throw new InvalidPreferredLanguageError();
   }
 
   const personUpdate: Partial<NewPerson> = {

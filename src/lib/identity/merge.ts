@@ -54,6 +54,7 @@ export interface MergePersonFields {
   ownerBdId: string | null;
   sourceKey: string | null;
   contactType: string | null;
+  preferredLanguage: string | null;
 }
 
 type PersonField = keyof Omit<MergePersonFields, "id">;
@@ -295,6 +296,7 @@ export const MERGE_TRACKED_FIELDS: readonly PersonField[] = [
   "ownerBdId",
   "sourceKey",
   "contactType",
+  "preferredLanguage",
 ];
 
 function candidate(value: string | null, specificity?: number) {
@@ -369,7 +371,7 @@ function mergeEmailFields(a: MergePersonFields, b: MergePersonFields) {
 }
 
 /**
- * Phones and contactType are FILL-BLANK ONLY: a non-empty survivor value always
+ * Phones, contactType and preferredLanguage are FILL-BLANK ONLY: a non-empty survivor value always
  * stays; the merged side only fills a blank. Deliberately not `mergeProperty`,
  * whose "longer value wins" rule could replace a number a BD actually entered,
  * and for contactType (a closed two-value set) would always pick BUYER-CHAMPION
@@ -612,6 +614,8 @@ export function planMerge(input: PlanMergeInput): MergePlan {
   if (mobileResult.loss) propertyLosses.push({ property: "mobilePhone", value: mobileResult.loss });
   const contactTypeResult = fillBlank(survivor.contactType, merged.contactType);
   if (contactTypeResult.loss) propertyLosses.push({ property: "contactType", value: contactTypeResult.loss });
+  const preferredLanguageResult = fillBlank(survivor.preferredLanguage, merged.preferredLanguage);
+  if (preferredLanguageResult.loss) propertyLosses.push({ property: "preferredLanguage", value: preferredLanguageResult.loss });
 
   const survivorUpdate: Omit<MergePersonFields, "id"> = {
     firstName: (mergedFields.firstName as string | null) ?? null,
@@ -635,6 +639,7 @@ export function planMerge(input: PlanMergeInput): MergePlan {
     phone: phoneResult.value,
     mobilePhone: mobileResult.value,
     contactType: contactTypeResult.value,
+    preferredLanguage: preferredLanguageResult.value,
     ownerBdId: pickOwner(survivor, merged, [...input.survivorConnections, ...input.mergedConnections], input),
   };
 

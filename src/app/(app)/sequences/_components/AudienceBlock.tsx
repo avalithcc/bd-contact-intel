@@ -2,12 +2,13 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { ChevronDownIcon, WarningIcon } from "@/components/icons";
-import { fixMenuItems, formatColleagueBreakdown, holdKind } from "@/lib/sequences/audienceCard";
+import { fixMenuItems, formatColleagueBreakdown, holdKind, memberLanguage, preferredStamp } from "@/lib/sequences/audienceCard";
 import type { MemberAudience } from "@/lib/sequences/audienceView";
 import { countryNameEs, flagEmoji } from "@/lib/sequences/countryDisplay";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import { stampLabel } from "@/lib/scheduledEmail/view";
+import { fillStrong } from "@/lib/sequences/fillStrong";
 import type { OnAction } from "./actions";
 
 /** The "corregir" menu: links to the existing contact and company records, where the country is already editable. */
@@ -50,15 +51,19 @@ export function AudienceWhy({ m, name, l }: { m: DetailMember; name: string; l: 
   return <>{t.byPhone} <span className="badge badge-outline">{a.evidence}</span></>;
 }
 
-/** The "idioma" menu of the card: change it (opens the dialog) or go back to what the system resolved. Absent for a read-only viewer. */
+/**
+ * The "idioma" menu of the card: change it (opens the dialog) or go back to what the system resolved (the preferred language when
+ * there is one). When the preference decides, it also links to the record, where the preference lives. Absent for a read-only viewer.
+ */
 function LanguageMenu({ m, name, lockTitle, onAction, l }: { m: DetailMember; name: string; lockTitle?: string; onAction: OnAction; l: SequenceLabels }) {
   const lc = l.languageChoice;
-  const resolved = m.audience!.audience!.language === "es" ? l.audience.langEs : l.audience.langEn;
+  const resolved = memberLanguage(m)!.baseline === "es" ? l.audience.langEs : l.audience.langEn;
   return (
     <DropdownMenu trigger={<>{lc.menuTrigger}<ChevronDownIcon className="icon" /></>} triggerClassName="btn btn-ghost btn-sm" ariaLabel={fill(lc.menuAria, { name })}>
       <div className="menu-label">{lc.menuLabel}</div>
       <button type="button" role="menuitem" className="menu-item" disabled={lockTitle !== undefined} title={lockTitle} onClick={() => void onAction({ type: "chooseLanguage", memberId: m.memberId })}>{lc.menuChange}</button>
       {m.languageChoice && <button type="button" role="menuitem" className="menu-item" disabled={lockTitle !== undefined} title={lockTitle} onClick={() => void onAction({ type: "resetLanguage", memberId: m.memberId })}>{fill(lc.menuReset, { resolved })}</button>}
+      {memberLanguage(m)!.source === "preferred" && <Link role="menuitem" className="menu-item" href={`/contacts/${m.personId}`}>{l.audience.menuPreferredInRecord}</Link>}
     </DropdownMenu>
   );
 }
@@ -80,7 +85,7 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
     return (
       <div className="alert alert-danger" role="alert">
         <WarningIcon className="icon" />
-        <div className="grow"><strong>{fill(t.holdTitle, { name })}</strong> {text}</div>
+        <div className="grow"><strong>{fill(t.holdTitle, { name })}</strong> {text}{m.preferredLanguage && <> {fill(t.holdPreferredNote, { lang: m.preferredLanguage.language === "es" ? t.langEs : t.langEn })}</>}</div>
         {fix}
       </div>
     );
@@ -88,20 +93,28 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
 
   const company = m.company ?? "";
   const choice = m.languageChoice ?? null;
-  const language = choice?.language ?? a.audience.language;
+  const preferred = m.preferredLanguage ?? null;
+  const { language, source, baseline } = memberLanguage(m)!;
+  const word = (lang: string) => (lang === "es" ? t.langEs : t.langEn);
   const lc = l.languageChoice;
   const why = <AudienceWhy m={m} name={name} l={l} />;
+  // The language reason and the address reason are independent: with a preference deciding, the reason names who set it and what
+  // the system would have resolved without it, and the address keeps its own line (addressNote) with its own reason.
+  // No "cargado por" when there is no history row to quote, and no "sin esa preferencia" when the audience would have said the same.
+  const stamp = preferred ? preferredStamp(preferred) : null;
+  const preferredNote = source === "preferred" && preferred && <>{fillStrong(t.preferredBy, { name: first }, ["name"])}{stamp && <> {fillStrong(lc.preferredStamp, stamp, ["by"])}</>}.{a.audience.language !== language && <> {fill(t.preferredWithout, { resolved: word(a.audience.language) })}</>}<br />{lc.addressNote} {why}</>;
   return (
     <div className="stack-sm" aria-label={t.label}>
       <div className="row wrap" style={{ gap: ".5rem" }}>
-        <span aria-hidden="true">{choice ? flagEmoji(choice.language === "es" ? "AR" : "US") : a.iso ? flagEmoji(a.iso) : "🌐"}</span>
-        <strong>{language === "es" ? t.langEs : t.langEn}</strong>
+        <span aria-hidden="true">{source !== "audience" ? flagEmoji(language === "es" ? "AR" : "US") : a.iso ? flagEmoji(a.iso) : "🌐"}</span>
+        <strong>{word(language)}</strong>
         {choice && <span className="badge badge-info">{lc.chosenBadge}</span>}
+        {source === "preferred" && <span className="badge badge-info">{lc.badgePreferred}</span>}
         <span className="meta">·</span>
         <strong>{a.audience.address === "mdp" ? t.addrMdp : t.addrMiami}</strong>
       </div>
       <div className="row wrap" style={{ gap: ".5rem", justifyContent: "space-between" }}>
-        <div className="meta">↳ {choice ? <>{lc.chosenBy} <strong>{choice.byName ?? "?"}</strong> {fill(lc.chosenOn, { when: choice.at ? stampLabel(choice.at) : "", resolved: a.audience.language === "es" ? t.langEs : t.langEn })}<br />{lc.addressNote} {why}</> : why}</div>
+        <div className="meta">↳ {choice ? <>{lc.chosenBy} <strong>{choice.byName ?? "?"}</strong> {fill(lc.chosenOn, { when: choice.at ? stampLabel(choice.at) : "", resolved: word(baseline) })}<br />{lc.addressNote} {why}</> : preferredNote || why}</div>
         <div className="row" style={{ gap: ".25rem" }}>{onAction && <LanguageMenu m={m} name={name} lockTitle={lockTitle} onAction={onAction} l={l} />}{fix}</div>
       </div>
       {company.trim() && a.colleaguesDisagree && a.reason === "company_country" && (
