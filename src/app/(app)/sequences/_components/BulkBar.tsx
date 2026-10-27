@@ -60,7 +60,8 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
         />
         {/* Inside the sticky bar so the reason travels with the disabled button instead of being scrolled away. */}
         {unopened > 0 && <p className="note"><strong>{missing}</strong> {l.bulkMissingPending}. {l.bulkBlockedWhy}</p>}
-        {blocked && <p className="note">{blocked.rich} {l.bulkBlockedWhy}</p>}
+        {/* The gate sentence is said once: the unopened note already ends with it when both notes show. */}
+        {blocked && <p className="note">{blocked.rich}{unopened > 0 ? null : <> {l.bulkBlockedWhy}</>}</p>}
         {leftOut && <p className="note">{leftOut.rich}</p>}
       </div>
       {v.approveEnabled && outlook.deferred > 0 && (

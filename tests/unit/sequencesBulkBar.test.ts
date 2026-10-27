@@ -83,6 +83,7 @@ test("the review gate is untouched when a language block joins it: both reasons 
   const html = render([{ id: "m1", reviewed: false }, { id: "m2", reviewed: true, wrongLanguage: true }, { id: "m3", reviewed: true, wrongLanguage: true }], { m2: "Ana", m3: "Beto" });
   assert.ok(barOf(html).includes("<strong>Falta 1 borrador</strong> por abrir."));
   assert.ok(barOf(html).includes("<strong>2 de los seleccionados están en otro idioma</strong>: Ana, Beto."));
+  assert.equal(barOf(html).split(es.sequences.bulkBlockedWhy).length - 1, 1, "the gate sentence is said once when both reasons show");
 });
 
 test("drafts left out of the selection are named in the bar with the bold count, and the rest are counted", () => {
