@@ -2238,23 +2238,75 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   test at all, which is why none of this ever surfaced.
   `LATAM_COUNTRY_NAMES` is deliberately untouched, which is what keeps the
   contact form out of the blast radius.
-  **NOT fixed, needs the precedence change:** 182 rows of plainly-US text filed
-  `latam` via `co` (118), `pa` (47) and `ar` (11) — 40 openIT, 29 freshIT —
-  including `"Colorado Springs, CO, United States"`, `"Denver, CO, USA"`,
-  `"US-CO-Denver"` and `"Philadelphia, PA, United States"`. The module's own
-  comment pre-authorized this revisit ("revisit if a US-heavy target company's
-  postings start getting misclassified this way"). Design warning: precedence by
-  specificity ALONE inverts `"San Jose, CA"` (a LATAM phrase would beat a bare US
-  token), which is why the `san jose` deletion has to land first. Also still
-  open: `ca` alone (67 rows, 30 Canada vs 37 California, only 2 freshIT — a
-  genuine owner call), `tn` / Tamil Nadu (12 wrong vs 20 real Tennessee, 0
-  freshIT either side — and removing `in` EXPOSES it by making `tn` the sole
-  decider on `"Chennai, TN, in"`), `"Albuquerque, New Mexico"` -> `latam` via the
-  `mexico` substring (2 rows), and `peru` -> token (1 `"Perugia, IT"` row;
-  entangled with `LATAM_COUNTRY_NAMES`, and tokenizing `brasil` the same way
-  would LOSE `"Brasilia"`). Two reported "substring accidents" are NOT bugs and
-  must not be "fixed": `indiana` matching `"Indianapolis"` and `brasil` matching
-  `"Brasilia"` are both semantically correct.
+  **Precedence fixed 2026-10-27** (`fix/market-country-signal`, owner-approved
+  rules; pending merge and the `--execute` below). The 182 rows of plainly-US text
+  filed `latam` via `co`/`pa`/`ar` (`"Colorado Springs, CO, United States"`,
+  `"Denver, CO, USA"`, `"US-CO-Denver"`, `"Philadelphia, PA, United States"`) were
+  the symptom of ORDER: LATAM ran first and returned. `classifyMarket` now weighs
+  evidence in three tiers (explicit country: a name, `us`/`usa`, an unambiguous LATAM
+  code, or the country code in the fixed ATS position, i.e. the trailing segment of
+  `"City, Region, XX"` or the prefix of `"XX-Region-City"`; then a named place; then a
+  bare code) and classifies `;`-separated places one by one. Measured against 16,939
+  production rows, read-only (`scripts/measure/market-country-signal.ts`; old
+  classifier frozen in `scripts/measure/legacyMarkets.ts`): 300 rows change market
+  (`latam>us` 204 = 202 via `co`/`pa`/`ar` (the 182 of 10-21 plus rows synced since,
+  including the lone `, PA` cities) + 2 New Mexico, 39 openIT / 28 freshIT;
+  `us>other` 71, 18 openIT / 3 freshIT: Canada, India, Spain, Israel, the Netherlands;
+  `latam>other` 9, 0 openIT: `"Cork, CO, ie"`, `"Cadorago, CO, it"`; `other>us` 16).
+  `CA` by position: 22 Canada rows leave
+  `us` (`"Toronto, ON, ca"`, `"CA-Ontario-Toronto"`), 58 California rows leave `latam`;
+  `TN`: 12 Tamil Nadu rows leave `us` (`"Chennai, TN, in"`), 57 Tennessee stay.
+  `"Albuquerque, New Mexico"` is `us`. `is_miami`: 0 flips. Person impact: 3 of
+  27,496 persons change audience (0 mailable, 0 newly held), 0 of 12 live sequence
+  members, 0 approved-but-unsent drafts; 1 company gains the "open IT job in the US"
+  chip, none lose it; 3 companies stop being `mixed` (HOLD). The stored data stays
+  on the old rules until the recompute is run: `scripts/backfill-posting-markets.ts`
+  (dry run by default; `--execute --actor=<bd id>` takes a `job_posting` pg_dump first,
+  writes in one transaction with one `posting_market_backfill` audit row that holds
+  every previous value). Deploy before running it, or the next sync with the old code
+  rewrites the open rows back.
+  **Owner decision 2026-10-27, a bare `ar`/`co`/`pa` when nothing else decided** (no
+  country, no named place): `ar` -> latam (Argentina), `co` -> latam (Colombia), `pa` ->
+  us (Pennsylvania). Measured basis: of the 35 rows a stricter "ambiguous = other" rule
+  would have moved, 15 were Pennsylvania/Arkansas cities, 11 real Argentina/Colombia
+  (`"Capital Department, AR"`, `"Antioquia, CO"`), 9 Ireland/Italy (those stay `other`,
+  they carry a trailing country). One line per code in `BARE_AMBIGUOUS_CODE_MARKET`
+  (`src/lib/hiring/markets.ts`). **Accepted misses:** `"Bentonville, AR"`,
+  `"Fayettville, AR"` and a bare `"Boulder, CO"` (Arkansas/Colorado cities with no other
+  signal) read latam. A named US place or an explicit country still beats the code
+  (`"Remote, Denver, CO"`, `"Little Rock, AR, us"`, `"Cork, CO, ie"`).
+  **Hardening after fresh review (same day):** a trailing 2-letter code is a country only
+  in the `"City, Region, XX"` shape (no US place or county before it, no earlier US state
+  code, not joined by and/or/&//; the code must be a real ISO 3166-1 country), so
+  `"Remote, Atlanta, GA"` and `"Dallas, TX, Atlanta, GA"` stay us while
+  `"Toronto, Ontario, CA"`, `"Tel Aviv, Tel Aviv, IL"` and `"Casablanca, CAS, ma"` are
+  other; work-mode words (`Remote`, `Hybrid`, `On-site`, `In-Office`, also wrapped in
+  parentheses) around a place are ignored; the `XX-`
+  prefix needs the full `XX-Region-City` form with a real ISO code (`"On-site - Austin,
+  TX"`, `"In-Office-Denver"` and `"Co-located, Denver"` are not prefixes); a LATAM
+  country name used as a city
+  yields to a US state after it (`"Panama City, FL"`, `"Mexico, MO"`, `"Peru, IL"` are
+  us); a lone `"City, County, PA"` is us by the owner's `pa` rule. `"U.S."` written with
+  dots is now the United States (16 rows `other>us`, 2
+  openIT; not in the owner's list, trivially droppable). **A state code that is also a
+  country** (`ca il md tn ma al la ga va mn ...`) after a region name is decided by
+  CASING: the ATS country position is lowercase (`"Kulim, Kedah, al"`, `"Casablanca,
+  CAS, ma"`, `"Tunis, Tunis, tn"`), a US feed writes the state in capitals
+  (`"Nashville, Davidson, TN"`, `"San Jose, Santa Clara, CA"`, `"Springfield, Sangamon,
+  IL"` are us). Production 2026-10-27: 20 distinct strings end in a lowercase state-like
+  code (all foreign) and 3 in capitals (all US lists). A 2-letter non-US province code
+  before it (`"Toronto, ON, CA"`) or a Canadian province name before `CA` (`"Toronto,
+  Ontario, CA"`) is a country whatever the casing. **Accepted misses:** a capitalised
+  foreign code (`"Tel Aviv, Tel Aviv, IL"` files us) and `"Boulder, Boulder, CO"`
+  (lone-`co` rule, latam). `"Kulim, Kedah, al"` and an Israeli kibbutz `"..., il"` row
+  are `other`.
+  **Still open:** `"Toronto, CA"` (1 row, no province, so the position rule reads it as
+  California), `"Lima, OH"` (Lima token), `peru` -> token (`"Perugia, IT"` stays
+  `latam`; entangled with `LATAM_COUNTRY_NAMES`, and tokenizing `brasil` the same way
+  would LOSE `"Brasilia"`), and 2 stray Florida flags on non-US rows
+  (`"Almere, FL, nl"`, `"Naples, IT"`: `isMiamiArea` ignores the market; 0 openIT).
+  Two reported "substring accidents" are NOT bugs and must not be "fixed": `indiana`
+  matching `"Indianapolis"` and `brasil` matching `"Brasilia"` are both correct.
 - **Flaky e2e (noted 2026-10-20):** `tests/e2e/scheduled-send.spec.ts` "a reply
   puts the row on hold… Enviar igual" (:429) and "a dead-token row… Enviar ahora
   waits for the reconnection" (:452) fail intermittently on the first

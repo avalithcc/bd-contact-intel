@@ -1,69 +1,123 @@
 /**
- * Backfill (or re-backfill) `job_posting.market` for every existing row,
- * using the same classifier applied at sync time (see
- * src/lib/hiring/sync.ts and src/lib/hiring/markets.ts#classifyMarket).
+ * Recompute `job_posting.market` and `job_posting.is_miami` for every row with the classifier the application uses
+ * (src/lib/hiring/markets.ts#classifyMarket / #isMiamiArea). Both are pure functions of `location`, so this only writes the rows
+ * whose stored value disagrees with today's rules.
  *
- * `market` is a pure function of `location` — no lookup table involved — so
- * this script just recomputes and writes it directly, same pattern as
- * scripts/backfill-company-keys.ts.
+ * When to run it: after ANY edit of the rules in markets.ts. sync.ts recomputes the rows the ATS feed still returns on its next
+ * daily run, but never touches a closed posting, so without this a rules edit leaves stored data on a mix of old and new rules.
+ * Deploy the new rules FIRST (otherwise the next sync with the old code rewrites the open rows back), then run this.
  *
- * Needed for rows synced before the `market` column existed (one-time
- * backfill after drizzle/0006_job_posting_market.sql is applied), and for
- * any postings that were previously DROPPED by the old country_filter logic
- * — re-run a sync afterward (see src/lib/hiring/sync.ts) to pick those back
- * up; this script only reclassifies rows that already exist in the table.
- * Safe to re-run any time; it's idempotent.
+ * Gated like the other prod data changes (scripts/backfill-company-account-type.ts, scripts/unify-contacts.ts):
+ *   - Defaults to a DRY RUN: a read-only transaction that prints COUNTS ONLY (no ids, no location text) and writes nothing.
+ *   - `--execute --actor=<bd id>` is required to write. It first takes a pg_dump of `job_posting` to backups/ (verified with
+ *     pg_restore --list; the run aborts if the backup fails), then writes in ONE transaction, batched, together with ONE audit_log
+ *     row (action `posting_market_backfill`) whose metadata holds every previous value.
+ *   - Revert: the SQL documented on buildMarketBackfillAuditMetadata (src/lib/hiring/marketBackfill.ts), or pg_restore of the dump.
+ *   - Idempotent: a second run plans zero changes.
  *
- * Pages through `job_posting` via keyset pagination on `id` (order by id,
- * where id > lastId, limit BATCH_SIZE) instead of loading the whole table
- * into memory, and applies each page as a single bulk UPDATE ... FROM
- * (VALUES ...) statement instead of one UPDATE per row.
- *
- * Usage (do NOT run automatically — this touches the real database):
- *   npx tsx scripts/backfill-posting-markets.ts
- *
- * Requires DATABASE_URL to be set (see .env). Run AFTER
- * drizzle/0006_job_posting_market.sql has been migrated.
+ * Usage (the owner runs --execute after reviewing the dry run):
+ *   npx tsx --env-file=.env scripts/backfill-posting-markets.ts
+ *   npx tsx --env-file=.env scripts/backfill-posting-markets.ts --execute --actor=<bd id>
  */
 import { sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { jobPosting } from "../src/db/schema";
-import { classifyMarket } from "../src/lib/hiring/markets";
+import { auditLog } from "../src/db/schema";
+import {
+  buildMarketBackfillAuditMetadata,
+  MARKET_BACKFILL_ACTION,
+  planPostingMarketChanges,
+  summarizePostingMarketChanges,
+  type PostingMarketChange,
+  type PostingMarketRow,
+} from "../src/lib/hiring/marketBackfill";
+import { snapshotBackup } from "../src/lib/migration/backup";
+import { chunk } from "../src/lib/migration/collapseWriteRows";
 
-const BATCH_SIZE = 1000;
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+const PAGE_SIZE = 5000;
+const WRITE_BATCH_SIZE = 500;
+const MAX_ROWS = 200_000;
+
+async function readAllPostings(tx: Tx): Promise<PostingMarketRow[]> {
+  const rows: PostingMarketRow[] = [];
+  let lastId: string | null = null;
+  for (;;) {
+    const page = (await tx.execute(sql`
+      select id::text as id, location, market, is_miami as "isMiami"
+      from job_posting
+      where ${lastId === null ? sql`true` : sql`id > ${lastId}::uuid`}
+      order by id
+      limit ${PAGE_SIZE}`)) as unknown as PostingMarketRow[];
+    if (!page.length) break;
+    rows.push(...page);
+    if (rows.length > MAX_ROWS) throw new Error(`refusing to read more than ${MAX_ROWS} job_posting rows`);
+    lastId = page[page.length - 1].id;
+  }
+  return rows;
+}
+
+async function writeChanges(tx: Tx, changes: readonly PostingMarketChange[]): Promise<number> {
+  let written = 0;
+  for (const batch of chunk(changes, WRITE_BATCH_SIZE)) {
+    const values = batch.map((c) => sql`(${c.id}::uuid, ${c.toMarket}::text, ${c.toMiami}::boolean)`);
+    const updated = (await tx.execute(sql`
+      update job_posting jp set market = v.market, is_miami = v.is_miami
+      from (values ${sql.join(values, sql`, `)}) as v(id, market, is_miami)
+      where jp.id = v.id
+      returning jp.id`)) as unknown as unknown[];
+    written += updated.length;
+  }
+  return written;
+}
+
+function printSummary(scanned: number, changes: readonly PostingMarketChange[]) {
+  const summary = summarizePostingMarketChanges(changes);
+  console.log(`job_posting rows scanned: ${scanned}`);
+  console.log(`rows whose stored market or is_miami disagrees with today's rules: ${summary.changed}`);
+  for (const [transition, count] of Object.entries(summary.byTransition).sort()) console.log(`  market ${transition}: ${count}`);
+  console.log(`  is_miami flips: ${summary.miamiFlips}`);
+}
 
 async function main() {
-  let lastId: string | null = null;
-  let updated = 0;
+  const args = process.argv.slice(2);
+  const execute = args.includes("--execute");
+  const actor = args.find((a) => a.startsWith("--actor="))?.slice("--actor=".length) ?? null;
+  if (execute && !actor) throw new Error("--execute requires --actor=<bd id> for the audit log");
 
-  for (;;) {
-    const page: { id: string; location: string | null }[] = await db
-      .select({ id: jobPosting.id, location: jobPosting.location })
-      .from(jobPosting)
-      .where(lastId === null ? undefined : sql`${jobPosting.id} > ${lastId}`)
-      .orderBy(jobPosting.id)
-      .limit(BATCH_SIZE);
-
-    if (!page.length) break;
-
-    const values = page.map((row) => {
-      const market = classifyMarket(row.location);
-      return sql`(${row.id}::uuid, ${market}::text)`;
+  if (!execute) {
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`set transaction read only`);
+      const guard = (await tx.execute(sql`show transaction_read_only`)) as unknown as { transaction_read_only: string }[];
+      if (guard[0]?.transaction_read_only !== "on") throw new Error("refusing a dry run: the session is not read only");
+      const rows = await readAllPostings(tx);
+      printSummary(rows.length, planPostingMarketChanges(rows));
     });
-    await db.execute(sql`
-      UPDATE job_posting AS jp
-      SET market = v.market
-      FROM (VALUES ${sql.join(values, sql`, `)}) AS v(id, market)
-      WHERE jp.id = v.id
-        AND jp.market IS DISTINCT FROM v.market
-    `);
-
-    updated += page.length;
-    lastId = page[page.length - 1].id;
-    console.log(`  ${updated} processed (last id ${lastId})`);
+    console.log("Dry run only: nothing was written. Re-run with --execute --actor=<bd id> to apply.");
+    return;
   }
 
-  console.log(`Done. ${updated} job postings processed.`);
+  // Fail before the (slow) backup, not at the audit insert after the writes: the actor must be a real BD.
+  const known = (await db.execute(sql`select 1 from bd where id::text = ${actor}`)) as unknown as unknown[];
+  if (!known.length) throw new Error(`--actor=${actor} is not a bd id`);
+
+  const backupPath = await snapshotBackup("posting-market-backfill", ["job_posting"]);
+  console.log(`backup written and verified: ${backupPath}`);
+
+  await db.transaction(async (tx) => {
+    const rows = await readAllPostings(tx);
+    const changes = planPostingMarketChanges(rows);
+    printSummary(rows.length, changes);
+    if (!changes.length) {
+      console.log("Nothing to change: no audit row written.");
+      return;
+    }
+    const metadata = buildMarketBackfillAuditMetadata(rows.length, changes);
+    const written = await writeChanges(tx, changes);
+    if (written !== changes.length) throw new Error(`planned ${changes.length} updates but wrote ${written}: rolling back`);
+    const [audit] = await tx.insert(auditLog).values({ actorBdId: actor!, action: MARKET_BACKFILL_ACTION, metadata }).returning({ id: auditLog.id });
+    console.log(`updated ${written} job_posting row(s) and wrote 1 audit_log row (${MARKET_BACKFILL_ACTION}), id ${audit.id}: the revert path reads its metadata.`);
+  });
 }
 
 main()

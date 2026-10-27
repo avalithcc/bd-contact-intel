@@ -193,7 +193,7 @@ async function runWithFallback(
  * not as a command-line argument, so it never appears in `args`/process
  * listings either.
  */
-export async function snapshotBackup(runId: string): Promise<string> {
+export async function snapshotBackup(runId: string, tables: readonly string[] = BACKUP_TABLES): Promise<string> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is not set — cannot back up before --execute.");
@@ -205,7 +205,7 @@ export async function snapshotBackup(runId: string): Promise<string> {
 
   try {
     const dumpCandidates = resolvePgDumpCandidates(process.env);
-    const dumpResult = await runWithFallback(dumpCandidates, buildPgDumpArgs(outputPath), env);
+    const dumpResult = await runWithFallback(dumpCandidates, buildPgDumpArgs(outputPath, tables), env);
     if (dumpResult.code !== 0) {
       throw new Error(`pg_dump exited with code ${dumpResult.code}: ${dumpResult.stderr}`);
     }
