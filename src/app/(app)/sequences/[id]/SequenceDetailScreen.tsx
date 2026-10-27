@@ -12,6 +12,7 @@ import type { SendChoice } from "@/lib/sequences/sendMoment";
 import { releaseToast, sendRecipients, type ReleaseToast } from "@/lib/sequences/sendUi";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
 import { optOutErrorKey } from "@/lib/sequences/contactContext";
+import { memberLanguage } from "@/lib/sequences/audienceCard";
 import { choiceToStore } from "@/lib/sequences/languageChoice";
 import type { AudienceLanguage } from "@/lib/sequences/complianceAudience";
 import { generationLock } from "@/lib/sequences/generationLock";
@@ -24,6 +25,7 @@ import {
   approveMember,
   cancelApproval,
   chooseDraftLanguage,
+  savePreferredDraftLanguage,
   clearDraftLanguage,
   generateMemberDraft,
   loadReviewSignals,
@@ -217,15 +219,19 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     setLang({ memberId, mode, review });
   }
 
-  /** Stores the choice only when it differs from what is already recorded, then generates with it (the server reads it back). */
-  async function confirmLanguage(selected: AudienceLanguage) {
+  /**
+   * Stores the choice, then generates with it (the server reads it back). Saved as the contact's preferred language it lives on the
+   * contact and this member keeps no one-off; otherwise it is stored on the member only when it differs from what the system resolves
+   * (the preferred language when there is one).
+   */
+  async function confirmLanguage(selected: AudienceLanguage, saveAsPreferred: boolean) {
     const m = lang ? member(lang.memberId) : null;
-    const resolved = m?.audience?.audience?.language;
-    if (!lang || !m || !resolved) return;
-    const step = choiceToStore(resolved, m.languageChoice?.language ?? null, selected);
+    const current = m ? memberLanguage(m) : null;
+    if (!lang || !m || !current) return;
+    const step = saveAsPreferred ? ({ action: "preferred", language: selected } as const) : choiceToStore(current.baseline, m.languageChoice?.language ?? null, selected);
     setLangError(null);
     if (step.action !== "none") {
-      const r = await guarded(() => (step.action === "set" ? chooseDraftLanguage(m.memberId, step.language) : clearDraftLanguage(m.memberId)), setLangError);
+      const r = await guarded(() => (step.action === "preferred" ? savePreferredDraftLanguage(m.memberId, step.language) : step.action === "set" ? chooseDraftLanguage(m.memberId, step.language) : clearDraftLanguage(m.memberId)), setLangError);
       if (!r) return;
       if (!r.ok) return setLangError(l.languageChoice.saveFailed);
       router.refresh();
@@ -402,7 +408,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       )}
       {lang && member(lang.memberId) && (
         <LanguageChoiceDialog key={lang.memberId} member={member(lang.memberId)!} name={[member(lang.memberId)!.firstName, member(lang.memberId)!.lastName].filter(Boolean).join(" ") || l.unnamed} mode={lang.mode} labels={l}
-          busy={busy} locked={lock.active} error={langError} onCancel={() => { setLang(null); setLangError(null); }} onConfirm={(language) => void confirmLanguage(language)} />
+          busy={busy} locked={lock.active} error={langError} onCancel={() => { setLang(null); setLangError(null); }} onConfirm={(language, saveAsPreferred) => void confirmLanguage(language, saveAsPreferred)} />
       )}
       {editing && <EditSequenceDialog open name={detail.name} cap={detail.dailySendCap} labels={l} onClose={closeDialogs} onSave={onEdit} busy={busy} error={error} />}
     </>

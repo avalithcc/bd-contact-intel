@@ -8,7 +8,7 @@ function person(id: string, ownerBdId: string | null): MergePersonFields {
     id, firstName: "Jane", lastName: "Doe", email: null, emailNormalized: null, emailStatus: "none",
     emailConfidence: null, emailSource: null, phone: null, mobilePhone: null, company: "Acme", companyKey: "acme",
     companyCategory: null, jobTitle: null, roleGroup: null, seniority: null, industry: null, city: null,
-    region: null, country: null, ownerBdId, sourceKey: "csv", contactType: null,
+    region: null, country: null, ownerBdId, sourceKey: "csv", contactType: null, preferredLanguage: null,
   };
 }
 

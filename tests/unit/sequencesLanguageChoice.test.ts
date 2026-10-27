@@ -42,17 +42,17 @@ test("the table covers an override in both directions (not vacuous)", () => {
 test("a stored choice wins over the audience's language", () => {
   for (const a of AUDIENCES) {
     const chosen = other(a.language);
-    assert.equal(buildSequenceDraftInput(base, a, "first", chosen)?.language, chosen);
+    assert.equal(buildSequenceDraftInput(base, a, "first", { chosen })?.language, chosen);
     assert.equal(buildSequenceDraftInput(base, a, "first")?.language, a.language);
-    assert.equal(buildSequenceDraftInput(base, a, "first", undefined)?.language, a.language);
+    assert.equal(buildSequenceDraftInput(base, a, "first", {})?.language, a.language);
   }
 });
 
 test("SAFETY: the postal address is identical with and without an override, in both directions", () => {
   for (const a of AUDIENCES) {
     for (const chosen of LANGUAGE_CHOICES) {
-      assert.equal(resolveDraftCompliance(a, chosen)?.address, a.address);
-      const c = resolveDraftCompliance(a, chosen)!;
+      assert.equal(resolveDraftCompliance(a, { chosen })?.address, a.address);
+      const c = resolveDraftCompliance(a, { chosen })!;
       const withChoice = composeDraft(GENERATED, c.address, c.language, URL)!;
       const without = composeDraft(GENERATED, a.address, a.language, URL)!;
       const own = COMPLIANCE_CONFIG[a.address]!.postalAddress;
@@ -68,7 +68,7 @@ test("SAFETY: the postal address is identical with and without an override, in b
 test("the opt-out sentence follows the CHOSEN language while the address follows the audience", () => {
   for (const a of AUDIENCES) {
     const chosen = other(a.language);
-    const c = resolveDraftCompliance(a, chosen)!;
+    const c = resolveDraftCompliance(a, { chosen })!;
     const body = composeDraft(GENERATED, c.address, c.language, URL)!.body;
     assert.ok(body.includes(OPT_OUT_TEXT[chosen]));
     assert.ok(!body.includes(OPT_OUT_TEXT[a.language]));
@@ -81,12 +81,12 @@ test("regeneration reuses the stored choice; clearing it returns to the resolved
   for (const a of AUDIENCES) {
     const chosen = other(a.language);
     const stored = parseLanguageChoice(chosen);
-    const first = resolveDraftCompliance(a, stored)!.language;
-    const regenerated = resolveDraftCompliance(a, stored)!.language;
+    const first = resolveDraftCompliance(a, { chosen: stored })!.language;
+    const regenerated = resolveDraftCompliance(a, { chosen: stored })!.language;
     assert.equal(regenerated, first);
     assert.equal(regenerated, chosen);
     assert.deepEqual(choiceToStore(a.language, stored, a.language), { action: "clear" });
-    assert.equal(resolveDraftCompliance(a, null)!.language, a.language);
+    assert.equal(resolveDraftCompliance(a, {})!.language, a.language);
   }
 });
 
@@ -109,11 +109,11 @@ test("only es and en are accepted as a choice; everything else is rejected", () 
 
 test("a HOLD cannot be drafted whatever the stored choice is", () => {
   for (const chosen of [...LANGUAGE_CHOICES, undefined, null]) {
-    assert.equal(buildSequenceDraftInput(base, null, "first", chosen ?? undefined), null);
-    assert.equal(resolveDraftCompliance(null, chosen ?? null), null);
+    assert.equal(buildSequenceDraftInput(base, null, "first", { chosen }), null);
+    assert.equal(resolveDraftCompliance(null, { chosen }), null);
   }
 });
 
 test("a stored value that is not es or en can never reach the generator: it reads as no choice", () => {
-  for (const a of AUDIENCES) assert.equal(resolveDraftCompliance(a, parseLanguageChoice("pt"))!.language, a.language);
+  for (const a of AUDIENCES) assert.equal(resolveDraftCompliance(a, { chosen: parseLanguageChoice("pt") })!.language, a.language);
 });

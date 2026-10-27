@@ -5,6 +5,7 @@
 import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { revalidateLists } from "@/lib/contacts/revalidateLists";
+import { revalidateContactSurfaces } from "@/lib/contacts/revalidateContactSurfaces";
 import {
   advanceReminder as advanceReminderRow,
   approveBulk as approveBulkRows,
@@ -30,6 +31,7 @@ import {
   regenerateDrafts,
   saveDraftEdit,
   setMemberDraftLanguage,
+  setMemberPreferredLanguage,
   type DraftBatchResult,
   type SaveEditResult,
   type SetLanguageResult,
@@ -109,6 +111,20 @@ export async function chooseDraftLanguage(memberId: string, language: unknown): 
   if (!chosen || !isUuid(memberId)) return { ok: false, error: !chosen ? "invalid_language" : "not_found" };
   const me = await getCurrentBd();
   return setMemberDraftLanguage(me.id, memberId, chosen);
+}
+
+/**
+ * "Guardar como idioma preferido" in the language dialog: saves the language on the CONTACT (every sequence of theirs) instead of
+ * on this member, and drops this member's one-off choice. Only "es" or "en"; who and when come from the signed-in BD. Generates nothing.
+ */
+export async function savePreferredDraftLanguage(memberId: string, language: unknown): Promise<SetLanguageResult | { ok: false; error: "invalid_language" }> {
+  const chosen = parseLanguageChoice(language);
+  if (!chosen || !isUuid(memberId)) return { ok: false, error: !chosen ? "invalid_language" : "not_found" };
+  const me = await getCurrentBd();
+  const result = await setMemberPreferredLanguage(me.id, memberId, chosen);
+  if (!result.ok) return result;
+  if ("personId" in result) await revalidateContactSurfaces(result.personId, "touch");
+  return { ok: true };
 }
 
 /** "Volver al idioma resuelto": clears the choice, so the audience's language applies again. */

@@ -4,6 +4,12 @@
  * resolver and libphonenumber, which must never reach a client bundle (tests/unit/whatsappClientBoundary.test.ts).
  */
 import type { MemberAudience } from "./audienceView";
+import { resolveDraftLanguage, type ResolvedDraftLanguage } from "./languageChoice";
+
+/** The language of a member's draft as the card and the dialog show it: the same resolveDraftLanguage the draft is generated with. */
+export function memberLanguage(m: { audience?: MemberAudience; languageChoice?: { language: string } | null; preferredLanguage?: { language: string } | null }): ResolvedDraftLanguage | null {
+  return resolveDraftLanguage(m.audience?.audience?.language ?? null, { chosen: m.languageChoice?.language, preferred: m.preferredLanguage?.language });
+}
 
 /**
  * "Argentina (4) y México (4)"; with three or more, "Argentina (4), México (4) y Chile (3)". Biggest group first, ties by name.

@@ -251,7 +251,7 @@ export function PropertyList({
 
       {properties.map((prop) => (
         <Fragment key={prop.key}>
-          {prop.key === "industry" && (
+          {prop.key === "preferredLanguage" && (
             <LocationPropertyRow
               key="location"
               personId={personId}
@@ -430,6 +430,21 @@ function PropertyRow({
                 </option>
               ))}
             </select>
+          ) : prop.key === "preferredLanguage" ? (
+            // Closed set: es | en, and the empty option ("Automático") clears the preference.
+            <select
+              id={inputId}
+              aria-labelledby={`${inputId}-label`}
+              className="select"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={busy}
+              autoFocus
+            >
+              <option value="">{l.preferredLanguageAuto}</option>
+              <option value="es">{l.preferredLanguageEs}</option>
+              <option value="en">{l.preferredLanguageEn}</option>
+            </select>
           ) : (
             <input
               id={inputId}
@@ -444,6 +459,7 @@ function PropertyRow({
           )}
         </dd>
         {prop.key === "profileKey" && !error && <dd className="hint">{l.profileKeyHelp}</dd>}
+        {prop.key === "preferredLanguage" && <dd className="hint">{l.preferredLanguageEditHint}</dd>}
         {conflict ? (
           // Nothing is merged here: name the owner and point at Duplicados.
           <dd className="alert alert-warn mt-md" role="alert">
@@ -477,7 +493,7 @@ function PropertyRow({
   return (
     <div className="prop">
       <dt>{prop.label}</dt>
-      <dd>
+      <dd className={prop.key === "preferredLanguage" && !prop.value ? "soft" : undefined}>
         {isPhoneProp && prop.value ? (
           <PhoneValue
             value={prop.value}
@@ -546,7 +562,9 @@ function PropertyRow({
         <LushaRow personId={personId} field={prop.key === "email" ? "emails" : "phones"} column={prop.key} fieldLabel={prop.label} view={lusha} labels={l} />
       )}
       {whatsappHint && <dd className="hint">{whatsappHint}</dd>}
-      {emailBounced && emailBounceHint ? (
+      {prop.key === "preferredLanguage" && !prop.value ? (
+        <dd className="hint">{l.preferredLanguageAutoHint}</dd>
+      ) : emailBounced && emailBounceHint ? (
         <dd className="hint">{emailBounceHint}</dd>
       ) : hunterHint ? (
         <dd className="hint">{hunterHint}</dd>

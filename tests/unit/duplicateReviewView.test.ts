@@ -36,6 +36,7 @@ function person(overrides: Partial<MergePersonFields> & { id: string }): MergePe
     ownerBdId: null,
     sourceKey: null,
     contactType: null,
+    preferredLanguage: null,
     ...overrides,
   };
 }

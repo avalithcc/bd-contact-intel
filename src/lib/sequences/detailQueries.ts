@@ -69,6 +69,8 @@ export type DetailMember = {
   audience?: MemberAudience;
   /** The language a person chose for this member's draft (languageChoice.ts); null when nobody did. `byName` is null if that BD is gone. */
   languageChoice?: { language: AudienceLanguage; byName: string | null; at: Date | null } | null;
+  /** The contact's own preferred language (person.preferred_language), with who set it and when, from person_property_history; null when it is Automático. */
+  preferredLanguage?: { language: AudienceLanguage; byName: string | null; at: Date | null } | null;
 };
 
 /** `sentToday`: sends recorded today (Miami day) from this Sequence's sending account, pending claims included: what the daily cap has already used. */
@@ -91,13 +93,21 @@ function languageChoiceOf(r: Row): DetailMember["languageChoice"] {
   return language ? { language, byName: (r.draft_language_by_name ?? null) as string | null, at: ts(r.draft_language_at) } : null;
 }
 
+function preferredLanguageOf(r: Row): DetailMember["preferredLanguage"] {
+  const language = parseLanguageChoice(r.preferred_language);
+  const edit = (r.preferred_language_edit ?? null) as { by: string | null; at: string } | null;
+  return language ? { language, byName: edit?.by ?? null, at: edit ? ts(edit.at) : null } : null;
+}
+
 async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string | null): Promise<SequenceDetail | null> {
   const owned = onlyOwnedBy ? sql`and s.owner_bd_id = ${onlyOwnedBy}::uuid` : sql``;
   const day = miamiCalendarDate(new Date());
   const rows = (await ex.execute(sql`
     select s.id::text as sid, s.name, s.owner_bd_id::text as owner_id, ob.name as owner_name, s.schedule, s.daily_send_cap, ea.email_address, used.n as sent_today,
            sm.id::text as member_id, sm.person_id::text as person_id, sm.state, sm.hold_reason, sm.sent_at, sm.replied_at, sm.reminder_due_at,
-           sm.discarded_at, sm.discard_reason, sm.discarded_by_bd_id::text as discarded_by_bd_id, sm.draft_language, sm.draft_language_at, lb.name as draft_language_by_name,
+           sm.discarded_at, sm.discard_reason, sm.discarded_by_bd_id::text as discarded_by_bd_id, sm.draft_language, sm.draft_language_at, lb.name as draft_language_by_name, p.preferred_language,
+           case when p.preferred_language is not null then (select json_build_object('by', pb.name, 'at', h.at) from person_property_history h left join bd pb on pb.id = h.changed_by_bd_id
+             where h.person_id = sm.person_id and h.property = 'preferredLanguage' order by h.at desc limit 1) end as preferred_language_edit,
            p.first_name, p.last_name, p.job_title, ${companyNameColumnsSql}, p.company_key, p.email, p.email_status = 'verified' as verified, p.role_group, p.city, p.region, p.country, cn.country as company_country,
            p.mobile_phone, p.phone, ${companyCountrySql} as audience_company_country, ${postingMarketsSql} as posting_markets, ${rosterCountriesSql} as roster_countries,
            coalesce(h.open_it, 0)::int as open_it, coalesce(h.is_florida, false) as is_florida,
@@ -168,6 +178,7 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
       reminderDraft: draftOf(r, "d2"),
       place: { city: (r.city ?? null) as string | null, region: (r.region ?? null) as string | null, country: ((r.country || r.company_country) || null) as string | null },
       languageChoice: languageChoiceOf(r),
+      preferredLanguage: preferredLanguageOf(r),
       // The detail read names two of the audience columns differently (`country` is also the place, `audience_company_country` is not `cn.country`).
       audience: buildMemberAudience(audienceInputsFromRow({ ...r, person_country: r.country ?? null, company_country: r.audience_company_country ?? null })),
     })),

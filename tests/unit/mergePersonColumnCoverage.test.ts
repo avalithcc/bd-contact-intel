@@ -50,6 +50,7 @@ const PERSON_COLUMN_DECISION: Record<string, Decision> = {
   statusActivityId: { notCarried: "cache recomputed together with status" },
   sourceKey: "carried",
   contactType: "carried",
+  preferredLanguage: "carried",
   mergedIntoId: { notCarried: "written onto the MERGED row by the merge itself, never copied" },
   migrationRunId: { notCarried: "provenance of the survivor's own creation" },
   createdAt: { notCarried: "survivor keeps its own creation time" },
@@ -82,6 +83,7 @@ function fields(id: string): MergePersonFields {
     ownerBdId: null,
     sourceKey: null,
     contactType: null,
+    preferredLanguage: null,
   };
 }
 

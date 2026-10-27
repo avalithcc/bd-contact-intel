@@ -142,7 +142,7 @@ const usAddress = unsubscribePageAudience(usCompany)?.postalAddress;
 test("a chosen language that differs from the audience wins for the locale, and the address stays the audience's (production case)", () => {
   assert.equal(unsubscribePageAudience(usCompany)?.locale, "en");
   assert.ok(usAddress);
-  const page = unsubscribePageAudience(usCompany, "es");
+  const page = unsubscribePageAudience(usCompany, { chosen: "es" });
   assert.deepEqual(page, { postalAddress: usAddress, locale: "es" });
   const html = renderUnsubscribeHtml(confirm, page);
   assert.match(html, /Sí, darme de baja/);
@@ -151,30 +151,33 @@ test("a chosen language that differs from the audience wins for the locale, and 
 
 test("nobody chose (null or undefined): the audience language still applies", () => {
   const argentina = { mobilePhone: null, phone: null, rosterCountries: [], personCountry: "Argentina" } as const;
-  assert.equal(unsubscribePageAudience(argentina, null)?.locale, "es");
+  assert.equal(unsubscribePageAudience(argentina, { chosen: null })?.locale, "es");
   assert.equal(unsubscribePageAudience(argentina)?.locale, "es");
-  assert.equal(unsubscribePageAudience(usCompany, null)?.locale, "en");
+  assert.equal(unsubscribePageAudience(usCompany, { chosen: null })?.locale, "en");
 });
 
 test("a chosen language with no audience gives that locale and no address", () => {
   const none = { mobilePhone: null, phone: null, rosterCountries: [], personCountry: null } as const;
   assert.equal(unsubscribePageAudience(none), undefined);
-  assert.deepEqual(unsubscribePageAudience(none, "es"), { locale: "es" });
-  assert.deepEqual(unsubscribePageAudience(none, "en"), { locale: "en" });
-  assert.doesNotMatch(renderUnsubscribeHtml(done, unsubscribePageAudience(none, "es")), /help center mt-md/);
+  assert.deepEqual(unsubscribePageAudience(none, { chosen: "es" }), { locale: "es" });
+  assert.deepEqual(unsubscribePageAudience(none, { chosen: "en" }), { locale: "en" });
+  assert.doesNotMatch(renderUnsubscribeHtml(done, unsubscribePageAudience(none, { chosen: "es" })), /help center mt-md/);
 });
 
 test("a stored value that is not es/en reads as no choice: the audience language applies", () => {
   for (const garbage of ["pt", "ES", "", " es", "fr", 3, {}]) {
-    assert.deepEqual(unsubscribePageAudience(usCompany, garbage), unsubscribePageAudience(usCompany), String(garbage));
+    assert.deepEqual(unsubscribePageAudience(usCompany, { chosen: garbage }), unsubscribePageAudience(usCompany), String(garbage));
   }
-  assert.equal(unsubscribePageAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: null }, "pt"), undefined);
+  assert.equal(unsubscribePageAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: null }, { chosen: "pt" }), undefined);
 });
 
 test("a language choice never changes the postal address", () => {
   for (const country of ["Argentina", "Mexico", "Spain", "Ireland", "United States"]) {
     const input = { mobilePhone: null, phone: null, rosterCountries: [], personCountry: country } as const;
     const base = unsubscribePageAudience(input)?.postalAddress;
-    for (const choice of ["es", "en", null, "garbage"]) assert.equal(unsubscribePageAudience(input, choice)?.postalAddress, base, `${country}/${choice}`);
+    for (const choice of ["es", "en", null, "garbage"]) {
+      assert.equal(unsubscribePageAudience(input, { chosen: choice })?.postalAddress, base, `${country}/${choice}`);
+      assert.equal(unsubscribePageAudience(input, { preferred: choice })?.postalAddress, base, `${country}/preferred ${choice}`);
+    }
   }
 });

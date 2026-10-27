@@ -10,7 +10,7 @@ import { test } from "node:test";
 import { ContactMergedError } from "@/lib/contacts/mergeGuard";
 import { ContactNotFoundError } from "@/lib/contacts/errors";
 import { TaskNotFoundError } from "@/lib/tasks/errors";
-import { InvalidContactTypeError, InvalidEmailError, InvalidNameError } from "@/lib/contacts/propertyEdit";
+import { InvalidContactTypeError, InvalidEmailError, InvalidNameError, InvalidPreferredLanguageError } from "@/lib/contacts/propertyEdit";
 import { GmailSendError } from "@/lib/gmail/errors";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import {
@@ -33,6 +33,10 @@ test("maps TaskNotFoundError to 'not_found' — a task write scoped to the wrong
 
 test("maps InvalidEmailError to 'invalid_email'", () => {
   assert.equal(contactActionErrorReason(new InvalidEmailError("invalid_format")), "invalid_email");
+});
+
+test("maps InvalidPreferredLanguageError to 'invalid_preferred_language'", () => {
+  assert.equal(contactActionErrorReason(new InvalidPreferredLanguageError()), "invalid_preferred_language");
 });
 
 test("maps InvalidContactTypeError to 'invalid_contact_type'", () => {
