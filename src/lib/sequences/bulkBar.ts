@@ -5,10 +5,10 @@
  */
 import { bulkApprovalGate, type GateRow } from "./bulkApprovalGate";
 
-export type BulkBarView = { visible: boolean; selected: number; reviewed: number; approveEnabled: boolean; allReviewed: boolean; ids: string[] };
+export type BulkBarView = { visible: boolean; selected: number; reviewed: number; approveEnabled: boolean; allReviewed: boolean; ids: string[]; /** How many selected drafts are in another language than today's. */ wrongLanguage: number };
 
 export function bulkBarView(selection: readonly GateRow[]): BulkBarView {
   const gate = bulkApprovalGate(selection);
   const ids = [...new Set(selection.map((r) => r.id))];
-  return { visible: gate.total > 0, selected: gate.total, reviewed: gate.reviewed, approveEnabled: gate.enabled, allReviewed: gate.total > 0 && gate.reviewed === gate.total, ids };
+  return { visible: gate.total > 0, selected: gate.total, reviewed: gate.reviewed, approveEnabled: gate.enabled, allReviewed: gate.total > 0 && gate.reviewed === gate.total, ids, wrongLanguage: gate.wrongLanguageIds.length };
 }

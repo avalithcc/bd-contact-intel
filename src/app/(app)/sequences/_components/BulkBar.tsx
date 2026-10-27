@@ -16,15 +16,17 @@ import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendC
 /**
  * `selection` is every selected row with its reviewed flag: the counter and the gate are computed from it, nothing else.
  * "Aprobar y enviar ahora los N" is the shared split button (one choice for all N); before the BD confirms, a warning says how many
- * leave now and how many wait because of the account's daily cap.
+ * leave now and how many wait because of the account's daily cap. `leftOut` counts the drafts in another language that cannot be selected.
  */
-export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now, lock }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date; lock: GenerationLock }) {
+export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now, lock, leftOut }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date; lock: GenerationLock; leftOut: number }) {
   const v = bulkBarView(selection);
   if (!v.visible) return null;
   const one = v.selected === 1;
   const unopened = v.selected - v.reviewed;
   const missing = fill(unopened === 1 ? l.bulkMissingOne : l.bulkMissing, { n: unopened });
-  const gateTitle = `${missing} ${l.bulkMissingPending}`;
+  const wl = l.languageMismatch;
+  const blockedLanguage = v.wrongLanguage === 0 ? null : v.wrongLanguage === 1 ? wl.barBlocked : fill(wl.barBlockedMany, { n: v.wrongLanguage });
+  const gateTitle = blockedLanguage ?? `${missing} ${l.bulkMissingPending}`;
   const n = { n: v.selected };
   const outlook = capOutlook({ count: v.selected, cap: cap.cap, sentToday: cap.sentToday });
   return (
@@ -48,7 +50,9 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
           onSchedule={(slot) => onAction({ type: "approve", memberIds: v.ids, when: { kind: "at", ...slot } })}
         />
         {/* Inside the sticky bar so the reason travels with the disabled button instead of being scrolled away. */}
-        {!v.approveEnabled && <p className="note"><strong>{missing}</strong> {l.bulkMissingPending}. {l.bulkBlockedWhy}</p>}
+        {unopened > 0 && <p className="note"><strong>{missing}</strong> {l.bulkMissingPending}. {l.bulkBlockedWhy}</p>}
+        {blockedLanguage && <p className="note">{blockedLanguage}</p>}
+        {leftOut > 0 && <p className="note">{leftOut === 1 ? wl.barLeftOut : fill(wl.barLeftOutMany, { n: leftOut })}</p>}
       </div>
       {v.approveEnabled && outlook.deferred > 0 && (
         <div className="alert alert-warn mt-md" role="status">

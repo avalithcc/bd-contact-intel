@@ -13,6 +13,7 @@ import type { DetailMember } from "./detailQueries";
 import type { GateRow } from "./bulkApprovalGate";
 import type { SaveEditResult } from "./draftQueries";
 import { mapMemberCard, type CardActionId } from "./memberCard";
+import { memberDraftMismatch } from "./audienceCard";
 
 export type ReviewText = { subject: string; body: string };
 export type ReviewFlowError = Extract<SaveEditResult, { ok: false }>["error"] | Extract<ApproveResult, { error: "rejected" }>["rejected"][number]["reason"] | "too_many" | "failed";
@@ -52,15 +53,15 @@ export async function runReviewIntent(intent: "save" | "approve", input: { store
   }
 }
 
-/** "Aprobar los N listos": N = drafted members with a draft, the same set the header counts. */
-export const readyMemberIds = (members: readonly DetailMember[]): string[] => members.filter((m) => m.state === "drafted" && m.draft !== null).map((m) => m.memberId);
+/** "Aprobar los N listos": N = drafted members with a draft, the same set the header counts, minus the drafts in another language (they cannot be selected). */
+export const readyMemberIds = (members: readonly DetailMember[]): string[] => members.filter((m) => m.state === "drafted" && m.draft !== null && !memberDraftMismatch(m)).map((m) => m.memberId);
 
 /** Bulk-bar rows for the selected ids. An id that left the roster or stopped being a drafted member is dropped, not counted. */
 export function gateRows(members: readonly DetailMember[], selected: readonly string[]): GateRow[] {
   const byId = new Map(members.map((m) => [m.memberId, m]));
   return selected.flatMap((id) => {
     const m = byId.get(id);
-    return m && m.state === "drafted" && m.draft ? [{ id, reviewed: m.draft.reviewedAt !== null }] : [];
+    return m && m.state === "drafted" && m.draft ? [{ id, reviewed: m.draft.reviewedAt !== null, wrongLanguage: memberDraftMismatch(m) !== null }] : [];
   });
 }
 

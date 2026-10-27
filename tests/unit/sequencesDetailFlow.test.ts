@@ -4,7 +4,7 @@ import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent, sameC
 import type { DetailDraft, DetailMember } from "@/lib/sequences/detailQueries";
 
 const NOW = new Date("2026-10-15T15:00:00Z");
-const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject", body: "Body", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject", body: "Body", language: null, edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 const member = (id: string, over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: id, personId: `p-${id}`, state: "drafted", holdReason: null, firstName: "A", lastName: "B", jobTitle: null, company: "Acme", companyKey: "acme",
   email: "a@acme.test", emailVerified: true, openIt: 1, florida: false, leadership: false, lastContactAt: null, repliedAt: null, sentAt: null,
@@ -98,7 +98,7 @@ test("'Aprobar los N listos' selects exactly the drafted members that have a dra
 
 test("the gate counts a member as reviewed only when its draft was opened, and drops ids that left the roster or the state", () => {
   const members = [member("a", { draft: draft({ reviewedAt: NOW }) }), member("b"), member("c", { state: "approved" })];
-  assert.deepEqual(gateRows(members, ["a", "b", "c", "stale"]), [{ id: "a", reviewed: true }, { id: "b", reviewed: false }]);
+  assert.deepEqual(gateRows(members, ["a", "b", "c", "stale"]), [{ id: "a", reviewed: true, wrongLanguage: false }, { id: "b", reviewed: false, wrongLanguage: false }]);
 });
 
 test("after a member is refreshed as reviewed, the counter follows (the stale-counter obligation)", () => {

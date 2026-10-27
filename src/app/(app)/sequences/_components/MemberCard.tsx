@@ -9,6 +9,7 @@ import { SendNowButton } from "@/components/send/SendNowButton";
 import { SendSplitButton } from "@/components/send/SendSplitButton";
 import { resolveRecipientZone, zoneClock } from "@/lib/sendSchedule/zones";
 import { slotOf } from "@/lib/sendSchedule/time";
+import { memberDraftMismatch } from "@/lib/sequences/audienceCard";
 import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { approvedMoment, type ApprovedMoment } from "@/lib/sequences/approvedMoment";
@@ -18,6 +19,7 @@ import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/v
 import { clockLabel, whenLabel } from "@/lib/scheduledEmail/view";
 import type { OnAction } from "./actions";
 import { AudienceBlock } from "./AudienceBlock";
+import { LanguageMismatchAlert, languageWord } from "./LanguageMismatch";
 import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
 
 /**
@@ -89,7 +91,7 @@ function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels
   return parts;
 }
 
-function Actions({ card, m, l, onAction, generation, send, now, moment, audienceHeld }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generation: GenerationLock; send: SequenceSendContext; now: Date; moment: ApprovedMoment | null; audienceHeld: boolean }) {
+function Actions({ card, m, l, onAction, generation, send, now, moment, audienceHeld, blockedTitle }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generation: GenerationLock; send: SequenceSendContext; now: Date; moment: ApprovedMoment | null; audienceHeld: boolean; blockedTitle?: string }) {
   const contactHref = `/contacts/${m.personId}`;
   const run = (type: CardActionId) => () => void onAction({ type, memberId: m.memberId } as Parameters<OnAction>[0]);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
@@ -115,8 +117,8 @@ function Actions({ card, m, l, onAction, generation, send, now, moment, audience
               labels={send.labels}
               primaryLabel={l.reviewApproveNow}
               busy={send.busy}
-              disabled={gen.reviewDisabled}
-              title={reviewLock.title}
+              disabled={gen.reviewDisabled || blockedTitle !== undefined}
+              title={blockedTitle ?? reviewLock.title}
               error={send.error}
               placement="down"
               schedule={approvalSchedule(send, recipients, "one")}
@@ -181,10 +183,14 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
   // Shown while a draft can still be generated or reviewed; a HOLD (no audience) also disables "Generar borrador".
   const showAudience = card.kind === "noDraft" || card.kind === "draft";
   const audienceHeld = showAudience && m.audience != null && m.audience.audience === null;
+  // A draft written in another language than today's cannot be approved or selected; the alert below it says why and offers the two exits.
+  const mismatch = card.kind === "draft" ? memberDraftMismatch(m) : null;
+  const mismatchVars = mismatch ? { draft: languageWord(mismatch.draft, l), now: languageWord(mismatch.now, l) } : null;
+  const generationLockTitle = generation.active ? fill(l.generateWaitTitle, { name: generation.generatingName ?? "" }) : undefined;
   return (
     <div className="card">
       <div className="card-body row row-lg" style={{ flexWrap: "wrap" }}>
-        {selection && card.kind === "draft" && <input type="checkbox" checked={selection.selected} onChange={selection.onToggle} aria-label={fill(l.selectMember, { name })} />}
+        {selection && card.kind === "draft" && <input type="checkbox" checked={selection.selected} onChange={selection.onToggle} disabled={mismatch !== null && !selection.selected} title={mismatchVars ? fill(l.languageMismatch.selectTitle, mismatchVars) : undefined} aria-label={fill(l.selectMember, { name })} />}
         <Avatar id={m.personId} initials={initialsFromName(name)} />
         <div className="stack-sm" style={{ flex: "1 1 320px", minWidth: 0 }}>
           <div className="row wrap">
@@ -196,6 +202,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
             {m.draft && showsReviewFlag(card.kind) && (m.draft.reviewedAt
               ? <span className="badge badge-success">{l.badgeReviewed}</span>
               : <span className="badge badge-warn">{l.badgeUnreviewed}</span>)}
+            {mismatchVars && <span className="badge badge-warn" title={fill(l.languageMismatch.badgeTitle, mismatchVars)}>{l.languageMismatch.badge}</span>}
             {card.florida && <span className="badge badge-outline">{l.florida}</span>}
           </div>
           <p className="headline">
@@ -203,10 +210,11 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
             {m.company && <> {l.headlineAt} {m.companyKey ? <Link href={`/companies/${encodeURIComponent(m.companyKey)}`}>{m.company}</Link> : m.company}</>}
           </p>
           <div className="meta">{parts.map((p, i) => <Fragment key={i}>{i > 0 && " · "}{p}</Fragment>)}</div>
-          {showAudience && <AudienceBlock m={m} name={name} l={l} onAction={readOnly ? undefined : onAction} lockTitle={generation.active ? fill(l.generateWaitTitle, { name: generation.generatingName ?? "" }) : undefined} />}
+          {showAudience && <AudienceBlock m={m} name={name} l={l} onAction={readOnly ? undefined : onAction} lockTitle={generationLockTitle} />}
+          {mismatch && <LanguageMismatchAlert m={m} mismatch={mismatch} name={name} l={l} ownView={ownView} busy={send.busy} locked={generation.active} lockTitle={generationLockTitle} onRegenerate={readOnly ? undefined : () => void onAction({ type: "regenerate", memberId: m.memberId })} onKeep={readOnly ? undefined : () => void onAction({ type: "keepLanguage", memberId: m.memberId })} />}
           {chips.length > 0 && <div className="row wrap row-xs">{chips.map((c) => <span key={c} className="chip">{c}</span>)}</div>}
         </div>
-        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} audienceHeld={audienceHeld} />
+        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} audienceHeld={audienceHeld} blockedTitle={mismatchVars ? fill(l.languageMismatch.approveTitle, mismatchVars) : undefined} />
       </div>
       {!readOnly && showOptOutPrompt(card.kind, optOutPhrase) && (
         <div className="card-body">

@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { EyeIcon, GenerateIcon, InfoIcon, WarningIcon } from "@/components/icons";
 import { SendSplitButton } from "@/components/send/SendSplitButton";
 import { resolveRecipientZone } from "@/lib/sendSchedule/zones";
+import { memberDraftMismatch } from "@/lib/sequences/audienceCard";
 import { draftVersion } from "@/lib/sequences/draftVersion";
 import { INITIAL_RELOAD, reloadKey, reloadReducer } from "@/lib/sequences/reviewReload";
 import type { SendChoice } from "@/lib/sequences/sendMoment";
@@ -13,6 +14,7 @@ import { reviewView, type ReviewFooterId } from "@/lib/sequences/reviewDialog";
 import type { Schedule } from "@/lib/sequences/schedule";
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnReviewAction } from "./actions";
+import { LanguageMismatchAlert, languageWord } from "./LanguageMismatch";
 import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
 
 type Props = {
@@ -70,6 +72,9 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   if (!m || !view) return null;
 
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
+  // An unapproved step 1 draft in another language than today's: the exits are in the alert, Aprobar waits (the server refuses it too).
+  const mismatch = !view.readOnly && step === 1 && view.kind === "draft" ? memberDraftMismatch(m) : null;
+  const blockedTitle = mismatch ? fill(l.languageMismatch.approveTitle, { draft: languageWord(mismatch.draft, l), now: languageWord(mismatch.now, l) }) : undefined;
   const title = [name, [m.jobTitle?.trim() || l.noTitle, m.company && `${l.headlineAt} ${m.company}`].filter(Boolean).join(" ")].join(" · ");
   const when = (d: Date) => { const w = miamiWhen(d, now); return `${w.ddmm} ${w.hhmm}`; };
   // Null for a member stopped before anything was sent: there is no cadence to show (reviewDialog.ts kindOf).
@@ -103,6 +108,8 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         labels={send.labels}
         primaryLabel={l.reviewApproveNow}
         busy={busy}
+        disabled={mismatch !== null}
+        title={blockedTitle}
         error={send.error}
         schedule={approvalSchedule(send, [{ name, zone: resolveRecipientZone(m.place ?? {}) }], "one")}
         cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => approveWith({ kind: "cadence" }) }}
@@ -110,7 +117,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         onSchedule={async (slot) => { await approveWith({ kind: "at", ...slot }); }}
       />
     ) : (
-      <button key={id} type="submit" form={formId} value={id} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy}>{id === "approve" ? l.reviewApprove : l.reviewSave}</button>
+      <button key={id} type="submit" form={formId} value={id} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy || (id === "approve" && mismatch !== null)} title={id === "approve" ? blockedTitle : undefined}>{id === "approve" ? l.reviewApprove : l.reviewSave}</button>
     );
 
   return (
@@ -124,6 +131,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
             <button type="button" className="btn btn-secondary btn-sm" disabled={pending !== null} onClick={() => { dispatch({ type: "click", key: reloadKey(m.memberId, step), marker: m }); onAction({ type: "reloadCurrent", memberId: m.memberId, step }); }}>{l.reviewStaleReload}</button>
           </div>
         )}
+        {mismatch && <LanguageMismatchAlert m={m} mismatch={mismatch} name={name} l={l} ownView={ownView} explain busy={busy} locked={regenerateLocked} onRegenerate={() => onAction({ type: "regenerate", memberId: m.memberId, step })} onKeep={() => onAction({ type: "keepLanguage", memberId: m.memberId, step })} />}
         {readOnly ? (
           <div className="alert alert-neutral"><EyeIcon className="icon" /><div>{fill(l.readOnlyDialogNotice, { owner: ownerName })}</div></div>
         ) : (
@@ -176,6 +184,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
             </div>
           </div>
         )}
+        {mismatch && <p className="help">{l.languageMismatch.dialogApproveHelp}</p>}
         {error && <span className="error-text" role="alert">{error}</span>}
       </form>
     </Dialog>

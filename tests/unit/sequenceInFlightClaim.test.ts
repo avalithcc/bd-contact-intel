@@ -16,7 +16,7 @@ const body = (() => {
 })();
 const facts = (over: Partial<PreSendFacts>): PreSendFacts => ({
   step: 1, memberState: "approved", draftApproved: true, merged: false, email: "jane@acme.test", hasClientStatus: false, address: "miami", body,
-  accountStatus: "connected", activeClaim: null, activeClaimAt: null, repliedAt: null, inboundReplyAt: null, lastSyncedAt: NOW, step1RfcMessageId: null, step1ThreadId: null, ...over,
+  accountStatus: "connected", activeClaim: null, activeClaimAt: null, repliedAt: null, inboundReplyAt: null, lastSyncedAt: NOW, step1RfcMessageId: null, step1ThreadId: null, draftLanguage: null, languageToday: null, ...over,
 });
 const ctx = { now: NOW, suppression: [] };
 const ago = (ms: number) => new Date(NOW.getTime() - ms);

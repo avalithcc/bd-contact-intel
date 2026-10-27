@@ -12,7 +12,7 @@ import type { SendChoice } from "@/lib/sequences/sendMoment";
 import { releaseToast, sendRecipients, type ReleaseToast } from "@/lib/sequences/sendUi";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
 import { optOutErrorKey } from "@/lib/sequences/contactContext";
-import { memberLanguage } from "@/lib/sequences/audienceCard";
+import { memberDraftMismatch, memberLanguage } from "@/lib/sequences/audienceCard";
 import { choiceToStore } from "@/lib/sequences/languageChoice";
 import type { AudienceLanguage } from "@/lib/sequences/complianceAudience";
 import { generationLock } from "@/lib/sequences/generationLock";
@@ -242,6 +242,16 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     return void (mode === "generate" ? generateOne(memberId) : regenerateOne(memberId));
   }
 
+  /** "Mantener en {idioma}": the draft's own language becomes this member's one-off choice (who and when are the server's), so the draft matches and approves normally. */
+  async function keepLanguage(memberId: string): Promise<boolean> {
+    const language = member(memberId)?.draft?.language;
+    const r = language ? await guarded(() => chooseDraftLanguage(memberId, language)) : undefined;
+    router.refresh();
+    if (!r?.ok || !language) { fail(l.languageChoice.saveFailed); return false; }
+    showToast(fill(l.languageMismatch.toastKept, { draft: language === "es" ? l.audience.langEs : l.audience.langEn }), "success");
+    return true;
+  }
+
   async function openReview(memberId: string, step: 1 | 2) {
     setError(null);
     // The chips are the generator's own input, read on demand: opening with an empty list would say "no signals" for a draft that had some.
@@ -264,6 +274,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       case "optOut": return setOptOutId(a.memberId);
       case "regenerate": return askLanguage(a.memberId, "regenerate");
       case "chooseLanguage": return askLanguage(a.memberId, member(a.memberId)?.draft ? "regenerate" : "generate");
+      case "keepLanguage": return void keepLanguage(a.memberId);
       case "resetLanguage": return void guarded(() => clearDraftLanguage(a.memberId)).then((r) => { if (!r) return; if (r.ok) showToast(l.languageChoice.toastReset, "success"); else fail(); router.refresh(); });
       case "approveWith": return approveWith([a.memberId], a.when, false);
       case "reschedule": return reschedule(a.memberId, a.when);
@@ -308,6 +319,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       else if (r && r.error === "stale") setStaleKey(reviewKey(a.memberId, a.step));
       return;
     }
+    if (a.type === "keepLanguage") return void (await keepLanguage(a.memberId));
     if (a.type === "reloadCurrent") {
       // The warning stays until the re-report of the refetched text answers ok (a stale answer keeps it).
       router.refresh();
@@ -390,7 +402,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       <SequenceDetailView
         detail={detail} labels={l} send={send} now={now} onAction={onAction} viewerBdId={viewerBdId} optOutPhrases={optOutPhrases}
         lock={lock} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
-        bulk={readOnly ? undefined : (g) => <BulkBar lock={g} selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} />}
+        bulk={readOnly ? undefined : (g) => <BulkBar lock={g} selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} leftOut={detail.members.filter((m) => memberDraftMismatch(m)).length} />}
       />
       <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={lock.active} error={error} stale={review !== null && staleKey === reviewKey(review.memberId, review.step)} send={{ ...send, error }} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />

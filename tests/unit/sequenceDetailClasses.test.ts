@@ -54,7 +54,7 @@ function classesInSources(): Set<string> {
 
 const NOW = new Date("2026-10-15T14:00:00Z");
 const hours = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
-const draft = (over: Partial<NonNullable<DetailMember["draft"]>> = {}) => ({ subject: "s", body: "b", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<NonNullable<DetailMember["draft"]>> = {}) => ({ subject: "s", body: "b", language: null, edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 
 // Synthetic people only: the approved mockup lists real prospects and none of them may enter the repo.
 function member(i: number, over: Partial<DetailMember>): DetailMember {

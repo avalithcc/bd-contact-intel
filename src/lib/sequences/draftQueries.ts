@@ -19,6 +19,7 @@ import { REGENERABLE_STATES } from "./detailFlow";
 import { blocksEditedOverwrite, composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult, type EditConfirmations, type SkippedEdit } from "./draftCompose";
 import { buildSequenceDraftInput, draftSignals, resolveDraftCompliance, senderIdentity } from "@/lib/sequences/draftInput";
 import { parseLanguageChoice, type DraftLanguageOverrides } from "./languageChoice";
+import { pinToStep1 } from "./languageMismatch";
 import type { AudienceLanguage } from "./complianceAudience";
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
@@ -65,6 +66,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
              ${audienceFactsSql},
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as has_reminder_draft,
+             (select d.language from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as step1_language,
              (select d.edited_at from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as draft_edited_at,
              (select d.edited_at from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as reminder_edited_at
       from sequence_member sm
@@ -78,7 +80,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   // The recorded human statements about the language, if any: this member's one-off choice and the contact's preferred language.
   // A stored value that is not es/en reads as nothing, so it can never reach the generator (resolveDraftLanguage decides).
   const overrides: DraftLanguageOverrides = { chosen: parseLanguageChoice(r.draft_language), preferred: parseLanguageChoice(r.preferred_language) };
-  return { r, audience, overrides, state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };
+  return { r, audience, overrides, step1Language: parseLanguageChoice(r.step1_language), state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };
 }
 
 /** Everything the model may see, loaded as the signed-in owner (R6: counts and shared notes only, never messages). */
@@ -118,7 +120,9 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
   const facts = await loadFacts(bdId, memberId, sequenceId);
   if (!facts || !editable.includes(facts.state)) return "skipped";
   if (reminder ? !facts.hasDraft || (mode === "missing" && facts.hasReminderDraft) : mode === "missing" && (facts.state !== "drafted" || facts.hasDraft)) return "skipped";
-  const { r, audience, overrides } = facts;
+  const { r, audience } = facts;
+  // A reminder is pinned to the language step 1 was written in, so the thread never mixes languages (unknown: the resolver decides as before).
+  const overrides = reminder ? pinToStep1(facts.overrides, facts.step1Language) : facts.overrides;
   // The address is the audience's; only the language can be a recorded human statement (draftInput.ts).
   const compliance = resolveDraftCompliance(audience, overrides);
   // Cheap early exit so a refused overwrite does not spend a model call. The authoritative check is inside the transaction below.
@@ -151,13 +155,13 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
       guard.skippedEdited.push({ memberId, editedAt: current!.editedAt!.getTime() });
       return "skipped";
     }
-    const values = { sequenceMemberId: memberId, step, ...draft };
+    const values = { sequenceMemberId: memberId, step, ...draft, language: compliance.language };
     if (mode === "missing") {
       if (!(await tx.insert(sequenceDraft).values(values).onConflictDoNothing().returning({ id: sequenceDraft.id })).length) return "skipped";
     } else {
       await tx.insert(sequenceDraft).values(values).onConflictDoUpdate({
         target: [sequenceDraft.sequenceMemberId, sequenceDraft.step],
-        set: { ...draft, generatedAt: new Date(), editedAt: null, editedByBdId: null, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null },
+        set: { ...draft, language: compliance.language, generatedAt: new Date(), editedAt: null, editedByBdId: null, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null },
       });
       await tx.insert(auditLog).values(sequenceAuditRow("regenerate", { actorBdId: bdId, personId: r.person_id as string, memberId, sequenceId, step }));
     }
@@ -180,8 +184,9 @@ export async function memberDraftSignals(bdId: string, memberId: string, step: 1
   const facts = await loadFacts(bdId, memberId);
   if (!facts) return null;
   if (!facts.audience) return [];
-  const language = resolveDraftCompliance(facts.audience, facts.overrides)!.language;
-  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first", facts.overrides);
+  const overrides = step === REMINDER_STEP ? pinToStep1(facts.overrides, facts.step1Language) : facts.overrides;
+  const language = resolveDraftCompliance(facts.audience, overrides)!.language;
+  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first", overrides);
   return input ? draftSignals(input) : [];
 }
 

@@ -13,7 +13,7 @@
  * (applyReplies.ts), which is swallowed on failure so mail sync survives. `inboundReplyAt` comes from email_message, the
  * source of truth, so a hook that failed costs nothing here: the last line of defence never depends on an optional step.
  */
-import type { ComplianceAddress } from "./complianceAudience";
+import type { AudienceLanguage, ComplianceAddress } from "./complianceAudience";
 import { complianceRefusal, extractUnsubscribeUrl } from "./complianceGate";
 import { COMPLIANCE_CONFIG, SEQUENCE_SYNC_STALE_MS, type ComplianceConfig } from "./config";
 import { isSyncFreshEnough } from "./syncFreshness";
@@ -28,6 +28,7 @@ export const HOLD_REASONS = [
   "client_company",
   "unmapped_market",
   "missing_footer",
+  "wrong_language",
   "account_not_connected",
   "replied",
   "sync_stale",
@@ -47,6 +48,9 @@ export interface PreSendFacts {
   /** The address the recipient's audience resolves to NOW; null = no audience, hold. Recomputed at send time, never stored. */
   address: ComplianceAddress | null;
   body: string;
+  /** `sequence_draft.language` of THIS step (null = unknown, never held for it) and the language to measure it against: the resolver's for step 1, step 1's own for a reminder (languageToday). */
+  draftLanguage: string | null;
+  languageToday: AudienceLanguage | null;
   accountStatus: string;
   /** Outcome of the member's non-failed claim for THIS step, if any. */
   activeClaim: "pending" | "sent" | null;
@@ -88,7 +92,7 @@ export function evaluatePreSendChecks(
   if (isSuppressed(email, ctx.suppression)) return hold("suppressed");
   if (f.hasClientStatus) return hold("client_company");
   const config = ctx.config ?? COMPLIANCE_CONFIG;
-  const refusal = complianceRefusal(f.address, f.body, config);
+  const refusal = complianceRefusal(f.address, f.body, config, { draft: f.draftLanguage, today: f.languageToday });
   if (refusal) return hold(refusal);
   if (f.accountStatus !== "connected") return hold("account_not_connected");
   if (f.step === 2) {

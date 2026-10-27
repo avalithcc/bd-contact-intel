@@ -15,7 +15,7 @@ const { ReviewDialog } = require("@/app/(app)/sequences/_components/ReviewDialog
 
 const NOW = new Date("2026-10-15T14:00:00Z");
 const hours = (h: number) => new Date(NOW.getTime() - h * 3_600_000);
-const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject 1", body: "Body 1\n\n--\nSynthetic footer", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "Subject 1", body: "Body 1\n\n--\nSynthetic footer", language: null, edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 // Synthetic person only: the approved mockup holds real prospects and none of them may enter the repo.
 const member = (over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "drafted", holdReason: null, firstName: "Test1", lastName: "Person",

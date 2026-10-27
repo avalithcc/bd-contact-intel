@@ -1891,6 +1891,9 @@ export const sequenceDraft = pgTable(
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     approvedByBdId: uuid("approved_by_bd_id").references(() => bd.id),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    // The language this draft was composed in ("es" | "en"), written at generation. NULL = unknown (every row stored before the column):
+    // never flagged as a wrong-language draft (languageMismatch.ts), and the step 2 reminder is pinned to step 1's.
+    language: text("language"),
   },
   (t) => ({
     memberStepUnique: unique("sequence_draft_member_step_unique").on(t.sequenceMemberId, t.step),
