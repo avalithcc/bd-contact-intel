@@ -2171,9 +2171,16 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   contact created from "Madrid, Spain" stores `city = "Madrid, Spain"` and no
   country, and European contacts are reachable only through their company's
   country.
-- **`tests/db/gmailFleet.test.ts:192` flakes in PARALLEL runs on `main`** (6 of 7
-  runs measured 2026-10-20). Pre-existing, unrelated to the sequences work. The
-  serial run is green. A fleet-wide count that other test files perturb.
+- ~~**`tests/db/gmailFleet.test.ts:192` flakes in PARALLEL runs on `main`**~~
+  **Fixed 2026-10-26, two causes.** (1) The global pill-vs-fleet equality at :192
+  compared two reads other files perturb; dropped in #418 (the invariant lives in
+  `tests/unit/gmailFleetAttention.test.ts`). (2) What remained, `deadlock
+  detected` in ~3 of 20 full parallel runs, was `gmailReminder.test.ts` (0048) and
+  `lushaPerBd.test.ts` (0047) running `DROP TABLE` / `ALTER TABLE "bd" DROP COLUMN`
+  on the shared `public` tables: ACCESS EXCLUSIVE locks that block or deadlock any
+  file touching `bd`. They now replay the real migration SQL in a private schema
+  (`tests/support/migrationReplay.ts`). Rule: a `tests/db` test never runs DDL on a
+  `public` table.
 - **A constants edit in `src/lib/hiring/markets.ts` is a PRODUCTION DATA
   MIGRATION.** `src/lib/hiring/sync.ts:113-130` upserts `market`, `is_miami` AND
   `is_offshore_hub` from `excluded`, so the next daily hiring sync recomputes all
@@ -2250,6 +2257,12 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   waits for the reconnection" (:452) fail intermittently on the first
   interaction after `gotoAuthed`/`page.reload()` on `/contacts/[id]` (likely a
   click before hydration). Pass when re-run. Stabilize (wait for hydration).
+  **Fixed 2026-10-26:** `clickHydrated` / `waitUntilHydrated` in
+  `tests/e2e/helpers.ts` wait for React's `__reactProps$` handler on the element
+  before the first click after a navigation or reload (`networkidle` does not
+  cover hydration; `page.reload()` waits for nothing). Predicate verified in a
+  real browser against `/login` with the JS chunks held back: false before, true
+  after. The full spec has not been re-run with a real session.
 - **Shipped 2026-10-20:** sending in-progress state + leave-page guard
   (`51098186`); email_account broadcasts only on visible changes (migration
   0058) and the contacts export link no longer prefetched (`58892fa3`, probable
