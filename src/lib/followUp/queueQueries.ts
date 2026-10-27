@@ -10,17 +10,22 @@
  * badge — see that module's doc comment) — deleted here rather than kept
  * as unused dead code.
  */
-import { and, asc, eq, exists, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, company, followUpQueueItem, person } from "@/db/schema";
 import { addDaysToDateString, argentinaCalendarDate, argentinaInstantDayWindow } from "@/lib/tasks/argentinaDate";
 import { WORKED_ACTIVITY_TYPES, workedTodayAtSql } from "@/lib/followUp/queueSelection";
 import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
-import { buildFollowUpInsertQuery } from "@/lib/followUp/candidateQuery";
+import { buildFollowUpInsertQuery, buildFollowUpReentryQuery } from "@/lib/followUp/candidateQuery";
+import { carriedOpenItemSql } from "@/lib/followUp/openCycle";
 
 export interface FollowUpQueueRow {
   id: string;
   personId: string;
+  /** The day this row was written. An earlier day than the page's means the item is carried over. */
+  queueDate: string;
+  /** The ART date the contact entered the queue in this cycle; null only for a row written before follow-up-expiry. */
+  cycleStartedOn: string | null;
   position: number;
   state: "pending" | "postponed" | "skipped";
   dueStatus: "replied" | "contacted";
@@ -95,6 +100,8 @@ export async function readQueueRows(
     .select({
       id: followUpQueueItem.id,
       personId: followUpQueueItem.personId,
+      queueDate: followUpQueueItem.queueDate,
+      cycleStartedOn: followUpQueueItem.cycleStartedOn,
       position: followUpQueueItem.position,
       state: followUpQueueItem.state,
       dueStatus: followUpQueueItem.dueStatus,
@@ -111,8 +118,12 @@ export async function readQueueRows(
     .leftJoin(company, eq(company.companyKey, person.companyKey))
     .where(
       and(
-        eq(followUpQueueItem.bdId, bdId),
-        eq(followUpQueueItem.queueDate, queueDate),
+        // Today's rows, plus every unworked item still open from an earlier day (follow-up-expiry): the Vencidos and the
+        // days 1-2 carried items. `carriedOpenItemSql` is the one definition shared with the badge and the expiry job.
+        or(
+          and(eq(followUpQueueItem.bdId, bdId), eq(followUpQueueItem.queueDate, queueDate)),
+          carriedOpenItemSql(bdId, queueDate),
+        ),
         // Defense in depth: a person queued this morning could be merged
         // away later the same day (a duplicate cleanup can run any time) —
         // merged persons are hidden from every read in this app (design
@@ -127,7 +138,8 @@ export async function readQueueRows(
 
   return rows.map((r) => ({
     ...r,
-    state: r.state as FollowUpQueueRow["state"],
+    // A carried row whose snooze has lapsed is pending again, whatever state its opening day left it in.
+    state: (r.queueDate < queueDate ? "pending" : r.state) as FollowUpQueueRow["state"],
     dueStatus: r.dueStatus as FollowUpQueueRow["dueStatus"],
     workedToday: Boolean(r.workedToday),
   }));
@@ -154,14 +166,20 @@ export async function readQueueRows(
  */
 export async function ensureTodayFollowUpQueue(bdId: string, now: Date): Promise<void> {
   const queueDate = argentinaCalendarDate(now);
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${bdId} || ':' || ${queueDate}, 0))`);
-    const existing = await tx.execute(
-      sql`select 1 from ${followUpQueueItem} where bd_id = ${bdId}::uuid and queue_date = ${queueDate}::date limit 1`,
-    );
-    if (existing.length > 0) return;
-    await tx.execute(buildFollowUpInsertQuery(bdId, queueDate));
-  });
+  await db.transaction((tx) => materializeQueueInTx(tx, bdId, queueDate));
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** `ensureTodayFollowUpQueue`'s body on a caller-owned transaction (exported so the scratch-database tests can drive any day). */
+export async function materializeQueueInTx(tx: Tx, bdId: string, queueDate: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${bdId} || ':' || ${queueDate}, 0))`);
+  const existing = await tx.execute(
+    sql`select 1 from ${followUpQueueItem} where bd_id = ${bdId}::uuid and queue_date = ${queueDate}::date limit 1`,
+  );
+  if (existing.length > 0) return;
+  await tx.execute(buildFollowUpInsertQuery(bdId, queueDate));
+  await tx.execute(buildFollowUpReentryQuery(bdId, queueDate));
 }
 
 /**

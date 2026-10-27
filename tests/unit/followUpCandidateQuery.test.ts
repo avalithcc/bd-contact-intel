@@ -17,7 +17,10 @@ import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
-import { buildFollowUpInsertQuery, buildFollowUpVerificationQuery } from "@/lib/followUp/candidateQuery";
+import { buildFollowUpInsertQuery, buildFollowUpReentryQuery, buildFollowUpVerificationQuery } from "@/lib/followUp/candidateQuery";
+import { FOLLOW_UP_DROP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
+import { FOLLOW_UP_ENTRY_DAYS } from "@/lib/followUp/cycle";
+import { carriedOpenItemSql } from "@/lib/followUp/openCycle";
 
 const dialect = new PgDialect();
 
@@ -136,4 +139,50 @@ test("fuq_activity excludes exactly the shared no-progress types from the last-t
   const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
   assert.deepEqual(bound, [...NO_PROGRESS_ACTIVITY_TYPES]);
   assert.deepEqual(bound, ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced", ...FOLLOW_UP_ACTIVITY_TYPES]);
+});
+
+// follow-up-expiry: one entry threshold for both statuses, from the exported constant (owner decision 2026-10-27).
+test("the entry rule is five days for Respondió and Contactado alike, with no per-status threshold left", () => {
+  const text = renderVerification();
+  assert.equal(text.match(/interval '5 days'/g)?.length, 1);
+  assert.doesNotMatch(text, /interval '3 days'|interval '7 days'/);
+  assert.equal(FOLLOW_UP_ENTRY_DAYS, 5);
+});
+
+test("a dropped contact and a contact with an open cycle are kept out of the new entries", () => {
+  const { sql: text, params } = dialect.sqlToQuery(buildFollowUpVerificationQuery());
+  const due = text.slice(text.indexOf("fuq_due as ("));
+  assert.match(due, /activity\.created_at > fuq_last_touch/);
+  assert.ok(FOLLOW_UP_DROP_ACTIVITY_TYPES.every((t) => params.includes(t)));
+  assert.match(due, /fuq_cycle\.cycle_started_on is not null\s+and fuq_cycle\.last_touch_at >= fuq_last_touch/);
+});
+
+test("the insert opens a cycle on its own queue date and gives the cap to days 1-2 carried items only", () => {
+  const text = renderInsert();
+  assert.match(text, /\(bd_id, queue_date, person_id, position, due_status, last_touch_at, cycle_started_on\)/);
+  assert.match(text, /fuq_selected\.fuq_last_touch, \$\d+::date\s+from/);
+  assert.match(text, /limit greatest\(\$\d+ - \(\s*select count\(\*\) from follow_up_queue_item/);
+  assert.match(text, /follow_up_queue_item\.cycle_started_on > \$\d+::date - \$\d+::int\s*\)/);
+});
+
+test("the re-entry statement fires only while the latest follow-up activity is a drop", () => {
+  const { sql: text, params } = dialect.sqlToQuery(buildFollowUpReentryQuery("00000000-0000-0000-0000-000000000001", "2026-10-27"));
+  assert.match(text, /insert into "activity" \(person_id, type, metadata\)/);
+  assert.match(text, /order by last_event\.created_at desc\s+limit 1/);
+  assert.ok(params.includes("follow_up_reentered"));
+  assert.match(text, /\) in \(\$\d+, \$\d+\)\s*$/);
+});
+
+test("the open-cycle predicate reads every table through its schema object and ends a cycle on a touch or a drop", () => {
+  const { sql: text, params } = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27"));
+  for (const table of ["person", "activity", "person_bd_connection"]) assert.match(text, new RegExp(`from "${table}"`));
+  assert.doesNotMatch(text, /from "(person|activity|person_bd_connection)" [a-z_]+\s/);
+  assert.match(text, /person_bd_connection\.last_message_at > follow_up_queue_item\.last_touch_at/);
+  assert.match(text, /activity\.created_at >= follow_up_queue_item\.created_at/);
+  for (const t of [...NO_PROGRESS_ACTIVITY_TYPES, ...FOLLOW_UP_DROP_ACTIVITY_TYPES]) assert.ok(params.includes(t), t);
+});
+
+test("the open-cycle predicate renders identically on repeated calls", () => {
+  const render = () => dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27"));
+  assert.deepEqual(render(), render());
 });

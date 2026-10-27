@@ -15,7 +15,10 @@ import { gmailAttentionCount, type GmailFleetAccountJson } from "@/lib/gmail/fle
 
 export interface AppShellBadgeCounts {
   taskCount: number;
+  /** Everything pending in Seguimientos: Vencidos plus the rest of the page (follow-up-expiry). */
   followUpCount: number;
+  /** The Vencidos alone, for the badge's accessible name. */
+  followUpOverdueCount: number;
   /** Open absorption proposals, team-wide (not per-BD). */
   absorptionCount: number;
   /** Open duplicate candidates, team-wide; always 0 for non-admins (query skipped). */
@@ -78,6 +81,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
     )) as unknown as {
       task_count: number;
       follow_up_count: number;
+      follow_up_overdue_count: number;
       absorption_count: number;
       duplicate_count: number;
       sequence_count: number;
@@ -89,7 +93,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
     }[];
     // An empty result cannot happen (scalar subqueries), but keep the old
     // `row?.` tolerance rather than throwing in the shell.
-    return r ?? { task_count: 0, follow_up_count: 0, absorption_count: 0, duplicate_count: 0, sequence_count: 0, scheduled_count: 0, meeting_pending_count: 0, queue_built: true, email_account_banner_state: null, gmail_fleet_accounts: null };
+    return r ?? { task_count: 0, follow_up_count: 0, follow_up_overdue_count: 0, absorption_count: 0, duplicate_count: 0, sequence_count: 0, scheduled_count: 0, meeting_pending_count: 0, queue_built: true, email_account_banner_state: null, gmail_fleet_accounts: null };
   };
   // F5: build today's queue on the first page of the day — see
   // readBadgeRowEnsuringQueue.ts for the rationale and the behaviour change.
@@ -114,6 +118,7 @@ export async function getAppShellBadgeCounts(bdId: string, now: Date, isAdmin = 
   return {
     taskCount: Number(row?.task_count ?? 0),
     followUpCount: Number(row?.follow_up_count ?? 0),
+    followUpOverdueCount: Number(row?.follow_up_overdue_count ?? 0),
     absorptionCount: Number(row?.absorption_count ?? 0),
     duplicateCount: Number(row?.duplicate_count ?? 0),
     sequenceCount: Number(row?.sequence_count ?? 0),
