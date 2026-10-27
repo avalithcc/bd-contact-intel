@@ -6,8 +6,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { pickContactRecordLabels } from "@/lib/contacts/labels";
 import { es } from "@/lib/i18n/dictionaries/es";
-import { buildDroppedMetadata, buildExpiredMetadata } from "@/lib/followUp/cycle";
-import { followUpEntryText, followUpPropertyText } from "@/lib/followUp/entryText";
+import { FOLLOW_UP_DROP_REASONS, buildDroppedMetadata, buildExpiredMetadata } from "@/lib/followUp/cycle";
+import { followUpEntryText, followUpPropertyText, followUpReasonLabel } from "@/lib/followUp/entryText";
 
 const l = pickContactRecordLabels(es as never);
 
@@ -62,4 +62,15 @@ test("missing or malformed metadata never prints a placeholder", () => {
   assert.ok(view && !/[{}]/.test(view.headline + view.body), view?.body);
   const dropped = followUpEntryText({ type: "follow_up_dropped", actorName: null, metadata: { reason: "ghost" } }, l);
   assert.ok(dropped && !/[{}]/.test(dropped.headline + dropped.body), dropped?.headline);
+});
+
+test("every follow-up drop reason has a Spanish label, and an unknown one shows none instead of the raw code", () => {
+  for (const reason of FOLLOW_UP_DROP_REASONS) {
+    const label = followUpReasonLabel(reason, l);
+    assert.ok(label.length > 0, reason);
+    assert.notEqual(label, reason);
+  }
+  assert.equal(followUpReasonLabel("some_future_reason", l), "");
+  assert.equal(followUpReasonLabel("constructor", l), "");
+  assert.equal(followUpReasonLabel(undefined, l), "");
 });

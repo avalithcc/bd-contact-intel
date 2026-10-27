@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { assertClientStrings } from "@/lib/i18n/clientStrings";
+import { OPT_OUT_DISCARD_REASON } from "@/lib/sequences/optOut";
 import { HOLD_REASONS } from "@/lib/sequences/preSendChecks";
 import { agoText, fill, miamiWhen } from "@/lib/sequences/viewText";
 
@@ -34,4 +35,16 @@ test("the sequences slice is client-safe and complete in both languages", () => 
     assert.deepEqual(Object.keys(d.sequences.holdReasons).sort(), [...HOLD_REASONS].sort());
   }
   assert.deepEqual(Object.keys(es.sequences).sort(), Object.keys(en.sequences).sort());
+});
+
+test("every system-written sequence discard reason has a label in both languages", () => {
+  // The codes the system itself writes to sequence_member.discard_reason: opt_out (optOut.ts), bounce (gmail/bounceQueries.ts)
+  // and merge_duplicate (sequences/mergeQueries.ts). The last two modules open the database on import, so their values are
+  // spelled out here. A BD removal reason is free text and is shown as typed.
+  for (const d of [es, en]) {
+    for (const code of [OPT_OUT_DISCARD_REASON, "bounce", "merge_duplicate"]) {
+      const label = (d.sequences.discardReasons as Record<string, string>)[code];
+      assert.ok(label && label !== code, code);
+    }
+  }
 });

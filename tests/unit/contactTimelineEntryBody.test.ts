@@ -8,7 +8,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
+import { DISCARD_REASON_CODES } from "@/lib/contacts/discard";
+import { pickContactRecordLabels } from "@/lib/contacts/labels";
 import { callWhatLabel, entryBody, type TimelineEntryForBody } from "@/lib/contacts/timelineEntryBody";
+import { es } from "@/lib/i18n/dictionaries/es";
 
 function labels(): ContactRecordLabels {
   return {
@@ -30,6 +33,12 @@ function labels(): ContactRecordLabels {
     callOutcomeVoicemail: "Left voicemail",
     callOutcomeWrongNumber: "Wrong number",
     leadStatuses: { new: "New", contacted: "Contacted", replied: "Replied", meeting: "Meeting", discarded: "Discarded" },
+    discardReasonWrongProfile: "Not the right profile",
+    discardReasonNotInterested: "Not interested",
+    discardReasonOtherVendor: "Another vendor",
+    discardReasonLeftCompany: "Left the company",
+    discardReasonBadData: "Bad data",
+    discardReasonOther: "Other",
   } as unknown as ContactRecordLabels;
 }
 
@@ -43,9 +52,9 @@ function entry(overrides: Partial<TimelineEntryForBody> = {}): TimelineEntryForB
   };
 }
 
-test("a plain 'discarded' activity shows its reason", () => {
+test("a plain 'discarded' activity shows the label of its reason, never the raw code", () => {
   const body = entryBody(entry({ type: "discarded", metadata: { reason: "wrong_profile", note: null } }), labels());
-  assert.equal(body, "wrong_profile");
+  assert.equal(body, "Not the right profile");
 });
 
 test("a status_backfill activity with status 'discarded' ALSO shows its reason, same as a plain discarded activity", () => {
@@ -53,7 +62,7 @@ test("a status_backfill activity with status 'discarded' ALSO shows its reason, 
     entry({ type: "status_backfill", metadata: { status: "discarded", reason: "wrong_profile" } }),
     labels(),
   );
-  assert.equal(body, "wrong_profile");
+  assert.equal(body, "Not the right profile");
 });
 
 test("a status_backfill activity with a non-discarded status still shows the status label prefix, unaffected", () => {
@@ -64,6 +73,45 @@ test("a status_backfill activity with a non-discarded status still shows the sta
 test("a status_backfill discarded with no reason falls back to the default discarded copy", () => {
   const body = entryBody(entry({ type: "status_backfill", metadata: { status: "discarded" } }), labels());
   assert.equal(body, "Contact discarded.");
+});
+
+// --- discard reasons render in Spanish (owner bug 2026-10-27) ---------------
+
+const LABELS_ES = pickContactRecordLabels(es as never);
+
+const DISCARD_ES: Record<string, string> = {
+  wrong_profile: "No es el perfil adecuado",
+  not_interested: "Sin interés",
+  other_vendor: "Ya trabaja con otro proveedor",
+  left_company: "Dejó la empresa",
+  bad_data: "Datos incorrectos o desactualizados",
+  other: "Otro",
+};
+
+test("every fixed discard code renders its Spanish label on a plain discarded activity", () => {
+  assert.deepEqual(Object.keys(DISCARD_ES).sort(), [...DISCARD_REASON_CODES].sort());
+  for (const code of DISCARD_REASON_CODES) {
+    const body = entryBody(entry({ type: "discarded", metadata: { reason: code, note: null } }), LABELS_ES);
+    assert.equal(body, DISCARD_ES[code], code);
+    assert.notEqual(body, code);
+  }
+});
+
+test("a HubSpot-imported discard (status_backfill) renders the same Spanish label", () => {
+  const body = entryBody(entry({ type: "status_backfill", metadata: { status: "discarded", reason: "wrong_profile" } }), LABELS_ES);
+  assert.equal(body, "No es el perfil adecuado");
+});
+
+test("the note follows the label", () => {
+  const body = entryBody(entry({ type: "discarded", metadata: { reason: "other", note: "Se jubiló" } }), LABELS_ES);
+  assert.equal(body, "Otro · Se jubiló");
+});
+
+test("an unknown discard code never renders raw: the note alone, or the neutral default", () => {
+  assert.equal(entryBody(entry({ type: "discarded", metadata: { reason: "some_future_code", note: "Se jubiló" } }), LABELS_ES), "Se jubiló");
+  const body = entryBody(entry({ type: "discarded", metadata: { reason: "some_future_code", note: null } }), LABELS_ES);
+  assert.equal(body, "Contacto descartado.");
+  assert.doesNotMatch(body, /some_future_code/);
 });
 
 // --- call activity (migration 0016) -----------------------------------------

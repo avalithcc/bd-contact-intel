@@ -4,7 +4,7 @@
  * the re-entry are dashed system cards, the same variant "Unificado a partir de N registros" uses.
  */
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
-import { formatCycleDate } from "@/lib/followUp/cycle";
+import { formatCycleDate, type FollowUpDropReason } from "@/lib/followUp/cycle";
 import {
   FOLLOW_UP_DROPPED_TYPE,
   FOLLOW_UP_EXPIRED_TYPE,
@@ -25,10 +25,10 @@ const REASON_LABEL_KEY = {
   no_response: "followUpReasonNoResponse",
   bad_contact: "followUpReasonBadContact",
   other: "followUpReasonOther",
-} as const satisfies Record<string, keyof ContactRecordLabels>;
+} as const satisfies Record<FollowUpDropReason, keyof ContactRecordLabels>;
 
 export function followUpReasonLabel(reason: unknown, l: ContactRecordLabels): string {
-  return typeof reason === "string" && reason in REASON_LABEL_KEY ? l[REASON_LABEL_KEY[reason as keyof typeof REASON_LABEL_KEY]] : "";
+  return typeof reason === "string" && Object.hasOwn(REASON_LABEL_KEY, reason) ? l[REASON_LABEL_KEY[reason as keyof typeof REASON_LABEL_KEY]] : "";
 }
 
 function statusLabel(status: unknown, l: ContactRecordLabels): string {
