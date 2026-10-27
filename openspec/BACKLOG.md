@@ -2347,7 +2347,11 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   `scripts/backfill-role-groups.ts` targets `contact` only.
 - ~~There is no lint script, and unused imports are not caught.~~ Fixed 2026-10-18: `npm run lint` (`tsc --noEmit --noUnusedLocals`, no new dependency; not wired into the Vercel build). Unused parameters are not checked.
 
-### Preferred language: nothing flags an unapproved draft written in the old language (found 2026-10-27)
+### ~~Preferred language: nothing flags an unapproved draft written in the old language (found 2026-10-27)~~ Resolved 2026-10-27 on `feat/draft-language-mismatch` (pending merge)
+**Resolved:** `sequence_draft.language` (migration 0064) is written at generation; one predicate (`wrong_language`, `src/lib/sequences/languageMismatch.ts`) refuses
+the approval (single and bulk), flags the card and the review dialog, and holds an approved-but-unsent draft at release. Exits: "Regenerar en {now}" or "Mantener en
+{draft}". Drafts stored before the column have a NULL language and are never flagged (see the open entries below). The original finding follows.
+
 After a contact's preferred language changes (`person.preferred_language`, branch `feat/preferred-language`), a step 1 draft that
 already exists and has not been approved stays in the language it was generated in, and nothing says so. Evidence from the code,
 read 2026-10-27: the approval gate is `complianceRefusal` in `src/lib/sequences/complianceGate.ts:22`, which calls `bodyHasFooter`
@@ -2358,7 +2362,11 @@ for the feature was to reuse an existing mismatch flag and not invent one; none 
 decided: compare the draft's footer language with `resolveDraftLanguage` at approval time and refuse or warn. Not measured against
 production: no query was run.
 
-### Preferred language: a step 2 reminder follows the preference at the time it is generated, not the language step 1 went out in (found 2026-10-27)
+### ~~Preferred language: a step 2 reminder follows the preference at the time it is generated, not the language step 1 went out in (found 2026-10-27)~~ Resolved 2026-10-27 on `feat/draft-language-mismatch` (pending merge)
+**Resolved:** the reminder is drafted with step 1's stored `sequence_draft.language` (`pinToStep1`), also on "Regenerar" of a reminder and for the unsubscribe page
+link, and the approval and release re-check measure it against step 1's language. Only a step 1 whose language is NULL is not pinned (open entry below).
+`tests/db/preferredLanguage.test.ts` ("PRODUCER step 2 reminder") now asserts the pin. The original finding follows.
+
 `sequence_draft` has no language column (`src/db/schema.ts`, `sequence_draft` table: subject, body, review and approval stamps
 only), so nothing records the language of step 1. The reminder is generated later through the same `loadFacts` ->
 `resolveDraftCompliance` path (`src/lib/sequences/draftQueries.ts`, `generateReminderDraft`), which reads the preference as it is
@@ -2366,6 +2374,18 @@ then. If a BD sets or changes a contact's preferred language between the step 1 
 new language after step 1 went out in the old one. Reproduced 2026-10-27 on the scratch database, `tests/db/preferredLanguage.test.ts`
 ("PRODUCER step 2 reminder"): step 1 `en`, preference set to `es`, reminder `es`. Possible fix, not decided: store the draft language on
 `sequence_draft` and have the reminder reuse step 1's. Not measured against production.
+
+### Legacy threads whose step 1 language is NULL are not pinned (found 2026-10-27)
+A member whose step 1 was written before `sequence_draft.language` existed has a NULL language, so its reminder is drafted in whatever the resolver says
+at that moment and can still switch language (country corrected, preference loaded after the send). The exposure is tiny: it needs a sent step 1 from before
+migration 0064 AND a change of language signal before its reminder. A safe partial inference exists and is not built: a Spanish opt-out sentence in step 1's body
+implies `es` (that sentence did not exist before it was translated, `complianceFooter.ts:43-47`); the English sentence proves nothing, because drafts stored
+before the translation hold it on Spanish bodies. Measured 2026-10-27: 3 of the 21 production drafts have the English sentence on a Spanish body.
+
+### The 12 live production drafts stay unflagged until each one is regenerated (found 2026-10-27)
+Measured read-only 2026-10-27 (`scripts/measure/draft-language-mismatch.ts`): 21 drafts exist, 12 can still be sent, all 12 unapproved. They were stored before
+`sequence_draft.language` existed, so their language is NULL and the wrong-language rule never flags them. Each gets its language the next time it is regenerated
+(one contact at a time). No backfill on purpose: inferring from the opt-out sentence would have flagged 2 of the 12 on day 1, both falsely.
 
 ## Deferred from crm-hubspot-ux
 
