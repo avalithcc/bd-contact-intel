@@ -294,6 +294,10 @@ the same journal. Rules:
   Read the LAST entry's `when` in `drizzle/meta/_journal.json` and compare it
   with today: `db:generate` works unaided only once the real clock has passed
   it.
+- `tests/unit/migrationJournal.test.ts` (logic in `src/lib/migration/journalGuard.ts`)
+  fails any journal entry above `LAST_APPLIED_IDX` whose `when` is not above
+  `LEDGER_MAX_WHEN`, plus idx gaps and tag/`.sql` mismatches. After a migration is
+  applied and recorded in the ledger, bump both constants.
 - Vercel does not run migrations. Apply them by hand with
   `node --env-file=.env.local node_modules/.bin/drizzle-kit migrate`.
 - Never trust the success message: verify the objects exist afterwards, e.g.
