@@ -435,6 +435,13 @@
       "when": 1794774000000,
       "tag": "0061_sequence_member_draft_language",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1794860400000,
+      "tag": "0062_follow_up_cycle_started_on",
+      "breakpoints": true
     }
   ]
 }

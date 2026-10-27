@@ -46,6 +46,10 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "lusha_reveal",
   "discarded",
   "status_backfill",
+  // follow-up-expiry: leaving and re-entering Seguimientos (rendered as Sistema rows).
+  "follow_up_dropped",
+  "follow_up_expired",
+  "follow_up_reentered",
   "task_created",
   "task_updated",
   "task_completed",

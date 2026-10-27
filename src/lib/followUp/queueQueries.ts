@@ -10,17 +10,23 @@
  * badge — see that module's doc comment) — deleted here rather than kept
  * as unused dead code.
  */
-import { and, asc, eq, exists, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activity, company, followUpQueueItem, person } from "@/db/schema";
 import { addDaysToDateString, argentinaCalendarDate, argentinaInstantDayWindow } from "@/lib/tasks/argentinaDate";
 import { WORKED_ACTIVITY_TYPES, workedTodayAtSql } from "@/lib/followUp/queueSelection";
 import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
-import { buildFollowUpInsertQuery } from "@/lib/followUp/candidateQuery";
+import { buildFollowUpInsertQuery, buildFollowUpReentryQuery } from "@/lib/followUp/candidateQuery";
+import { shouldAttemptPageBuild, type PageBuildState } from "@/lib/followUp/pageBuildBackoff";
+import { carriedOpenItemSql } from "@/lib/followUp/openCycle";
 
 export interface FollowUpQueueRow {
   id: string;
   personId: string;
+  /** The day this row was written. An earlier day than the page's means the item is carried over. */
+  queueDate: string;
+  /** The ART date the contact entered the queue in this cycle; null only for a row written before follow-up-expiry. */
+  cycleStartedOn: string | null;
   position: number;
   state: "pending" | "postponed" | "skipped";
   dueStatus: "replied" | "contacted";
@@ -95,6 +101,8 @@ export async function readQueueRows(
     .select({
       id: followUpQueueItem.id,
       personId: followUpQueueItem.personId,
+      queueDate: followUpQueueItem.queueDate,
+      cycleStartedOn: followUpQueueItem.cycleStartedOn,
       position: followUpQueueItem.position,
       state: followUpQueueItem.state,
       dueStatus: followUpQueueItem.dueStatus,
@@ -111,8 +119,12 @@ export async function readQueueRows(
     .leftJoin(company, eq(company.companyKey, person.companyKey))
     .where(
       and(
-        eq(followUpQueueItem.bdId, bdId),
-        eq(followUpQueueItem.queueDate, queueDate),
+        // Today's rows, plus every unworked item still open from an earlier day (follow-up-expiry): the Vencidos and the
+        // days 1-2 carried items. `carriedOpenItemSql` is the one definition shared with the badge and the expiry job.
+        or(
+          and(eq(followUpQueueItem.bdId, bdId), eq(followUpQueueItem.queueDate, queueDate)),
+          carriedOpenItemSql(bdId, queueDate, argentinaInstantDayWindow(now).fromUtc.toISOString()),
+        ),
         // Defense in depth: a person queued this morning could be merged
         // away later the same day (a duplicate cleanup can run any time) —
         // merged persons are hidden from every read in this app (design
@@ -127,7 +139,8 @@ export async function readQueueRows(
 
   return rows.map((r) => ({
     ...r,
-    state: r.state as FollowUpQueueRow["state"],
+    // A carried row whose snooze has lapsed is pending again, whatever state its opening day left it in.
+    state: (r.queueDate < queueDate ? "pending" : r.state) as FollowUpQueueRow["state"],
     dueStatus: r.dueStatus as FollowUpQueueRow["dueStatus"],
     workedToday: Boolean(r.workedToday),
   }));
@@ -152,16 +165,22 @@ export async function readQueueRows(
  * more than 10 rows for the day; the lock guarantees only one computation
  * ever runs.
  */
-export async function ensureTodayFollowUpQueue(bdId: string, now: Date): Promise<void> {
+export async function ensureTodayFollowUpQueue(bdId: string, now: Date, executor: Pick<typeof db, "transaction"> = db): Promise<void> {
   const queueDate = argentinaCalendarDate(now);
-  await db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${bdId} || ':' || ${queueDate}, 0))`);
-    const existing = await tx.execute(
-      sql`select 1 from ${followUpQueueItem} where bd_id = ${bdId}::uuid and queue_date = ${queueDate}::date limit 1`,
-    );
-    if (existing.length > 0) return;
-    await tx.execute(buildFollowUpInsertQuery(bdId, queueDate));
-  });
+  await executor.transaction((tx) => materializeQueueInTx(tx, bdId, queueDate));
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** `ensureTodayFollowUpQueue`'s body on a caller-owned transaction (exported so the scratch-database tests can drive any day). */
+export async function materializeQueueInTx(tx: Tx, bdId: string, queueDate: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${bdId} || ':' || ${queueDate}, 0))`);
+  const existing = await tx.execute(
+    sql`select 1 from ${followUpQueueItem} where bd_id = ${bdId}::uuid and queue_date = ${queueDate}::date limit 1`,
+  );
+  if (existing.length > 0) return;
+  await tx.execute(buildFollowUpInsertQuery(bdId, queueDate));
+  await tx.execute(buildFollowUpReentryQuery(bdId, queueDate));
 }
 
 /**
@@ -171,14 +190,36 @@ export async function ensureTodayFollowUpQueue(bdId: string, now: Date): Promise
  * `ensureTodayFollowUpQueue` (a few extra round trips, but this runs once
  * per BD per day, not once per page view) and re-reads.
  */
-export async function getFollowUpQueuePage(bdId: string, now: Date): Promise<FollowUpQueueRow[]> {
+export async function getFollowUpQueuePage(
+  bdId: string,
+  now: Date,
+  executor: Pick<typeof db, "select" | "transaction"> = db,
+): Promise<FollowUpQueueRow[]> {
   const queueDate = argentinaCalendarDate(now);
-  const rows = await readQueueRows(bdId, queueDate, now);
-  if (rows.length > 0) return rows;
-
-  await ensureTodayFollowUpQueue(bdId, now);
-  return readQueueRows(bdId, queueDate, now);
+  const rows = await readQueueRows(bdId, queueDate, now, executor);
+  // "Has today's queue been built?" asks for a row WRITTEN today. The read now also returns items carried over from earlier days
+  // (follow-up-expiry), so any non-empty read says nothing about today; a BD with only Vencidos must still get today's entries.
+  if (rows.some((r) => r.queueDate === queueDate)) return rows;
+  // A BD with nothing new due keeps `rows` free of today's date all day: build once per instance and day (like the shell badge),
+  // not on every visit, because the selection scans every person.
+  const attemptKey = `${bdId}:${queueDate}`;
+  if (!shouldAttemptPageBuild(pageBuildState.get(attemptKey), now.getTime())) return rows;
+  try {
+    await ensureTodayFollowUpQueue(bdId, now, executor);
+  } catch (err) {
+    // Same as the shell badge: a failed build must not take the page down. A later visit retries, at most once per
+    // PAGE_BUILD_RETRY_MS; logged (BD id, error class and message, no PII) so it lands in the Vercel logs.
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error(`[follow-ups] today's queue build failed for bd ${bdId}: ${detail}`);
+    pageBuildState.set(attemptKey, { status: "failed", at: now.getTime() });
+    return rows;
+  }
+  pageBuildState.set(attemptKey, { status: "built" });
+  return readQueueRows(bdId, queueDate, now, executor);
 }
+
+/** (bd, ART day) -> outcome of this server instance's last attempt to build from the page. */
+const pageBuildState = new Map<string, PageBuildState>();
 
 /**
  * "Posponer a mañana" / "Omitir hoy" (mockup README decision 5): both leave

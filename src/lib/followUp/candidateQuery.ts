@@ -3,10 +3,14 @@
  * (rule: "the selection query is one round trip"; openspec/decisions/
  * 2026-09-30-decision-brief.md "1. Follow-up cadence — decided"). This is
  * the single canonical place the eligibility/ordering rule is written down
- * and enforced: owned by the BD, not merged, `status` is `replied` (due at
- * 3+ days since the last touch) or `contacted` (due at 7+ days), last
- * touched within 12 months, ordered replied-first then most-recent-touch-
- * first, tie-broken by company name ascending, capped at `FOLLOW_UP_DAILY_CAP`.
+ * and enforced: owned by the BD, not merged, `status` is `replied` or
+ * `contacted` and 5+ days have passed since the last touch (follow-up-expiry,
+ * owner decision 2026-10-27; it used to be 3 / 7), last touched within 12
+ * months, ordered replied-first then most-recent-touch-first, tie-broken by
+ * company name ascending, capped at `FOLLOW_UP_DAILY_CAP` new entries a day.
+ * A contact already in an open cycle (carried, see openCycle.ts) or dropped
+ * since its last touch is not a new entry; the cap is reduced by the carried
+ * items still in days 1-2, and Vencidos never use it.
  * A contact whose most recent touch is a `call` activity with outcome
  * `wrong_number` is NOT eligible (launch-readiness finding F6), however old
  * that call is; any newer touch brings the contact back on its own (see
@@ -49,6 +53,9 @@ import type { CallOutcomeCode } from "@/lib/contacts/call";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
+import { FOLLOW_UP_ACTIVITY_TYPES, FOLLOW_UP_DROP_ACTIVITY_TYPES, FOLLOW_UP_REENTERED_TYPE } from "@/lib/followUp/activityTypes";
+import { FOLLOW_UP_ENTRY_DAYS } from "@/lib/followUp/cycle";
+import { EXPIRY_LOOKBACK_DAYS, carriedNormalCountSql, openCycleRowSql } from "@/lib/followUp/openCycle";
 import { FOLLOW_UP_DAILY_CAP } from "@/lib/followUp/queueSelection";
 
 /**
@@ -68,7 +75,16 @@ const WRONG_NUMBER_OUTCOME: CallOutcomeCode = "wrong_number";
 
 /** `with` body only (no leading `with` keyword) so callers can splice in
  * their own additional CTEs/final SELECT around it. */
-export function fuqCandidatesCte() {
+export interface CandidateOptions {
+  /**
+   * Skip the "open cycle" exclusion, which reads `follow_up_queue_item.cycle_started_on`. Only the read-only pre-migration
+   * measurement (scripts/measure/follow-up-expiry-day0.ts) sets it false: before the column exists there are no cycles, so
+   * the exclusion would exclude nobody. Every production caller leaves it on.
+   */
+  includeCycles?: boolean;
+}
+
+export function fuqCandidatesCte({ includeCycles = true }: CandidateOptions = {}) {
   return sql`
     fuq_activity as (
       select activity.person_id as fuq_activity_person_id,
@@ -129,10 +145,33 @@ export function fuqCandidatesCte() {
         -- timestamp with another activity excludes the contact; rare and
         -- harmless, chosen over the complexity of breaking that tie.
         and not (fuq_wrong_number_at is not null and fuq_wrong_number_at >= fuq_last_touch)
-        and (
-          (fuq_status = 'replied' and fuq_last_touch <= now() - interval '3 days')
-          or (fuq_status = 'contacted' and fuq_last_touch <= now() - interval '7 days')
+        -- follow-up-expiry: both statuses enter five days after the last touch (was replied 3 / contacted 7).
+        and fuq_last_touch <= now() - ${sql.raw(`interval '${FOLLOW_UP_ENTRY_DAYS} days'`)}
+        -- A dropped contact (by a BD or by the expiry job) stays out until a NEW touch moves fuq_last_touch past the drop.
+        and not exists (
+          select 1 from ${activity}
+          where activity.person_id = fuq_person_id
+            and activity.type in (${sql.join(
+              FOLLOW_UP_DROP_ACTIVITY_TYPES.map((t) => sql`${t}`),
+              sql`, `,
+            )})
+            and activity.created_at > fuq_last_touch
         )
+        -- A contact whose cycle is still open (the SAME predicate the page reads with, openCycle.ts) is carried, never re-added
+        -- as new, whatever moved fuq_last_touch meanwhile (a Hunter lookup does). Rows older than the expiry job's lookback
+        -- no longer block, so a job that stopped cannot strand a contact out of the queue for good.
+        ${
+          includeCycles
+            ? sql`and not exists (
+          select 1 from ${followUpQueueItem} fuq_cycle
+          where fuq_cycle.bd_id = fuq_owner_bd_id
+            and fuq_cycle.person_id = fuq_person_id
+            and fuq_cycle.cycle_started_on is not null
+            and fuq_cycle.queue_date > current_date - ${EXPIRY_LOOKBACK_DAYS}::int
+            and ${openCycleRowSql({ rowRef: "fuq_cycle" })}
+        )`
+            : sql``
+        }
     )
   `;
 }
@@ -172,9 +211,9 @@ function fuqOrderBy() {
  */
 export function buildFollowUpInsertQuery(bdId: string, queueDate: string, cap: number = FOLLOW_UP_DAILY_CAP) {
   return sql`
-    insert into ${followUpQueueItem} (bd_id, queue_date, person_id, position, due_status, last_touch_at)
+    insert into ${followUpQueueItem} (bd_id, queue_date, person_id, position, due_status, last_touch_at, cycle_started_on)
     select ${bdId}::uuid, ${queueDate}::date, fuq_selected.fuq_person_id, fuq_selected.fuq_position,
-      fuq_selected.fuq_status, fuq_selected.fuq_last_touch
+      fuq_selected.fuq_status, fuq_selected.fuq_last_touch, ${queueDate}::date
     from (
       with ${fuqCandidatesCte()}
       select fuq_person_id, fuq_status, fuq_last_touch,
@@ -189,9 +228,40 @@ export function buildFollowUpInsertQuery(bdId: string, queueDate: string, cap: n
             and fuq_prior.snoozed_until > ${queueDate}::date
         )
       order by ${fuqOrderBy()}
-      limit ${cap}
+      -- Days 1-2 carried items fill the cap; Vencidos (3+) never do.
+      limit greatest(${cap} - ${carriedNormalCountSql(bdId, queueDate)}, 0)
     ) as fuq_selected
     on conflict (bd_id, queue_date, person_id) do nothing
+  `;
+}
+
+/**
+ * follow-up-expiry: a contact that comes back after a drop gets ONE "Volvió a Seguimientos" system row, written right after the
+ * day's rows are. Idempotent by construction: it fires only while the latest follow-up activity of the person is a drop, and
+ * writing it makes the latest one a re-entry. Not a touch (activityTypes.ts), so it never restarts the cadence.
+ */
+export function buildFollowUpReentryQuery(bdId: string, queueDate: string) {
+  return sql`
+    insert into ${activity} (person_id, type, metadata)
+    select follow_up_queue_item.person_id, ${FOLLOW_UP_REENTERED_TYPE}::text,
+      jsonb_build_object('cycleStartedOn', follow_up_queue_item.cycle_started_on::text)
+    from ${followUpQueueItem}
+    where follow_up_queue_item.bd_id = ${bdId}::uuid
+      and follow_up_queue_item.queue_date = ${queueDate}::date
+      and follow_up_queue_item.cycle_started_on = ${queueDate}::date
+      and (
+        select last_event.type from ${activity} last_event
+        where last_event.person_id = follow_up_queue_item.person_id
+          and last_event.type in (${sql.join(
+            FOLLOW_UP_ACTIVITY_TYPES.map((t) => sql`${t}`),
+            sql`, `,
+          )})
+        order by last_event.created_at desc
+        limit 1
+      ) in (${sql.join(
+        FOLLOW_UP_DROP_ACTIVITY_TYPES.map((t) => sql`${t}`),
+        sql`, `,
+      )})
   `;
 }
 
@@ -209,9 +279,9 @@ export function buildFollowUpInsertQuery(bdId: string, queueDate: string, cap: n
  * postponed/skipped rows; the real materialization is always the source of
  * truth.
  */
-export function buildFollowUpVerificationQuery(cap: number = FOLLOW_UP_DAILY_CAP) {
+export function buildFollowUpVerificationQuery(cap: number = FOLLOW_UP_DAILY_CAP, options: CandidateOptions = {}) {
   return sql`
-    with ${fuqCandidatesCte()}
+    with ${fuqCandidatesCte(options)}
     select fuq_owner_bd_id as owner_bd_id, count(*)::int as eligible_count,
       least(count(*), ${cap})::int as queue_count
     from fuq_due

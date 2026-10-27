@@ -18,6 +18,7 @@ export const SESSION_EXEMPT_ROUTES: readonly string[] = [
   "/api/email/scheduled/run",
   "/api/owners/recompute",
   "/api/duplicates/rescan",
+  "/api/follow-ups/expire",
   "/api/sequences/run",
   "/api/unsubscribe",
 ];

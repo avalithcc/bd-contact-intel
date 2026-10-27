@@ -1,3 +1,5 @@
+import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
+
 /**
  * Activity types that mean "the BD tried and nothing happened": real engagement
  * (they still count as "última actividad") that must NOT count as progress.
@@ -28,4 +30,12 @@
  * queue fills with people who never answer, build a real retry cadence (back
  * in 2 days, not 7 or never); that needs attempt data, which did not exist yet.
  */
-export const NO_PROGRESS_ACTIVITY_TYPES = ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced"] as const;
+export const NO_PROGRESS_ACTIVITY_TYPES = [
+  "call_attempt",
+  "lusha_reveal",
+  "auto_reply_received",
+  "email_bounced",
+  // follow-up-expiry: a drop (by a BD or by the expiry job) or a re-entry records what happened to the contact's place in
+  // Seguimientos. If it counted as a touch the contact would be re-queued five days after being dropped.
+  ...FOLLOW_UP_ACTIVITY_TYPES,
+] as const;

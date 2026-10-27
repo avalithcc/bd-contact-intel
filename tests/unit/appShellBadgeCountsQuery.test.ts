@@ -33,6 +33,18 @@ function render(isAdmin = false) {
   );
 }
 
+// follow-up-expiry: the badge is Vencidos + the rest of the page, in the SAME single statement, and reports the Vencidos apart.
+test("buildAppShellBadgeCountsQuery: follow_up_count adds the carried items and follow_up_overdue_count counts the Vencidos, in the same statement", () => {
+  const { sql } = render();
+  assert.match(sql, /as follow_up_overdue_count/i);
+  // ONE pass over the carried items (FILTER) feeds both numbers, joined as a single-row derived table.
+  assert.match(sql, /\+ fu_carried\.fuc_total/);
+  assert.match(sql, /fu_carried\.fuc_overdue as follow_up_overdue_count/);
+  assert.match(sql, /count\(\*\) filter \(where follow_up_queue_item\.cycle_started_on <= \$\d+::date - \$\d+::int\)/);
+  assert.equal(sql.match(/fu_carried/g)?.length, 3, "defined once, read twice");
+  assert.doesNotMatch(sql.replace(/--.*$/gm, ""), /;/, "still one statement");
+});
+
 test("buildAppShellBadgeCountsQuery: selects exactly task_count and follow_up_count", () => {
   const { sql } = render();
   assert.match(sql, /as task_count/i);

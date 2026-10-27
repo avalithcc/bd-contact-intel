@@ -40,6 +40,9 @@ export interface CompanyTimelineViewLabels {
   atTaskUpdated: string;
   atTaskCompleted: string;
   atTaskReopened: string;
+  atFollowUpDropped: string;
+  atFollowUpExpired: string;
+  atFollowUpReentered: string;
   taskChangeFieldTitle: string;
   taskChangeFieldDue: string;
   taskChangeFieldAssignee: string;
@@ -118,6 +121,12 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atTaskCompleted;
     case "task_reopened":
       return l.atTaskReopened;
+    case "follow_up_dropped":
+      return l.atFollowUpDropped;
+    case "follow_up_expired":
+      return l.atFollowUpExpired;
+    case "follow_up_reentered":
+      return l.atFollowUpReentered;
     default:
       return type;
   }

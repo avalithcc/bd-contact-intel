@@ -133,6 +133,8 @@ export interface FollowUpQueueItemRow {
   lastTouchAt: Date;
   state: string; // 'pending' | 'postponed' | 'skipped'
   snoozedUntil: string | null;
+  /** follow-up-expiry: the cycle this row opened; a merge must carry it or a restored row would silently leave its cycle. */
+  cycleStartedOn: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -1061,6 +1063,7 @@ function parseFollowUpQueueItemRow(value: unknown, path: string): FollowUpQueueI
     lastTouchAt: reviveDate(row.lastTouchAt, `${path}.lastTouchAt`),
     state: row.state as string,
     snoozedUntil: typeof row.snoozedUntil === "string" ? row.snoozedUntil : null,
+    cycleStartedOn: typeof row.cycleStartedOn === "string" ? row.cycleStartedOn : null,
     createdAt: reviveDate(row.createdAt, `${path}.createdAt`),
     updatedAt: reviveDate(row.updatedAt, `${path}.updatedAt`),
   };

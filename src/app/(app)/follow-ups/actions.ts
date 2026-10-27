@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentBd } from "@/lib/queries";
+import { parseDropInput } from "@/lib/followUp/cycle";
+import { dropFollowUp } from "@/lib/followUp/dropQueries";
+import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
+import { isUuid } from "@/lib/uuid";
 import { postponeFollowUpItem, skipFollowUpItem } from "@/lib/followUp/queueQueries";
 
 /**
@@ -20,4 +24,22 @@ export async function skipFollowUpAction(itemId: string) {
   const me = await getCurrentBd();
   await skipFollowUpItem(itemId, me.id, new Date());
   revalidatePath("/follow-ups");
+}
+
+export type DropFollowUpResult = { ok: true } | { ok: false; error: "invalid_item" | "reason_required" | "detail_required" | "detail_too_long" };
+
+/**
+ * "Dar de baja del seguimiento" (follow-up-expiry). Re-validates on the server what the dialog already enforces (a uuid item id, a known
+ * reason, the detail rule, and that the item is Vencido today), then appends the `follow_up_dropped` activity; the pipeline status is untouched. A second click, or an item that was worked or dropped in
+ * the meantime, is a quiet no-op (the page refreshes either way).
+ */
+export async function dropFollowUpAction(itemId: string, reason: string, detail: string): Promise<DropFollowUpResult> {
+  const me = await getCurrentBd();
+  if (!isUuid(itemId)) return { ok: false, error: "invalid_item" };
+  const input = parseDropInput(reason, detail);
+  if (!input.ok) return input;
+  // `today` makes the server enforce "only a Vencido (day 3-9 in the queue) can be dropped", whatever the client sends.
+  await dropFollowUp({ itemId, bdId: me.id, reason: input.reason, detail: input.detail, today: argentinaCalendarDate(new Date()) });
+  revalidatePath("/follow-ups");
+  return { ok: true };
 }
