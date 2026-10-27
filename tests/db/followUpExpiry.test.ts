@@ -34,6 +34,7 @@ async function inRolledBackTransaction(body: (tx: Tx) => Promise<void>): Promise
 const NOW = new Date();
 const HOUR = 3600 * 1000;
 const ago = (days: number) => new Date(NOW.getTime() - days * 24 * HOUR - HOUR);
+const hoursAgo = (h: number) => new Date(NOW.getTime() - h * HOUR);
 
 async function today() {
   const { argentinaCalendarDate } = await import("@/lib/tasks/argentinaDate");
@@ -171,7 +172,9 @@ test("a BD drop removes the item without touching the pipeline status, and a sec
     await materialize(tx, bdId, d0);
     const [item] = await rowsFor(tx, bdId);
     const { dropFollowUp } = await import("@/lib/followUp/dropQueries");
-    const input = { itemId: item!.id, bdId, reason: "no_response" as const, detail: null };
+    const d3 = await plusDays(d0, 3);
+    assert.deepEqual(await dropFollowUp({ itemId: item!.id, bdId, reason: "no_response", detail: null, today: await plusDays(d0, 1) }, tx as never), { dropped: false }, "a day-1 item is not Vencido yet");
+    const input = { itemId: item!.id, bdId, reason: "no_response" as const, detail: null, today: d3 };
     assert.deepEqual(await dropFollowUp(input, tx as never), { dropped: true });
     assert.deepEqual(await dropFollowUp(input, tx as never), { dropped: false });
     assert.equal((await activitiesOf(tx, id, "follow_up_dropped")).length, 1);
@@ -180,8 +183,8 @@ test("a BD drop removes the item without touching the pipeline status, and a sec
     assert.deepEqual(row!.metadata, { reason: "no_response", detail: null, cycleStartedOn: d0, status: "replied" });
     const [p] = await tx.select().from(person).where(eq(person.id, id));
     assert.equal(p!.status, "replied");
-    assert.equal((await read(tx, bdId, await plusDays(d0, 1))).length, 0);
-    await materialize(tx, bdId, await plusDays(d0, 1));
+    assert.equal((await read(tx, bdId, d3)).length, 0);
+    await materialize(tx, bdId, d3);
     assert.equal((await rowsFor(tx, bdId)).length, 1);
   });
 });
@@ -194,7 +197,7 @@ test("another BD cannot drop my item", async () => {
     await materialize(tx, bdId, await today());
     const [item] = await rowsFor(tx, bdId);
     const { dropFollowUp } = await import("@/lib/followUp/dropQueries");
-    assert.deepEqual(await dropFollowUp({ itemId: item!.id, bdId: other, reason: "not_now", detail: null }, tx as never), { dropped: false });
+    assert.deepEqual(await dropFollowUp({ itemId: item!.id, bdId: other, reason: "not_now", detail: null, today: await plusDays(await today(), 3) }, tx as never), { dropped: false });
   });
 });
 
@@ -205,7 +208,7 @@ test("a new touch ends the cycle: the item leaves the page and waits five days a
     const d0 = await today();
     const id = await seedPerson(tx, bdId, "worked", "contacted", 6);
     await materialize(tx, bdId, d0);
-    await tx.insert(activity).values({ personId: id, actorBdId: bdId, type: "note", metadata: { note: "hablé" } });
+    await tx.insert(activity).values({ personId: id, actorBdId: bdId, type: "note", metadata: { note: "hablé" }, createdAt: hoursAgo(30) });
     const d1 = await plusDays(d0, 1);
     assert.equal((await read(tx, bdId, d1)).length, 0);
     await materialize(tx, bdId, d1);
@@ -283,5 +286,301 @@ test("the sidebar badge counts Vencidos plus the rest of the page, and reports t
     assert.equal(Number(counts!.follow_up_count), 5);
     assert.equal(Number(counts!.follow_up_overdue_count), 3);
     assert.equal((await read(tx, bdId, d3)).length, 5, "the page and the badge report the same number");
+  });
+});
+
+test("the record page reads the owner's latest cycle row and the derived state matches the page", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { readOwnerWithFollowUpCycle } = await import("@/lib/contacts/queries");
+    const { deriveFollowUpRecordState } = await import("@/lib/followUp/recordState");
+    const bdId = await seedBd(tx);
+    const other = await seedBd(tx);
+    const d0 = await today();
+    const id = await seedPerson(tx, bdId, "rec", "contacted", 6);
+    await materialize(tx, bdId, d0);
+    const [owner] = await readOwnerWithFollowUpCycle(tx as never, bdId, id);
+    assert.equal(owner!.name, "ZZ Expiry");
+    assert.equal(owner!.followUpCycle?.cycleStartedOn, d0);
+    const [stranger] = await readOwnerWithFollowUpCycle(tx as never, other, id);
+    assert.equal(stranger!.followUpCycle, null, "another BD's queue is not this person's cycle");
+    const cycle = { cycleStartedOn: owner!.followUpCycle!.cycleStartedOn, lastTouchAt: new Date(owner!.followUpCycle!.lastTouchAt), createdAt: new Date(owner!.followUpCycle!.createdAt) };
+    const state = deriveFollowUpRecordState({ cycle, activities: [], connectionLastMessageAt: null, today: await plusDays(d0, 3) });
+    assert.equal(state?.kind, "overdue");
+  });
+});
+
+
+// ---- review fixes -------------------------------------------------------------------------------------------------------
+
+/** A cycle opened `startedDaysAgo` Argentina days before today, still unworked; its last touch was `lastTouchDaysAgo` days ago. */
+async function seedCarried(tx: Tx, bdId: string, personId: string, startedDaysAgo: number, lastTouchDaysAgo: number) {
+  const { followUpQueueItem } = await import("@/db/schema");
+  const start = await plusDays(await today(), -startedDaysAgo);
+  const [row] = await tx
+    .insert(followUpQueueItem)
+    .values({
+      bdId,
+      personId,
+      queueDate: start,
+      cycleStartedOn: start,
+      position: 1,
+      dueStatus: "contacted",
+      lastTouchAt: ago(lastTouchDaysAgo),
+      createdAt: ago(startedDaysAgo),
+    })
+    .returning();
+  return row!;
+}
+
+async function addActivity(tx: Tx, personId: string, type: string, createdAt: Date, extra: { metadata?: Record<string, unknown>; deletedAt?: Date } = {}) {
+  const { activity } = await import("@/db/schema");
+  await tx.insert(activity).values({ personId, type, createdAt, metadata: extra.metadata ?? {}, deletedAt: extra.deletedAt ?? null });
+}
+
+async function badge(tx: Tx, bdId: string, queueDate: string) {
+  const { buildAppShellBadgeCountsQuery } = await import("@/lib/shell/appShellBadgeCountsQuery");
+  const { argentinaDayBoundaries, argentinaInstantDayWindow } = await import("@/lib/tasks/argentinaDate");
+  const w = argentinaInstantDayWindow(NOW);
+  const [counts] = (await tx.execute(
+    buildAppShellBadgeCountsQuery({
+      bdId,
+      queueDate,
+      tomorrowStartUtcIso: argentinaDayBoundaries(NOW).tomorrowStartUtc.toISOString(),
+      workedTodayFromIso: w.fromUtc.toISOString(),
+      workedTodayToIso: w.toUtc.toISOString(),
+      nowIso: NOW.toISOString(),
+    }),
+  )) as unknown as { follow_up_count: number; follow_up_overdue_count: number }[];
+  return { total: Number(counts!.follow_up_count), overdue: Number(counts!.follow_up_overdue_count) };
+}
+
+test("the page builds today's queue even when carried items already show in the read", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { getFollowUpQueuePage } = await import("@/lib/followUp/queueQueries");
+    const bdId = await seedBd(tx);
+    const carried = await seedPerson(tx, bdId, "carried", "contacted", 7);
+    await seedCarried(tx, bdId, carried, 1, 7);
+    const fresh = await seedPerson(tx, bdId, "fresh", "contacted", 6);
+    const page = await getFollowUpQueuePage(bdId, NOW, tx as never);
+    assert.deepEqual(page.map((r) => r.personId).sort(), [carried, fresh].sort());
+    const d0 = await today();
+    assert.equal((await rowsFor(tx, bdId)).filter((r) => r.queueDate === d0).length, 1, "today's row for the new contact was written");
+  });
+});
+
+test("a note that was added and then soft-deleted still closes the cycle: deleting text does not un-count work", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const bdId = await seedBd(tx);
+    const id = await seedPerson(tx, bdId, "deleted", "contacted", 7);
+    await seedCarried(tx, bdId, id, 2, 7);
+    assert.equal((await read(tx, bdId, await today())).length, 1);
+    await addActivity(tx, id, "note", hoursAgo(30), { deletedAt: hoursAgo(1) });
+    assert.equal((await read(tx, bdId, await today())).length, 0);
+  });
+});
+
+test("only the owner's worked set closes a cycle: a Hunter lookup or a status change does not, a reply does", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "hunter", "contacted", 10);
+    await seedCarried(tx, bdId, p, 4, 10);
+    await addActivity(tx, p, "hunter_lookup", hoursAgo(30));
+    await addActivity(tx, p, "status_change", hoursAgo(30), { metadata: { status: "contacted" } });
+    const page = await read(tx, bdId, d0);
+    assert.deepEqual(page.map((r) => r.personId), [p], "the Vencido keeps its clock");
+    await addActivity(tx, p, "reply_received", hoursAgo(30), { metadata: { occurredAt: hoursAgo(30).toISOString() } });
+    assert.equal((await read(tx, bdId, d0)).length, 0, "a reply closes it");
+  });
+});
+
+test("a Hunter lookup on a carried item does not let selection queue the same contact a second time", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    // Last real touch 10 days ago, cycle opened 4 days ago, Hunter lookup 6 days ago: fuq_last_touch moved and is due again.
+    const p = await seedPerson(tx, bdId, "dup", "contacted", 10);
+    await seedCarried(tx, bdId, p, 4, 10);
+    await addActivity(tx, p, "hunter_lookup", ago(6));
+    await materialize(tx, bdId, d0);
+    assert.equal((await rowsFor(tx, bdId)).filter((r) => r.personId === p).length, 1);
+  });
+});
+
+test("a carried item worked TODAY stays on the page as done, for the Hoy progress; worked yesterday it is gone", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { classifyQueueItems } = await import("@/lib/followUp/cycle");
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const normal = await seedPerson(tx, bdId, "normal", "contacted", 7);
+    const overdue = await seedPerson(tx, bdId, "overdue", "contacted", 10);
+    const gone = await seedPerson(tx, bdId, "gone", "contacted", 7);
+    await seedCarried(tx, bdId, normal, 1, 7);
+    await seedCarried(tx, bdId, overdue, 4, 10);
+    await seedCarried(tx, bdId, gone, 1, 7);
+    await addActivity(tx, normal, "note", NOW);
+    await addActivity(tx, overdue, "call", NOW, { metadata: { outcome: "connected" } });
+    await addActivity(tx, gone, "note", hoursAgo(30));
+    const page = await read(tx, bdId, d0);
+    assert.deepEqual(page.map((r) => r.personId).sort(), [normal, overdue].sort());
+    assert.ok(page.every((r) => r.workedToday && r.state === "pending"));
+    const { today: hoy, overdue: venc } = classifyQueueItems(page, d0);
+    assert.equal(hoy.length, 2, "both count in Hoy's progress");
+    assert.equal(venc.length, 0);
+    assert.deepEqual(await badge(tx, bdId, d0), { total: 0, overdue: 0 }, "the badge counts only what is still pending");
+  });
+});
+
+/** Committed fixtures for the concurrency tests (a rolled-back transaction cannot show two connections the same rows). Cleans up. */
+async function withCommittedBd(body: (ctx: { bdId: string; db: typeof import("@/db").db }) => Promise<void>) {
+  const { db } = await import("@/db");
+  const { bd, person } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const tag = Math.random().toString(36).slice(2);
+  // The expiry job is global, so a fixture left behind by an interrupted run would be counted by the next one: sweep first.
+  const { like, inArray } = await import("drizzle-orm");
+  const stale = (await db.select({ id: bd.id }).from(bd).where(like(bd.email, "zz-fc-%"))).map((r) => r.id);
+  if (stale.length) {
+    await db.delete(person).where(inArray(person.ownerBdId, stale));
+    await db.delete(bd).where(inArray(bd.id, stale));
+  }
+  const [me] = await db.insert(bd).values({ email: `zz-fc-${tag}@example.test`, name: "ZZ Concurrent" }).returning();
+  try {
+    await body({ bdId: me!.id, db });
+  } finally {
+    await db.delete(person).where(eq(person.ownerBdId, me!.id));
+    await db.delete(bd).where(eq(bd.id, me!.id));
+  }
+}
+
+test("two drops at once write one activity: the second evaluates 'open' only after it holds the row lock", async () => {
+  await withCommittedBd(async ({ bdId, db }) => {
+    const { followUpQueueItem, activity } = await import("@/db/schema");
+    const { and, eq, sql } = await import("drizzle-orm");
+    const { dropFollowUp } = await import("@/lib/followUp/dropQueries");
+    const p = await db.transaction((tx) => seedPerson(tx, bdId, "race", "contacted", 10));
+    const row = await db.transaction((tx) => seedCarried(tx, bdId, p, 4, 10));
+    const today3 = await today();
+    // A holds the row lock and drops it; B starts meanwhile and must wait for A's commit, then see the drop.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const a = db.transaction(async (tx) => {
+      await tx.execute(sql`select 1 from ${followUpQueueItem} where id = ${row.id}::uuid for update`);
+      await tx.insert(activity).values({ personId: p, actorBdId: bdId, type: "follow_up_dropped", metadata: {} });
+      await gate;
+    });
+    await new Promise((r) => setTimeout(r, 150));
+    const b = dropFollowUp({ itemId: row.id, bdId, reason: "not_now", detail: null, today: today3 });
+    await new Promise((r) => setTimeout(r, 300));
+    release();
+    await a;
+    assert.deepEqual(await b, { dropped: false });
+    const rows = await db.select().from(activity).where(and(eq(activity.personId, p), eq(activity.type, "follow_up_dropped")));
+    assert.equal(rows.length, 1);
+  });
+});
+
+test("two expiry runs at once write one activity: the second waits on the advisory lock and then finds nothing", async () => {
+  await withCommittedBd(async ({ bdId, db }) => {
+    const { activity } = await import("@/db/schema");
+    const { and, eq, sql } = await import("drizzle-orm");
+    const { EXPIRY_LOCK_KEY, expireOverdueFollowUps } = await import("@/lib/followUp/dropQueries");
+    const p = await db.transaction((tx) => seedPerson(tx, bdId, "race2", "contacted", 14));
+    await db.transaction((tx) => seedCarried(tx, bdId, p, 11, 14));
+    const day = await today();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const a = db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(${EXPIRY_LOCK_KEY})`);
+      const n = await expireOverdueFollowUps(day, tx as never);
+      await gate;
+      return n;
+    });
+    await new Promise((r) => setTimeout(r, 150));
+    const b = expireOverdueFollowUps(day, db);
+    await new Promise((r) => setTimeout(r, 300));
+    release();
+    assert.equal(await a, 1);
+    assert.equal(await b, 0);
+    const rows = await db.select().from(activity).where(and(eq(activity.personId, p), eq(activity.type, "follow_up_expired")));
+    assert.equal(rows.length, 1);
+  });
+});
+
+test("a drop cannot change the person row at all, even when the cached status disagrees with the derived one", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { person } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { dropFollowUp } = await import("@/lib/followUp/dropQueries");
+    const bdId = await seedBd(tx);
+    // Cached 'replied', but the only activity is an email we sent: recomputing would flip it to 'contacted'.
+    const id = await seedPerson(tx, bdId, "inconsistent", "replied", 10);
+    await tx.update(person).set({ status: "replied" }).where(eq(person.id, id));
+    const item = await seedCarried(tx, bdId, id, 4, 10);
+    const [before] = await tx.select().from(person).where(eq(person.id, id));
+    assert.deepEqual(await dropFollowUp({ itemId: item.id, bdId, reason: "not_now", detail: null, today: await today() }, tx as never), { dropped: true });
+    const [after] = await tx.select().from(person).where(eq(person.id, id));
+    assert.deepEqual(after, before);
+  });
+});
+
+test("a note already deleted when the row is written does not close it: no born-closed row, no daily re-queue", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "loop", "contacted", 7);
+    // Mis-filed note, deleted before the contact enters the queue. The entry clock ignores it (owner decision), so the contact is due.
+    await addActivity(tx, p, "note", hoursAgo(30), { deletedAt: hoursAgo(29) });
+    await materialize(tx, bdId, d0);
+    assert.equal((await rowsFor(tx, bdId)).length, 1);
+    const d1 = await plusDays(d0, 1);
+    assert.deepEqual((await read(tx, bdId, d1)).map((r) => r.personId), [p], "the row opened a cycle and is carried");
+    await materialize(tx, bdId, d1);
+    await materialize(tx, bdId, await plusDays(d0, 2));
+    assert.equal((await rowsFor(tx, bdId)).length, 1, "a cycle owns exactly one row: the contact is not queued again day after day");
+  });
+});
+
+test("work done and then deleted AFTER the row exists still closes the cycle, and the contact starts a new one later (entry clock ignores the note)", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "closed", "contacted", 7);
+    const first = await seedCarried(tx, bdId, p, 2, 7);
+    await addActivity(tx, p, "note", hoursAgo(30), { deletedAt: hoursAgo(1) });
+    assert.equal((await read(tx, bdId, d0)).length, 0);
+    await materialize(tx, bdId, d0);
+    const rows = (await rowsFor(tx, bdId)).filter((r) => r.personId === p);
+    assert.equal(rows.length, 2, "one closed cycle, and exactly one new row for the new one");
+    assert.ok(rows.some((r) => r.id === first.id));
+    await materialize(tx, bdId, await plusDays(d0, 1));
+    assert.equal((await rowsFor(tx, bdId)).filter((r) => r.personId === p).length, 2, "and it does not repeat");
+  });
+});
+
+test("a reply received today closes the cycle for the page, the badge and the drop alike (only BD work stays visible as done)", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { dropFollowUp } = await import("@/lib/followUp/dropQueries");
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "replied-today", "contacted", 10);
+    const item = await seedCarried(tx, bdId, p, 4, 10);
+    assert.equal((await read(tx, bdId, d0)).length, 1);
+    await addActivity(tx, p, "reply_received", NOW, { metadata: { occurredAt: NOW.toISOString() } });
+    assert.equal((await read(tx, bdId, d0)).length, 0, "the page drops it, like the badge");
+    assert.deepEqual(await badge(tx, bdId, d0), { total: 0, overdue: 0 });
+    assert.deepEqual(await dropFollowUp({ itemId: item.id, bdId, reason: "not_now", detail: null, today: d0 }, tx as never), { dropped: false });
+  });
+});
+
+test("a LinkedIn message received today also closes it for the page", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { personBdConnection } = await import("@/db/schema");
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "linkedin-today", "contacted", 10);
+    await seedCarried(tx, bdId, p, 4, 10);
+    await tx.insert(personBdConnection).values({ personId: p, bdId, lastMessageAt: NOW });
+    assert.equal((await read(tx, bdId, d0)).length, 0);
   });
 });

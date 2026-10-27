@@ -111,6 +111,18 @@ test("classifyQueueItems splits Hoy from Vencidos, orders Vencidos closest-to-dr
   );
 });
 
+test("an item worked today counts in Hoy's progress whatever its age, so a worked Vencido does not vanish from the X of N", () => {
+  const out = classifyQueueItems(
+    [
+      item({ id: "done-vencido", queueDate: "2026-10-23", cycleStartedOn: "2026-10-23", workedToday: true }),
+      item({ id: "open-vencido", queueDate: "2026-10-23", cycleStartedOn: "2026-10-23" }),
+    ],
+    "2026-10-27",
+  );
+  assert.deepEqual(out.today.map((i) => i.id), ["done-vencido"]);
+  assert.deepEqual(out.overdue.map((i) => i.id), ["open-vencido"]);
+});
+
 test("a legacy row without a cycle date is never overdue: it is today's row on its own day", () => {
   const out = classifyQueueItems([item({ id: "legacy", queueDate: "2026-10-27", cycleStartedOn: null })], "2026-10-27");
   assert.deepEqual(out.today.map((i) => i.id), ["legacy"]);

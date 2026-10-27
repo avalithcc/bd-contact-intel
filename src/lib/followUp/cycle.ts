@@ -84,13 +84,15 @@ export interface QueueItemForClassify {
   /** Null for a row written before follow-up-expiry: it belongs to no cycle and never goes overdue. */
   cycleStartedOn: string | null;
   position: number;
+  /** Worked today (any age): it stays on the page as done, counted in Hoy's progress. */
+  workedToday?: boolean;
 }
 
 export type OverdueItem<T> = T & { daysInQueue: number; daysOverdue: number; expiresOn: string };
 
 /**
  * Splits a BD's open items into "Hoy" (days 0-2: carried items first, oldest entry first, then queue position) and
- * "Vencidos" (days 3-9, closest to the automatic drop first). Day 10+ is dropped even if the nightly job has not run yet, so
+ * "Vencidos" (days 3-9, closest to the automatic drop first). An item worked today is "Hoy" whatever its age. Day 10+ is dropped even if the nightly job has not run yet, so
  * no item ever shows past its deadline. Pure: never mutates `items`.
  */
 export function classifyQueueItems<T extends QueueItemForClassify>(
@@ -102,6 +104,10 @@ export function classifyQueueItems<T extends QueueItemForClassify>(
   const hoy: T[] = [];
   const overdue: Array<OverdueItem<T>> = [];
   for (const item of items) {
+    if (item.workedToday) {
+      hoy.push(item);
+      continue;
+    }
     if (item.cycleStartedOn === null) {
       if (item.queueDate === today) hoy.push(item);
       continue;
