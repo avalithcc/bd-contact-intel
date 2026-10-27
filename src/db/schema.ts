@@ -2108,6 +2108,11 @@ export const followUpQueueItem = pgTable(
     // 'pending' | 'postponed' | 'skipped'
     state: text("state").notNull().default("pending"),
     snoozedUntil: date("snoozed_until"),
+    // follow-up-expiry: the ART calendar date this contact FIRST entered the queue in its current cadence cycle (equal to
+    // `queue_date` of the row that opened the cycle; a cycle owns exactly one row). The expiry clock counts from it:
+    // days 0-2 normal, 3-9 Vencido, 10 dropped. NULL on every row written before the feature: such a row belongs to no cycle,
+    // never goes overdue and is never carried to another day.
+    cycleStartedOn: date("cycle_started_on"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
