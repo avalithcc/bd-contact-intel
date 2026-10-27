@@ -59,10 +59,13 @@ export function resolveDraftLanguage(audienceLanguage: AudienceLanguage | null, 
 }
 
 /**
- * The "Guardar como idioma preferido" checkbox of the language dialog. `baseline` is the language without a one-off choice
- * (ResolvedDraftLanguage.baseline), so it already equals the stored preference when there is one. Null (hidden) when the selection
- * equals it: there is nothing to save. Checked by default only when nothing is stored; unchecked when saving would replace a value.
+ * The "Guardar como idioma preferido" checkbox of the language dialog. Hidden (null) only when the selection equals the STORED
+ * preference: there is nothing to save. Otherwise shown. Checked by default only when no preference is stored AND the BD changed
+ * the radio in this dialog session (`selected` differs from `opened`, the language the dialog opened with): reopening on an
+ * existing one-off, or picking the automatic language on purpose, shows it unchecked, so a plain confirm never promotes a one-off
+ * to the contact. `replaces` is true when saving would overwrite a stored value (the dialog then says so).
  */
-export function preferredCheckbox(preferred: AudienceLanguage | null, baseline: AudienceLanguage, selected: AudienceLanguage): { checked: boolean; replaces: boolean } | null {
-  return selected === baseline ? null : { checked: preferred === null, replaces: preferred !== null };
+export function preferredCheckbox(preferred: AudienceLanguage | null, selected: AudienceLanguage, opened: AudienceLanguage): { checked: boolean; replaces: boolean } | null {
+  if (selected === preferred) return null;
+  return { checked: preferred === null && selected !== opened, replaces: preferred !== null };
 }

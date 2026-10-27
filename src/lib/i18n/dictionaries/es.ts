@@ -3702,7 +3702,8 @@ export const es: typeof en = {
       holdSanctioned: "El país cargado, “{value}”, está bajo embargo, así que el correo no se manda.",
       generateDisabledTitle: "Falta saber dónde está para elegir idioma y dirección",
       // Preferred language (person.preferred_language): the language reason is split from the address reason.
-      preferredBy: "idioma preferido de {name} (cargado por {by} el {when}). Sin esa preferencia sería {resolved}.",
+      preferredBy: "idioma preferido de {name}",
+      preferredWithout: "Sin esa preferencia sería {resolved}.",
       menuPreferredInRecord: "Cambiar el idioma preferido en la ficha",
       holdPreferredNote: "Su idioma preferido es {lang}, pero el idioma no resuelve la dirección.",
     },
@@ -3744,10 +3745,10 @@ export const es: typeof en = {
       // "Guardar como idioma preferido" checkbox (preferredCheckbox in languageChoice.ts).
       savePreferred: "Guardar como idioma preferido de {name}",
       savePreferredHelp: "Se carga en su ficha, gana sobre el país y lo podés cambiar o borrar cuando quieras.",
-      savePreferredReplaces: "Hoy su idioma preferido es {lang} (cargado por {by} el {when}). Si lo guardás, lo reemplaza.",
-      changingAfterPreferred: "Queda guardado como idioma preferido de {name}: vale para todas sus secuencias, no solo para esta.",
+      savePreferredReplaces: "Hoy su idioma preferido es {lang}{stamp}. Si lo guardás, lo reemplaza.",
+      changingAfterPreferred: "Queda guardado como idioma preferido de {name} para sus secuencias, salvo donde alguien eligió un idioma solo para ese borrador.",
       badgePreferred: "idioma preferido",
-      preferredReason: "idioma preferido de {name} (cargado por {by} el {when})",
+      preferredStamp: "(cargado por {by} el {when})",
     },
     whenToday: "hoy",
     whenTomorrow: "mañana",

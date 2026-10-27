@@ -4,7 +4,13 @@
  * resolver and libphonenumber, which must never reach a client bundle (tests/unit/whatsappClientBoundary.test.ts).
  */
 import type { MemberAudience } from "./audienceView";
+import { formatArgentinaDayMonth } from "@/lib/i18n/format";
 import { resolveDraftLanguage, type ResolvedDraftLanguage } from "./languageChoice";
+
+/** Who set the preferred language and when, as the card and the dialog quote it. Null when there is no history row: they then say nothing about it rather than "cargado por ?". */
+export function preferredStamp(p: { byName: string | null; at: Date | null }): { by: string; when: string } | null {
+  return p.at ? { by: p.byName ?? "?", when: formatArgentinaDayMonth(p.at) } : null;
+}
 
 /** The language of a member's draft as the card and the dialog show it: the same resolveDraftLanguage the draft is generated with. */
 export function memberLanguage(m: { audience?: MemberAudience; languageChoice?: { language: string } | null; preferredLanguage?: { language: string } | null }): ResolvedDraftLanguage | null {

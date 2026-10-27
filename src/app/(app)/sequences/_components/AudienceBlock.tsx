@@ -2,13 +2,12 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { ChevronDownIcon, WarningIcon } from "@/components/icons";
-import { fixMenuItems, formatColleagueBreakdown, holdKind, memberLanguage } from "@/lib/sequences/audienceCard";
+import { fixMenuItems, formatColleagueBreakdown, holdKind, memberLanguage, preferredStamp } from "@/lib/sequences/audienceCard";
 import type { MemberAudience } from "@/lib/sequences/audienceView";
 import { countryNameEs, flagEmoji } from "@/lib/sequences/countryDisplay";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import { stampLabel } from "@/lib/scheduledEmail/view";
-import { formatArgentinaDayMonth } from "@/lib/i18n/format";
 import { fillStrong } from "@/lib/sequences/fillStrong";
 import type { OnAction } from "./actions";
 
@@ -101,7 +100,9 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
   const why = <AudienceWhy m={m} name={name} l={l} />;
   // The language reason and the address reason are independent: with a preference deciding, the reason names who set it and what
   // the system would have resolved without it, and the address keeps its own line (addressNote) with its own reason.
-  const preferredNote = source === "preferred" && preferred && <>{fillStrong(t.preferredBy, { name: first, by: preferred.byName ?? "?", when: preferred.at ? formatArgentinaDayMonth(preferred.at) : "", resolved: word(a.audience.language) }, ["name", "by"])}<br />{lc.addressNote} {why}</>;
+  // No "cargado por" when there is no history row to quote, and no "sin esa preferencia" when the audience would have said the same.
+  const stamp = preferred ? preferredStamp(preferred) : null;
+  const preferredNote = source === "preferred" && preferred && <>{fillStrong(t.preferredBy, { name: first }, ["name"])}{stamp && <> {fillStrong(lc.preferredStamp, stamp, ["by"])}</>}.{a.audience.language !== language && <> {fill(t.preferredWithout, { resolved: word(a.audience.language) })}</>}<br />{lc.addressNote} {why}</>;
   return (
     <div className="stack-sm" aria-label={t.label}>
       <div className="row wrap" style={{ gap: ".5rem" }}>

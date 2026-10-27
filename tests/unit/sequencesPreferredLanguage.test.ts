@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { RECOGNIZED_COUNTRIES, resolveComplianceAudience, type AudienceLanguage, type ComplianceAudience } from "@/lib/sequences/complianceAudience";
 import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
+import { preferredStamp } from "@/lib/sequences/audienceCard";
 import { buildSequenceDraftInput, resolveDraftCompliance, type SequenceDraftInputArgs } from "@/lib/sequences/draftInput";
 import { LANGUAGE_CHOICES, preferredCheckbox, resolveDraftLanguage } from "@/lib/sequences/languageChoice";
 import { unsubscribePageAudience } from "@/lib/sequences/unsubscribePageAudience";
@@ -108,18 +109,37 @@ test("PRODUCER unsubscribe page: the locale follows the same resolution as the d
   assert.equal(unsubscribePageAudience(usCompany, { chosen: "en", preferred: "es" })?.locale, "en", "a one-off choice still beats the preference");
 });
 
-test("save-as-preferred checkbox: shown only when there is something to save", () => {
-  for (const baseline of LANGUAGE_CHOICES) {
-    assert.equal(preferredCheckbox(null, baseline, baseline), null, "no preference, selection equals what the system resolved");
-    assert.equal(preferredCheckbox(baseline, baseline, baseline), null, "selection equals the stored preference");
+test("save-as-preferred checkbox: hidden only when the selection equals the STORED preference", () => {
+  for (const l of LANGUAGE_CHOICES) {
+    assert.equal(preferredCheckbox(l, l, l), null);
+    assert.equal(preferredCheckbox(l, l, other(l)), null, "even if the dialog opened on the other language");
   }
 });
 
-test("save-as-preferred checkbox: checked by default when nothing is stored, unchecked when saving would replace a stored value", () => {
-  for (const audience of LANGUAGE_CHOICES) {
-    const o = other(audience);
-    assert.deepEqual(preferredCheckbox(null, audience, o), { checked: true, replaces: false });
-    // The baseline of a contact with a stored preference IS that preference (resolveDraftLanguage), so the selection differs from it.
-    assert.deepEqual(preferredCheckbox(o, o, audience), { checked: false, replaces: true });
+test("save-as-preferred checkbox: with nothing stored it is checked only when the BD changed the radio in this session", () => {
+  for (const opened of LANGUAGE_CHOICES) {
+    assert.deepEqual(preferredCheckbox(null, other(opened), opened), { checked: true, replaces: false });
+    // Same language as the dialog opened with: shown but unchecked, so a BD can pin the automatic language on purpose.
+    assert.deepEqual(preferredCheckbox(null, opened, opened), { checked: false, replaces: false });
   }
+});
+
+test("save-as-preferred checkbox: reopening on an existing one-off does not pre-check the box, so a plain confirm promotes nothing", () => {
+  // The member already holds a one-off "es" over an automatic "en"; the dialog opens on "es" and the BD changes nothing.
+  const oneOff = resolveDraftLanguage("en", { chosen: "es" })!;
+  assert.equal(oneOff.source, "chosen");
+  assert.deepEqual(preferredCheckbox(null, oneOff.language, oneOff.language), { checked: false, replaces: false });
+});
+
+test("save-as-preferred checkbox: replacing a stored value is shown unchecked with the replace help", () => {
+  for (const stored of LANGUAGE_CHOICES) {
+    assert.deepEqual(preferredCheckbox(stored, other(stored), stored), { checked: false, replaces: true });
+    assert.deepEqual(preferredCheckbox(stored, other(stored), other(stored)), { checked: false, replaces: true }, "reopened on a one-off against a stored preference");
+  }
+});
+
+test("the 'cargado por' stamp quotes the history row, and is absent (never 'cargado por ?') when there is none", () => {
+  assert.deepEqual(preferredStamp({ byName: "Mariel Sosa", at: new Date("2026-10-27T15:00:00Z") }), { by: "Mariel Sosa", when: "27 oct" });
+  assert.deepEqual(preferredStamp({ byName: null, at: new Date("2026-10-27T15:00:00Z") }), { by: "?", when: "27 oct" }, "a BD that no longer exists");
+  assert.equal(preferredStamp({ byName: null, at: null }), null, "a preference with no history row (set by SQL or an import)");
 });

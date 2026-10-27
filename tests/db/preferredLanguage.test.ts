@@ -1,8 +1,10 @@
 /**
  * DB-backed test for person.preferred_language, through the real write and read paths: the property edit (value, actor and
- * history row), the three producers of the draft language (the generator input and the footer it is composed with, the Sequence
- * detail the card reads, the unsubscribe page), the dialog's "save as preferred" write, and the two things it must never do:
- * move the legal address or unblock a held contact. The model is replaced by an injected generator. Scratch database only
+ * history row), the producers of the draft language that can be observed (the generator input and the footer it is composed with,
+ * for step 1, a regeneration and the step 2 reminder; the Sequence detail the card reads; the unsubscribe page), the dialog's
+ * "save as preferred" write, and the two things it must never do: move the legal address or unblock a held contact.
+ * Not covered here: memberDraftSignals, which shares loadFacts and resolveDraftCompliance with the draft but returns signals that
+ * do not depend on the language, so no assertion could tell it apart. The model is replaced by an injected generator. Scratch database only
  * (`npm run test:db` with DATABASE_URL on a local `_e2e` database); every row is created under a per-run token and removed after.
  */
 import assert from "node:assert/strict";
@@ -17,6 +19,7 @@ const key = (name: string) => `zz-${run}-${name}`;
 let bdId: string;
 let otherBdId: string;
 let sequenceId: string;
+let accountId: string;
 const personIds: string[] = [];
 
 type Input = { language: string; contact: { firstName: string | null } };
@@ -74,6 +77,7 @@ before(async () => {
   bdId = a.id;
   otherBdId = b.id;
   const [acc] = await db.insert(emailAccount).values({ bdId, emailAddress: `zz-pref-sender-${run}@example.test` }).returning();
+  accountId = acc.id;
   const [s] = await db.insert(sequence).values({ name: key("seq"), ownerBdId: bdId, emailAccountId: acc.id, schedule: {} }).returning();
   sequenceId = s.id;
 });
@@ -139,17 +143,32 @@ test("PRODUCER draft: a US contact with español preferred is drafted in Spanish
   assert.ok(body.includes(OPT_OUT_TEXT.es) && !body.includes(OPT_OUT_TEXT.en), "the opt-out sentence follows the draft language");
 });
 
-test("PRODUCER draft: a one-off choice on the member beats the preference, and regenerating reuses it", async () => {
+/** A second Sequence of the same owner holding the same person: the one-off lives on the member, the preference on the person. */
+async function mkOtherMembership(personId: string) {
+  const { db } = await import("@/db");
+  const { sequence, sequenceMember } = await import("@/db/schema");
+  const [s] = await db.insert(sequence).values({ name: key("seq2"), ownerBdId: bdId, emailAccountId: accountId, schedule: {} }).returning();
+  const [m] = await db.insert(sequenceMember).values({ sequenceId: s.id, personId, state: "drafted" }).returning();
+  return { sequenceId: s.id, memberId: m.id };
+}
+
+test("PRODUCER draft: a one-off choice beats the preference for that member only, and regenerating reuses it", async () => {
   const { generateMemberDraft, regenerateDrafts, setMemberDraftLanguage } = await import("@/lib/sequences/draftQueries");
   const m = await mkMember("oneoff", { preferred: "es" });
+  const elsewhere = await mkOtherMembership(m.personId);
   assert.deepEqual(await setMemberDraftLanguage(bdId, m.memberId, "en"), { ok: true });
   calls.length = 0;
   await generateMemberDraft(bdId, sequenceId, m.memberId, deps);
   await regenerateDrafts(bdId, sequenceId, [m.memberId], deps);
   assert.deepEqual(languagesFor("oneoff"), ["en", "en"]);
+  // The same person in another Sequence has no one-off there, so the preference applies to that draft.
+  calls.length = 0;
+  await generateMemberDraft(bdId, elsewhere.sequenceId, elsewhere.memberId, deps);
+  assert.deepEqual(languagesFor("oneoff"), ["es"]);
+  calls.length = 0;
   await setMemberDraftLanguage(bdId, m.memberId, null);
   await regenerateDrafts(bdId, sequenceId, [m.memberId], deps);
-  assert.deepEqual(languagesFor("oneoff"), ["en", "en", "es"], "clearing the one-off falls back to the preference");
+  assert.deepEqual(languagesFor("oneoff"), ["es"], "clearing the one-off falls back to the preference");
 });
 
 test("SAFETY: a preferred language never unblocks a held contact", async () => {
@@ -171,12 +190,14 @@ test("PRODUCER Sequence detail: the card reads the preference with who set it an
   const { memberLanguage } = await import("@/lib/sequences/audienceCard");
   const auto = await mkMember("cardauto");
   const set = await mkMember("cardset");
+  const unstamped = await mkMember("cardunstamped", { preferred: "en" }); // set by SQL or an import: no history row
   await updateContactProperty(set.personId, "preferredLanguage", "es", bdId);
   const detail = await getSequenceDetail({ id: bdId, role: "bd" }, sequenceId);
   const byId = new Map(detail!.members.map((m) => [m.memberId, m]));
   const a = byId.get(auto.memberId)!;
   const s = byId.get(set.memberId)!;
   assert.equal(a.preferredLanguage, null);
+  assert.deepEqual(byId.get(unstamped.memberId)!.preferredLanguage, { language: "en", byName: null, at: null }, "no history row: nobody and no date to quote");
   assert.equal(memberLanguage(a)!.source, "audience");
   assert.equal(s.preferredLanguage?.language, "es");
   assert.equal(s.preferredLanguage?.byName, "ZZ Preferrer");
@@ -222,4 +243,22 @@ test("changing the preference leaves an existing draft exactly as it was", async
   await setMemberPreferredLanguage(bdId, m.memberId, "es");
   assert.deepEqual(await draftOf(m.memberId), before);
   assert.equal(calls.length, 0);
+});
+
+test("PRODUCER step 2 reminder: written in the preference as it stands when it is generated, with the Spanish opt-out sentence", async () => {
+  const { db } = await import("@/db");
+  const { sequenceDraft, sequenceMember } = await import("@/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+  const { generateMemberDraft, generateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const { updateContactProperty } = await import("@/lib/contacts/propertyEditDb");
+  const { OPT_OUT_TEXT } = await import("@/lib/sequences/config");
+  const m = await mkMember("reminder");
+  calls.length = 0;
+  await generateMemberDraft(bdId, sequenceId, m.memberId, deps);
+  await db.update(sequenceMember).set({ state: "sent" }).where(eq(sequenceMember.id, m.memberId));
+  await updateContactProperty(m.personId, "preferredLanguage", "es", bdId);
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m.memberId, deps), "generated");
+  assert.deepEqual(languagesFor("reminder"), ["en", "es"], "step 1 went out in the audience's language, the reminder follows the new preference");
+  const [reminder] = await db.select().from(sequenceDraft).where(and(eq(sequenceDraft.sequenceMemberId, m.memberId), eq(sequenceDraft.step, 2)));
+  assert.ok(reminder.body.includes(OPT_OUT_TEXT.es) && !reminder.body.includes(OPT_OUT_TEXT.en));
 });

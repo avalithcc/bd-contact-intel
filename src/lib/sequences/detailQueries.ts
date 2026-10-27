@@ -106,8 +106,8 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
     select s.id::text as sid, s.name, s.owner_bd_id::text as owner_id, ob.name as owner_name, s.schedule, s.daily_send_cap, ea.email_address, used.n as sent_today,
            sm.id::text as member_id, sm.person_id::text as person_id, sm.state, sm.hold_reason, sm.sent_at, sm.replied_at, sm.reminder_due_at,
            sm.discarded_at, sm.discard_reason, sm.discarded_by_bd_id::text as discarded_by_bd_id, sm.draft_language, sm.draft_language_at, lb.name as draft_language_by_name, p.preferred_language,
-           case when p.preferred_language is not null then (select json_build_object('by', pb.name, 'at', h.at) from person_property_history h left join bd pb on pb.id = h.changed_by_bd_id
-             where h.person_id = sm.person_id and h.property = 'preferredLanguage' order by h.at desc limit 1) end as preferred_language_edit,
+           case when p.preferred_language is not null then (select json_build_object('by', pb.name, 'at', pph.at) from person_property_history pph left join bd pb on pb.id = pph.changed_by_bd_id
+             where pph.person_id = sm.person_id and pph.property = 'preferredLanguage' order by pph.at desc limit 1) end as preferred_language_edit,
            p.first_name, p.last_name, p.job_title, ${companyNameColumnsSql}, p.company_key, p.email, p.email_status = 'verified' as verified, p.role_group, p.city, p.region, p.country, cn.country as company_country,
            p.mobile_phone, p.phone, ${companyCountrySql} as audience_company_country, ${postingMarketsSql} as posting_markets, ${rosterCountriesSql} as roster_countries,
            coalesce(h.open_it, 0)::int as open_it, coalesce(h.is_florida, false) as is_florida,

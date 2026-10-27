@@ -121,6 +121,18 @@ test("a dry run reports the split and the address per person and writes nothing"
   assert.deepEqual(lang.brazil, ["miami", "en"], "Brazil is English under the Miami address (it was Spanish under the old LATAM market)");
 });
 
+test("a dry run prints the language the draft will really use: the contact's preferred language over the audience's, the address unchanged", async () => {
+  const { db } = await import("@/db");
+  const { person } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const id = await mkPerson("prefspanish");
+  const entry = roster.pop()!; // keep the shared roster the other tests count on
+  await db.update(person).set({ preferredLanguage: "es" }).where(eq(person.id, id));
+  const r = await seed(false, [entry]);
+  const line = r.plan.lines.find((l) => l.candidate.label.startsWith("prefspanish"));
+  assert.deepEqual([line?.address, line?.language], ["miami", "es"], "a US contact preferring Spanish: Spanish draft under the Miami address");
+});
+
 test("apply seeds the survivors as drafted, never approved or sent, with one audit row", async () => {
   const { db } = await import("@/db");
   const { sequence, sequenceDraft, sequenceMember } = await import("@/db/schema");

@@ -4,12 +4,11 @@ import { useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { GenerateIcon, InfoIcon, WarningIcon } from "@/components/icons";
 import { flagEmoji } from "@/lib/sequences/countryDisplay";
-import { memberLanguage } from "@/lib/sequences/audienceCard";
+import { memberLanguage, preferredStamp } from "@/lib/sequences/audienceCard";
 import { buildFooter } from "@/lib/sequences/complianceFooter";
 import { COMPLIANCE_CONFIG } from "@/lib/sequences/config";
 import type { AudienceLanguage } from "@/lib/sequences/complianceAudience";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
-import { formatArgentinaDayMonth } from "@/lib/i18n/format";
 import { fillStrong } from "@/lib/sequences/fillStrong";
 import { preferredCheckbox } from "@/lib/sequences/languageChoice";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
@@ -22,8 +21,8 @@ const FLAG: Record<AudienceLanguage, string> = { es: "AR", en: "US" };
  * preselected with its reason; the BD confirms or overrides. Only the language is a control. The postal address is shown as
  * fixed (it comes from where the recipient is, CAN-SPAM), and the footer preview is built by the same buildFooter the draft
  * uses, from the same config, so it cannot drift from what is sent. A HOLD never reaches this dialog (no audience, no draft).
- * With a preferred language on the contact, THAT is the preselected "resolved" language and its reason names who set it. When the
- * selection differs from it, a checkbox offers to save the selection as the contact's preferred language (preferredCheckbox).
+ * With a preferred language on the contact, THAT is the preselected "resolved" language and its reason names who set it. Unless the
+ * selection equals the stored preference, a checkbox offers to save it as the contact's preferred language (preferredCheckbox).
  */
 export function LanguageChoiceDialog({ member: m, name, mode, labels: l, busy, locked, error, onCancel, onConfirm }: { member: DetailMember; name: string; mode: "generate" | "regenerate"; labels: SequenceLabels; busy: boolean; locked: boolean; error: string | null; onCancel: () => void; onConfirm: (language: AudienceLanguage, saveAsPreferred: boolean) => void }) {
   const resolved = m.audience!.audience!;
@@ -31,9 +30,11 @@ export function LanguageChoiceDialog({ member: m, name, mode, labels: l, busy, l
   const baseline = current.baseline;
   const preferred = m.preferredLanguage ?? null;
   const [selected, setSelected] = useState<AudienceLanguage>(current.language);
+  // The BD's explicit tick/untick; changing the radio forgets it, so the default is derived from the selection again.
   const [saveChoice, setSaveChoice] = useState<boolean | null>(null);
-  const box = preferredCheckbox(preferred?.language ?? null, baseline, selected);
+  const box = preferredCheckbox(preferred?.language ?? null, selected, current.language);
   const save = box !== null && (saveChoice ?? box.checked);
+  const stamp = preferred ? preferredStamp(preferred) : null;
   const t = l.audience;
   const lc = l.languageChoice;
   const first = m.firstName?.trim() || name;
@@ -43,7 +44,7 @@ export function LanguageChoiceDialog({ member: m, name, mode, labels: l, busy, l
   const footer = buildFooter(COMPLIANCE_CONFIG, resolved.address, selected, selected === "es" ? lc.linkEs : lc.linkEn);
   const footerLines = footer.status === "ok" ? footer.text.split("\n").filter(Boolean) : [];
   const option = (lang: AudienceLanguage) => (
-    <label className="check"><input type="radio" name="draft-language" value={lang} checked={selected === lang} onChange={() => setSelected(lang)} />{" "}
+    <label className="check"><input type="radio" name="draft-language" value={lang} checked={selected === lang} onChange={() => { setSelected(lang); setSaveChoice(null); }} />{" "}
       <span className={lang !== baseline && baseline === "en" && current.baselineSource === "audience" && selected !== lang ? "meta" : undefined}><span aria-hidden="true">{flagEmoji(FLAG[lang])}</span> {word(lang)}</span>
       {lang === baseline
         ? <span className={`badge ${selected === lang ? "badge-success" : "badge-outline"}`}>{current.baselineSource === "preferred" ? lc.badgePreferred : selected === lang && lang === "en" ? lc.badgeRecommended : lc.badgeResolved}</span>
@@ -53,7 +54,7 @@ export function LanguageChoiceDialog({ member: m, name, mode, labels: l, busy, l
   // Same `label.check` markup as the radios above (approved mockup), built outside the Dialog JSX like them.
   const saveBox = box && (
     <div className="field"><label className="check"><input type="checkbox" checked={save} onChange={(e) => setSaveChoice(e.target.checked)} /> <span>{fill(lc.savePreferred, { name: first })}</span></label>
-      <span className="help">{box.replaces && preferred ? fill(lc.savePreferredReplaces, { lang: word(preferred.language), by: preferred.byName ?? "?", when: preferred.at ? formatArgentinaDayMonth(preferred.at) : "" }) : lc.savePreferredHelp}</span></div>
+      <span className="help">{box.replaces && preferred ? fill(lc.savePreferredReplaces, { lang: word(preferred.language), stamp: stamp ? ` ${fill(lc.preferredStamp, stamp)}` : "" }) : lc.savePreferredHelp}</span></div>
   );
   return (
     <Dialog open onClose={onCancel} icon={<GenerateIcon className="icon" />} closeDisabled={busy} title={fill(mode === "generate" ? lc.title : lc.titleRegen, { name })}
@@ -65,7 +66,7 @@ export function LanguageChoiceDialog({ member: m, name, mode, labels: l, busy, l
         <fieldset className="field fieldset"><legend className="label">{lc.legend}</legend>
           <div className="stack-sm">
             {option(baseline)}
-            <div className="meta">↳ {preferred && current.baselineSource === "preferred" ? fillStrong(lc.preferredReason, { name: first, by: preferred.byName ?? "?", when: preferred.at ? formatArgentinaDayMonth(preferred.at) : "" }, ["name", "by"]) : <AudienceWhy m={m} name={name} l={l} />}</div>
+            <div className="meta">↳ {preferred && current.baselineSource === "preferred" ? <>{fillStrong(t.preferredBy, { name: first }, ["name"])}{stamp && <> {fillStrong(lc.preferredStamp, stamp, ["by"])}</>}</> : <AudienceWhy m={m} name={name} l={l} />}</div>
             {option(other)}
             {baseline === "en" && current.baselineSource === "audience" && selected === "en" && <div className="alert alert-warn" style={{ padding: "var(--space-sm) var(--space-md)" }}><WarningIcon className="icon" /><div>{fill(lc.warnEs, { name: first })}</div></div>}
           </div>
