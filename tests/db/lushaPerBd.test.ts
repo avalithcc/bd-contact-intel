@@ -51,13 +51,16 @@ test("a BD created without saying anything starts with Lusha disabled", async ()
 test("migration 0047 enables every BD that exists and leaves later ones disabled; a rerun changes nothing", async () => {
   const { db } = await import("@/db");
   const { sql } = await import("drizzle-orm");
-  const statements = readFileSync(join(__dirname, "..", "..", "drizzle", "0047_bd_lusha_enabled.sql"), "utf8").split("--> statement-breakpoint");
+  const { createIsolatedBd, migrationStatements } = await import("../support/migrationReplay");
+  const schema = `mig0047_${run}`;
+  const statements = migrationStatements(readFileSync(join(__dirname, "..", "..", "drizzle", "0047_bd_lusha_enabled.sql"), "utf8"), schema);
   const ROLLBACK = new Error("rollback");
   const seen: Record<string, unknown> = {};
   await db
     .transaction(async (tx) => {
-      await tx.execute(sql.raw(`ALTER TABLE "bd" DROP COLUMN "lusha_enabled"`)); // the world before 0047
+      await createIsolatedBd(tx, schema); // the world before 0047, in a private schema: DDL on the shared `bd` would lock out the other files
       await tx.execute(sql`insert into bd (name, email) values ('old', ${`zz-old-${run}@example.test`})`);
+      await tx.execute(sql`insert into bd (name, email) values ('existing', ${`zz-ana-${run}@example.test`})`); // a BD that exists when 0047 first runs
       for (const s of statements) await tx.execute(sql.raw(s));
       await tx.execute(sql`insert into bd (name, email) values ('new', ${`zz-new-${run}@example.test`})`);
       await tx.execute(sql`update bd set lusha_enabled = false where email = ${`zz-old-${run}@example.test`}`); // an admin switches the old one off

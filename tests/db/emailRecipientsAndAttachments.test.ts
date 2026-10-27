@@ -37,10 +37,14 @@ async function mkAlias(aliasKey: string, companyKey: string) {
   await db.insert(companyAlias).values({ aliasKey, companyKey });
   aliasKeys.push(aliasKey);
 }
+// Several tests create persons labelled "a", "b", "c" under the same run token. With a label-only address they all shared one
+// email, the sent-mail matcher (getKnownPersonsForAddresses, no ORDER BY) returned whichever twin Postgres produced first, and the
+// "every Para contact is linked" test failed about 1 run in 15 even alone. The sequence number makes every address unique.
+let personSeq = 0;
 async function mkPerson(label: string, over: Record<string, unknown> = {}) {
   const { db } = await import("@/db");
   const { person } = await import("@/db/schema");
-  const email = `${label}-${run}@prospect.test`;
+  const email = `${label}-${run}-${++personSeq}@prospect.test`;
   const [p] = await db.insert(person).values({ firstName: label, lastName: run, email, emailNormalized: email, ...over }).returning();
   personIds.push(p!.id);
   return p!;

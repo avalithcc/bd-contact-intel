@@ -1,6 +1,6 @@
 import { type Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { gotoAuthed, skipUnlessWritesAllowed, skipWithoutCredentials } from './helpers';
+import { clickHydrated, gotoAuthed, skipUnlessWritesAllowed, skipWithoutCredentials } from './helpers';
 import { e2eBdEmail, ensureBd, ensureEmailAccount, openScratchDb, runTag, type ScratchSql } from './scratchDb';
 import { es } from '../../src/lib/i18n/dictionaries/es';
 
@@ -98,7 +98,7 @@ test.beforeEach(async () => {
 
 async function openComposer(page: Page, personId: string) {
   await gotoAuthed(page, `/contacts/${personId}`);
-  await page.locator('.quick-actions').getByRole('button', { name: L.quickActionEmail, exact: true }).click();
+  await clickHydrated(page.locator('.quick-actions').getByRole('button', { name: L.quickActionEmail, exact: true }));
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   return dialog;
@@ -359,7 +359,7 @@ test.describe('Scheduled send: the contact timeline card (edit, cancel, lock)', 
   test('"Editar" reopens the scheduling dialog loaded with the row; saving updates it in place', async ({ page }) => {
     const id = await seedScheduled(withEmail.id, { inMs: 3 * HOUR, subject: `Antes ${tag}`, body: 'Texto original.' });
     await gotoAuthed(page, `/contacts/${withEmail.id}`);
-    await timelineCard(page, `Antes ${tag}`).getByRole('button', { name: L.schedActionEdit, exact: true }).click();
+    await clickHydrated(timelineCard(page, `Antes ${tag}`).getByRole('button', { name: L.schedActionEdit, exact: true }));
     const dialog = page.getByRole('dialog', { name: new RegExp(`${L.scheduleEditTitle} ${withEmail.name}`) });
     await expect(dialog.getByLabel(L.emailSubjectLabel)).toHaveValue(`Antes ${tag}`);
     await expect(dialog.getByLabel(L.emailBodyLabel)).toHaveValue('Texto original.');
@@ -384,7 +384,7 @@ test.describe('Scheduled send: the contact timeline card (edit, cancel, lock)', 
   test('a time past 30 days keeps the edit dialog open with the hint', async ({ page }) => {
     const id = await seedScheduled(withEmail.id, { inMs: 3 * HOUR, subject: `Lejos ${tag}` });
     await gotoAuthed(page, `/contacts/${withEmail.id}`);
-    await timelineCard(page, `Lejos ${tag}`).getByRole('button', { name: L.schedActionChangeTime, exact: true }).click();
+    await clickHydrated(timelineCard(page, `Lejos ${tag}`).getByRole('button', { name: L.schedActionChangeTime, exact: true }));
     const dialog = page.getByRole('dialog', { name: new RegExp(L.scheduleEditTitle) });
     await setWhen(dialog, Date.now() + 31 * DAY);
     await expect(dialog.getByText(L.errorScheduleTooFar)).toBeVisible();
@@ -396,7 +396,7 @@ test.describe('Scheduled send: the contact timeline card (edit, cancel, lock)', 
     const id = await seedScheduled(withEmail.id, { inMs: 3 * HOUR, subject: `Cancelar ${tag}` });
     await gotoAuthed(page, `/contacts/${withEmail.id}`);
     const card = timelineCard(page, `Cancelar ${tag}`);
-    await card.getByRole('button', { name: L.schedActionCancel, exact: true }).click();
+    await clickHydrated(card.getByRole('button', { name: L.schedActionCancel, exact: true }));
     const dialog = page.getByRole('dialog', { name: L.schedCancelTitle });
     await expect(dialog).toContainText(`Cancelar ${tag}`);
     await dialog.getByRole('button', { name: L.schedCancelKeep, exact: true }).click();
@@ -441,7 +441,7 @@ test.describe('Scheduled send: the contact timeline card (edit, cancel, lock)', 
     await expect(card.locator('.tl-body')).toContainText(L.schedHoldBodyAfter);
     await expect(card.getByRole('button', { name: L.schedActionEdit, exact: true })).toBeVisible();
 
-    await card.getByRole('button', { name: L.schedActionSendAnyway, exact: true }).click();
+    await clickHydrated(card.getByRole('button', { name: L.schedActionSendAnyway, exact: true }));
     await expect(page.locator('#toast-region')).toContainText(L.toastScheduleSendNow);
     const row = await rowOf(id);
     expect(row.status).toBe('scheduled');
@@ -463,7 +463,7 @@ test.describe('Scheduled send: the contact timeline card (edit, cancel, lock)', 
     await page.reload();
     const again = timelineCard(page, `Caido ${tag}`);
     await expect(again.getByRole('button', { name: L.schedActionSendNow, exact: true })).toBeEnabled();
-    await again.getByRole('button', { name: L.schedActionReschedule, exact: true }).click();
+    await clickHydrated(again.getByRole('button', { name: L.schedActionReschedule, exact: true }));
     const dialog = page.getByRole('dialog', { name: new RegExp(L.scheduleEditTitle) });
     await expect(dialog.getByText(L.scheduleTooSoonHint)).toBeVisible(); // its old time has passed: a new one is required
     await setWhen(dialog, Date.now() + 2 * HOUR);
@@ -480,7 +480,7 @@ test.describe('Scheduled send: the contact timeline card (edit, cancel, lock)', 
     const doubtful = timelineCard(page, `Dudoso ${tag}`);
     await expect(doubtful.locator('.badge')).toHaveText(L.schedFailedUnconfirmed);
     await expect(doubtful.locator('.tl-body')).toContainText(L.schedFailedBodyUnconfirmed);
-    await doubtful.getByRole('button', { name: L.schedActionSendNow, exact: true }).click();
+    await clickHydrated(doubtful.getByRole('button', { name: L.schedActionSendNow, exact: true }));
     const dialog = page.getByRole('dialog', { name: L.schedConfirmTitle });
     await expect(dialog).toContainText(L.schedConfirmBody);
     await dialog.getByRole('button', { name: L.cancel, exact: true }).click();
@@ -575,7 +575,7 @@ test.describe('Scheduled send: the "Programados" screen', () => {
     await gotoAuthed(page, '/scheduled');
     const menuFor = async (subject: string) => {
       const row = page.locator('table.data tbody tr').filter({ hasText: subject });
-      await row.getByRole('button', { name: `${L.schedMoreActions} ${withEmail.name}` }).click();
+      await clickHydrated(row.getByRole('button', { name: `${L.schedMoreActions} ${withEmail.name}` }));
       return page.getByRole('menu').getByRole('menuitem');
     };
     await expect(await menuFor(`M1 ${tag}`)).toHaveText([L.schedActionEdit, L.schedActionChangeTime, L.schedActionSendNow, L.schedActionCancel]);
@@ -594,7 +594,7 @@ test.describe('Scheduled send: the "Programados" screen', () => {
     await expect(banner.getByRole('link', { name: L.schedReconnect })).toHaveAttribute('href', '/account/email');
     await expect(banner.getByRole('link', { name: L.schedBannerWhat })).toHaveAttribute('href', `/contacts/${withEmail.id}#scheduled-emails`);
     const row = page.locator('table.data tbody tr').filter({ hasText: `Banner ${tag}` });
-    await row.getByRole('button', { name: `${L.schedMoreActions} ${withEmail.name}` }).click();
+    await clickHydrated(row.getByRole('button', { name: `${L.schedMoreActions} ${withEmail.name}` }));
     await expect(page.getByRole('menuitem', { name: L.schedActionSendNow, exact: true })).toBeDisabled();
   });
 
@@ -602,7 +602,7 @@ test.describe('Scheduled send: the "Programados" screen', () => {
     const id = await seedScheduled(withEmail.id, { inMs: 3 * HOUR, subject: `Lista ${tag}` });
     await gotoAuthed(page, '/scheduled');
     const row = () => page.locator('table.data tbody tr').filter({ hasText: `Lista ${tag}` });
-    const openMenu = () => row().getByRole('button', { name: `${L.schedMoreActions} ${withEmail.name}` }).click();
+    const openMenu = () => clickHydrated(row().getByRole('button', { name: `${L.schedMoreActions} ${withEmail.name}` }));
 
     await openMenu();
     await page.getByRole('menuitem', { name: L.schedActionEdit, exact: true }).click();

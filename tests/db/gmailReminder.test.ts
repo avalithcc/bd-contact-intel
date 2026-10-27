@@ -39,13 +39,15 @@ test("a BD created after the migration has last_seen_at NULL and reminders enabl
 test("migration 0048 backfills existing BDs to now() once; a rerun leaves a NULL and real values alone", async () => {
   const { db } = await import("@/db");
   const { sql } = await import("drizzle-orm");
-  const statements = readFileSync(join(__dirname, "..", "..", "drizzle", "0048_gmail_reminder.sql"), "utf8").split("--> statement-breakpoint");
+  const { createIsolatedBd, migrationStatements } = await import("../support/migrationReplay");
+  const schema = `mig0048_${run}`;
+  const statements = migrationStatements(readFileSync(join(__dirname, "..", "..", "drizzle", "0048_gmail_reminder.sql"), "utf8"), schema);
   const ROLLBACK = new Error("rollback");
   const seen: Record<string, unknown> = {};
   await db
     .transaction(async (tx) => {
-      await tx.execute(sql.raw(`DROP TABLE "gmail_reminder_send"`));
-      await tx.execute(sql.raw(`ALTER TABLE "bd" DROP COLUMN "last_seen_at", DROP COLUMN "email_reminders_enabled"`)); // the world before 0048
+      // The world before 0048, in a private schema: DDL on the shared `bd` would lock out (and deadlock with) the other files.
+      await createIsolatedBd(tx, schema);
       await tx.execute(sql`insert into bd (name, email) values ('old', ${`zz-old-${run}@example.test`})`);
       await tx.execute(sql`insert into bd (name, email) values ('ZZ E2E', 'e2e-bot@avalith.net') on conflict (email) do nothing`);
       await tx.execute(sql`insert into bd (name, email) values ('ZZ Otro', 'otro-bd-e2e@avalith.net') on conflict (email) do nothing`);

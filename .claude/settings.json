@@ -6,10 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd=$(jq -r '.tool_input.command // empty'); printf '%s' \"$cmd\" | rg -q '\\bgit\\b([^|;&]*\\s)?commit\\b' || exit 0; repo=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; cd \"$repo\" || { echo \"hook: no pude entrar a $repo\" >&2; exit 2; }; test -f package.json || { echo \"hook: $repo no es la raiz del proyecto\" >&2; exit 2; }; npm run lint >/dev/null 2>&1 || { echo 'lint FAILED - commit blocked' >&2; exit 2; }; npm run test:unit >/dev/null 2>&1 || { echo 'test:unit FAILED - commit blocked' >&2; exit 2; }; echo 'lint + unit OK'",
-            "onFailure": "block",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/commit-gate.sh\"",
             "timeout": 420,
-            "statusMessage": "lint + unit tests antes del commit"
+            "statusMessage": "lint + unit tests before the commit"
           }
         ]
       }

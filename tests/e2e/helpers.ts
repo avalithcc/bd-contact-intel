@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { skipReason } from './credentials';
 import { writeSkipReason } from './readOnlyGuard';
 
@@ -26,6 +26,34 @@ export async function gotoAuthed(page: Page, url: string) {
       'is missing or STALE (its Supabase refresh token expired). Re-run the setup project: ' +
       '`npx playwright test --project=setup` (needs E2E_EMAIL/E2E_PASSWORD, see tests/e2e/README.md).',
   ).not.toHaveURL(/\/login/);
+}
+
+/**
+ * Server-rendered buttons are visible and enabled before React hydrates them, and a click in
+ * that window is a silent no-op (no handler yet). `networkidle` does not cover it: hydration can
+ * still be running after the network goes quiet, and `page.reload()` does not wait for it at all.
+ * React records a node's props under a `__reactProps$<id>` key at the moment it hydrates that
+ * node, so "has an `onXxx` function prop there" is the hydration-ready signal for the element.
+ * Self-contained on purpose: Playwright serialises it into the page.
+ */
+export function hasHydratedHandler(el: Element): boolean {
+  const key = Object.keys(el).find((k) => k.startsWith('__reactProps$'));
+  if (!key) return false;
+  const props = (el as unknown as Record<string, Record<string, unknown>>)[key] ?? {};
+  return Object.entries(props).some(([name, value]) => /^on[A-Z]/.test(name) && typeof value === 'function');
+}
+
+/** Waits until React has attached its handler to the (single) element the locator points at. */
+export async function waitUntilHydrated(target: Locator) {
+  await expect
+    .poll(() => target.evaluate(hasHydratedHandler), { message: 'React has not hydrated this control yet (no handler attached)' })
+    .toBe(true);
+}
+
+/** Click that cannot land before hydration. Use for the first interaction after a navigation or reload. */
+export async function clickHydrated(target: Locator) {
+  await waitUntilHydrated(target);
+  await target.click();
 }
 
 /**
