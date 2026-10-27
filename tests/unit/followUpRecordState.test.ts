@@ -51,6 +51,17 @@ test("a note deleted AFTER the cycle opened still closes it; one deleted BEFORE 
   assert.equal(deriveFollowUpRecordState({ cycle: cycle(), activities: before, connectionLastMessageAt: null, today: "2026-10-23" })?.kind, "overdue");
 });
 
+test("drop, then a note, then that note deleted: still out (a deleted note is not a touch for the entry clock)", () => {
+  const activities = [
+    act("follow_up_dropped", "2026-10-24T15:00:00Z", { reason: "not_now" }),
+    { ...act("note", "2026-10-25T10:00:00Z"), deletedAt: at("2026-10-25T11:00:00Z") },
+  ];
+  assert.equal(deriveFollowUpRecordState({ cycle: null, activities, connectionLastMessageAt: null, today: "2026-10-26" })?.kind, "out");
+  // The same note, not deleted, brings the contact back.
+  const live = [activities[0]!, act("note", "2026-10-25T10:00:00Z")];
+  assert.equal(deriveFollowUpRecordState({ cycle: null, activities: live, connectionLastMessageAt: null, today: "2026-10-26" }), null);
+});
+
 test("a drop by a BD or by the system makes the contact 'out' until a newer touch", () => {
   const dropped = [act("follow_up_dropped", "2026-10-24T15:00:00Z", { reason: "no_response" })];
   assert.deepEqual(deriveFollowUpRecordState({ cycle: cycle(), activities: dropped, connectionLastMessageAt: null, today: "2026-10-25" }), {
