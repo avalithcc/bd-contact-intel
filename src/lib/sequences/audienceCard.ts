@@ -34,3 +34,14 @@ export function fixMenuItems(a: MemberAudience, hasCompany: boolean): FixItem[] 
   if (a.colleaguesDisagree && hasCompany) items.push("colleagues");
   return items;
 }
+
+export type HoldKind = "noSignal" | "splitRoster" | "sanctioned" | "unrecognised";
+
+/**
+ * Which sentence the card's danger alert uses for a HOLD. The split-roster sentence quotes the company by name, so it needs
+ * one: without a name it falls back to the generic no-signal copy instead of rendering "colegas en  están".
+ */
+export function holdKind(a: MemberAudience, company: string | null): HoldKind {
+  if (a.reason === null) return a.colleaguesDisagree && company?.trim() ? "splitRoster" : "noSignal";
+  return a.iso ? "sanctioned" : "unrecognised";
+}

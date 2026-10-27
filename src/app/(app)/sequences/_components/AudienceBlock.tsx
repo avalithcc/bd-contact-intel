@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { ChevronDownIcon, WarningIcon } from "@/components/icons";
-import { fixMenuItems, formatColleagueBreakdown } from "@/lib/sequences/audienceCard";
+import { fixMenuItems, formatColleagueBreakdown, holdKind } from "@/lib/sequences/audienceCard";
 import type { MemberAudience } from "@/lib/sequences/audienceView";
 import { countryNameEs, flagEmoji } from "@/lib/sequences/countryDisplay";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
@@ -43,9 +43,9 @@ export function AudienceWhy({ m, name, l }: { m: DetailMember; name: string; l: 
   if (a.reason === "person_country") return <>{t.byPersonCountry} <strong>{first}</strong> ({a.evidence})</>;
   if (a.reason === "roster_consensus") {
     const agree = a.colleagues?.agree ?? 0;
-    return <>{t.rosterBy} <strong>{fill(t.rosterColleagues, { n: agree })}</strong> {fill(t.rosterAt, { company })} ({a.isoName})<br />{fill(t.rosterNote, { name: first, k: agree, total: a.colleagues?.of ?? 0 })}{a.companyIgnored && <> {fill(t.rosterCompanyIgnored, { filed: a.companyIgnored })}</>}</>;
+    return <>{t.rosterBy} <strong>{fill(t.rosterColleagues, { n: agree })}</strong>{company.trim() && <> {fill(t.rosterAt, { company })}</>} ({a.isoName})<br />{fill(t.rosterNote, { name: first, k: agree, total: a.colleagues?.of ?? 0 })}{a.companyIgnored && <><br />{fill(t.rosterCompanyIgnored, { filed: a.companyIgnored })}</>}</>;
   }
-  if (a.reason === "company_country") return <>{t.byCompanyCountry} <strong>{company}</strong> ({a.evidence})<br />{fill(t.noOwnCountry, { name: first })}{!a.colleaguesDisagree && a.colleaguesKnown > 0 && <> {t.companyUncontradicted}</>}</>;
+  if (a.reason === "company_country") return <>{t.byCompanyCountry} <strong>{company}</strong> ({a.evidence})<br />{fill(t.noOwnCountry, { name: first })}{!a.colleaguesDisagree && a.colleaguesKnown > 0 && <><br />{t.companyUncontradicted}</>}</>;
   if (a.reason === "posting_markets") return <>{t.byPostings} <strong>{t.postingsStrong}</strong> {fill(t.postingsOf, { company })} ({a.evidence === "latam" ? t.zoneLatam : t.zoneUs})<br />{fill(t.postingsNote, { name: first })}</>;
   return <>{t.byPhone} <span className="badge badge-outline">{a.evidence}</span></>;
 }
@@ -72,12 +72,11 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
   const fix = a.reason === "person_country" && a.audience ? null : <FixMenu m={m} a={a} name={name} first={first} l={l} />;
 
   if (!a.audience) {
+    const kind = holdKind(a, m.company);
     const text =
-      a.reason === null && a.colleaguesDisagree
-        ? fill(t.holdSplitRoster, { company: m.company ?? "", k: a.colleagueCountries.length, breakdown: formatColleagueBreakdown(a.colleagueCountries, t.rosterListAnd), name: first })
-        : a.reason === null
-          ? t.holdNoSignal
-          : fill(a.iso ? t.holdSanctioned : t.holdUnrecognised, { value: a.reason === "roster_consensus" ? (a.isoName ?? "") : (a.evidence ?? "") });
+      kind === "splitRoster" ? fill(t.holdSplitRoster, { company: m.company!, k: a.colleagueCountries.length, breakdown: formatColleagueBreakdown(a.colleagueCountries, t.rosterListAnd), name: first })
+      : kind === "noSignal" ? t.holdNoSignal
+      : fill(kind === "sanctioned" ? t.holdSanctioned : t.holdUnrecognised, { value: a.reason === "roster_consensus" ? (a.isoName ?? "") : (a.evidence ?? "") });
     return (
       <div className="alert alert-danger" role="alert">
         <WarningIcon className="icon" />
@@ -105,12 +104,12 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
         <div className="meta">↳ {choice ? <>{lc.chosenBy} <strong>{choice.byName ?? "?"}</strong> {fill(lc.chosenOn, { when: choice.at ? stampLabel(choice.at) : "", resolved: a.audience.language === "es" ? t.langEs : t.langEn })}<br />{lc.addressNote} {why}</> : why}</div>
         <div className="row" style={{ gap: ".25rem" }}>{onAction && <LanguageMenu m={m} name={name} lockTitle={lockTitle} onAction={onAction} l={l} />}{fix}</div>
       </div>
-      {a.colleaguesDisagree && a.reason === "company_country" && (
+      {company.trim() && a.colleaguesDisagree && a.reason === "company_country" && (
         <div className="alert alert-warn" style={{ padding: "var(--space-sm) var(--space-md)" }}>
           <div>{fill(t.companyDespiteSplit, { company, filed: a.evidence ?? "", breakdown: formatColleagueBreakdown(a.colleagueCountries, t.rosterListAnd) })}</div>
         </div>
       )}
-      {a.colleaguesDisagree && a.reason !== "company_country" && (
+      {company.trim() && a.colleaguesDisagree && a.reason !== "company_country" && (
         <div className="alert alert-warn" style={{ padding: "var(--space-sm) var(--space-md)" }}>
           <div>
             <strong>{fill(t.rosterSplitTitle, { company, k: a.colleagueCountries.length })}</strong>{" "}

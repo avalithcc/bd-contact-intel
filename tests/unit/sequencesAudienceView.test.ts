@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildMemberAudience } from "@/lib/sequences/audienceView";
-import { fixMenuItems, formatColleagueBreakdown } from "@/lib/sequences/audienceCard";
+import { fixMenuItems, formatColleagueBreakdown, holdKind } from "@/lib/sequences/audienceCard";
 
 const base = { mobilePhone: null, phone: null, rosterCountries: [] };
 const roster = (...pairs: [string, number][]) => pairs.map(([country, n]) => ({ country, n }));
@@ -128,4 +128,20 @@ test("menu: no company on the card means no company items", () => {
 
 test("menu: with the person country decided the card hides the menu; the items left are the shipped ones", () => {
   assert.deepEqual(items({ ...base, personCountry: "Argentina" }), ["company", "phone"]);
+});
+
+// Which sentence the danger alert of a HOLD uses.
+test("hold kind: a split roster is quoted only when the company has a name to quote", () => {
+  const split = buildMemberAudience({ ...base, rosterCountries: roster(["Argentina", 4], ["Mexico", 4]) });
+  assert.equal(holdKind(split, "Nodo Labs"), "splitRoster");
+  assert.equal(holdKind(split, null), "noSignal", "no 'colegas en  están': the shipped generic copy instead");
+  assert.equal(holdKind(split, "   "), "noSignal");
+});
+
+test("hold kind: no signal, an embargoed country and a text that is not a country keep their own sentences", () => {
+  assert.equal(holdKind(buildMemberAudience(base), "Acme"), "noSignal");
+  assert.equal(holdKind(buildMemberAudience({ ...base, personCountry: "Cuba" }), "Acme"), "sanctioned");
+  assert.equal(holdKind(buildMemberAudience({ ...base, personCountry: "Greater Buenos Aires" }), "Acme"), "unrecognised");
+  assert.equal(holdKind(buildMemberAudience({ ...base, companyCountry: "Syria", rosterCountries: roster(["Argentina", 5]) }), "Acme"), "sanctioned", "a sanctioned company country holds despite a majority");
+  assert.equal(holdKind(buildMemberAudience({ ...base, rosterCountries: roster(["Cuba", 3]) }), "Acme"), "sanctioned", "a sanctioned majority holds");
 });
