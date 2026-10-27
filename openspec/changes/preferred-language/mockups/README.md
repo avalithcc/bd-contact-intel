@@ -144,11 +144,20 @@ Bulk set from the contacts list, import of the property, and a filter or column 
    One function decides it (`resolveDraftLanguage`, `src/lib/sequences/languageChoice.ts`); the draft input, the unsubscribe page and the card/dialog all call it.
 3. **Who-and-when line (open decision 3).** The record reuses its existing "Última actualización por … · {date}" line fed by the property history. No new
    "Cargado por" wording on the record (the card and the dialog do say "cargado por", from the same history row).
-4. **Dialog checkbox (open decision 1).** "Guardar como idioma preferido de {name}": checked by default when the contact has none, unchecked when saving would
-   replace a stored value (with the "lo reemplaza" help line), hidden when the selection equals the stored value. Saved as preferred, the value goes on the
-   contact and the member keeps no one-off; not saved, the one-off behaves as before.
-5. **Audience card.** When the preference decides: badge "idioma preferido", the reason "… Sin esa preferencia sería {resolved}." with the address reason on its
-   own line, and the menu item "Cambiar el idioma preferido en la ficha". A one-off choice keeps the existing wording.
+4. **Dialog checkbox (open decision 1), final rule.** "Guardar como idioma preferido de {name}":
+   - hidden ONLY when the selection equals the STORED preference;
+   - checked by default ONLY when no preference is stored AND the BD changed the radio in this dialog session (the selection differs from the
+     language the dialog opened with); toggling back to the opening language returns it to unchecked, and an explicit tick or untick is respected
+     until the radio changes again;
+   - otherwise shown unchecked: reopening on an existing one-off (a plain confirm promotes nothing), picking the automatic language on purpose
+     (a BD can pin it), and replacing a stored value (with the "lo reemplaza" help line).
+   Saved as preferred, the value goes on the contact and this member's one-off is dropped; one-offs on the same person's members in other
+   sequences keep winning (approved precedence, not cleared). Not saved, the one-off behaves as before. The info alert says the preference
+   applies to the person's sequences except where someone chose a language only for that draft.
+5. **Audience card.** When the preference decides: badge "idioma preferido", the reason "idioma preferido de {name} (cargado por {by} el {when}). Sin esa
+   preferencia sería {resolved}." with the address reason on its own line, and the menu item "Cambiar el idioma preferido en la ficha". The "(cargado por …)"
+   part is omitted when the preference has no history row, and "Sin esa preferencia …" is omitted when the audience would have said the same language.
+   A one-off choice keeps the existing wording.
 6. **No generation by itself.** Changing the preference writes no draft and regenerates nothing; drafts stay one contact at a time.
 7. **Country correction (open decision 2).** Changing or clearing the contact's own country does NOT clear the preference.
 8. **Not shown (open decision 5)** and **who can edit (open decision 6)**: as proposed (no "hoy sería …" on the record; any BD edits, actor in the history).
