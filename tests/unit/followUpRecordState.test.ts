@@ -34,6 +34,16 @@ test("a touch after the row ends the cycle; an unanswered dial and a re-entry ro
   assert.equal(deriveFollowUpRecordState({ cycle: cycle(), activities: [], connectionLastMessageAt: at("2026-10-21T10:00:00Z"), today: "2026-10-23" }), null);
 });
 
+test("only the owner's worked set closes the cycle: a Hunter lookup or a status change keeps the Vencido, a reply or a note ends it", () => {
+  const today = "2026-10-23";
+  const kept = [act("hunter_lookup", "2026-10-21T10:00:00Z"), act("status_change", "2026-10-21T10:00:00Z", { status: "contacted" })];
+  assert.equal(deriveFollowUpRecordState({ cycle: cycle(), activities: kept, connectionLastMessageAt: null, today })?.kind, "overdue");
+  for (const type of ["reply_received", "note", "call", "meeting_logged", "email_sent", "discarded"]) {
+    const closed = [act(type, "2026-10-21T10:00:00Z", { occurredAt: "2026-10-21T10:00:00Z" })];
+    assert.equal(deriveFollowUpRecordState({ cycle: cycle(), activities: closed, connectionLastMessageAt: null, today }), null, type);
+  }
+});
+
 test("a drop by a BD or by the system makes the contact 'out' until a newer touch", () => {
   const dropped = [act("follow_up_dropped", "2026-10-24T15:00:00Z", { reason: "no_response" })];
   assert.deepEqual(deriveFollowUpRecordState({ cycle: cycle(), activities: dropped, connectionLastMessageAt: null, today: "2026-10-25" }), {

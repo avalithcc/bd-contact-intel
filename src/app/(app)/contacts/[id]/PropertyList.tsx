@@ -25,6 +25,7 @@ import type { LushaView } from "@/lib/lusha/revealView";
 import { doNotCallWarning } from "@/lib/contacts/doNotCallWarning";
 import { DoNotCallBadge, LushaBadge, LushaRow, doNotCallFor, lushaBadgeFor } from "./LushaReveal";
 import { updateContactLocationAction, updateContactOwnerAction, updateContactPropertyAction } from "../actions";
+import type { FollowUpPropertyView } from "@/lib/followUp/entryText";
 
 export interface AboutPaneProperty {
   key: EditablePersonProperty;
@@ -57,8 +58,6 @@ export interface JobTitleRoleGroupHint {
   note: string | null;
   guideHref: string;
 }
-
-import type { FollowUpPropertyView } from "@/lib/followUp/entryText";
 
 export interface PropertyListProps {
   personId: string;

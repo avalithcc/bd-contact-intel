@@ -14,21 +14,31 @@ import { expireOverdueFollowUps } from "@/lib/followUp/dropQueries";
 import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 
 async function main() {
-  await db.execute(sql`set session characteristics as transaction read only`);
-  const guard = await db.execute(sql`show transaction_read_only`);
+  // One transaction, read only from its first statement: BEGIN READ ONLY semantics, asserted below rather than assumed.
+  await db.transaction(async (tx) => {
+    await measure(tx);
+  });
+  process.exit(0);
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function measure(tx: Tx) {
+  await tx.execute(sql`set transaction read only`);
+  const guard = await tx.execute(sql`show transaction_read_only`);
   const readOnly = (guard[0] as { transaction_read_only?: string } | undefined)?.transaction_read_only;
   console.log(`transaction_read_only: ${readOnly}`);
   if (readOnly !== "on") throw new Error("refusing to measure: the session is not read only");
 
   const today = argentinaCalendarDate(new Date());
-  const [col] = await db.execute(
+  const [col] = await tx.execute(
     sql`select count(*)::int as n from information_schema.columns where table_name = 'follow_up_queue_item' and column_name = 'cycle_started_on'`,
   );
   const hasCycleColumn = Number((col as { n: number }).n) > 0;
   console.log(`today (ART): ${today}; cycle_started_on column present: ${hasCycleColumn}`);
 
   const started = Date.now();
-  const perBd = (await db.execute(
+  const perBd = (await tx.execute(
     sql`select b.name as bd, v.eligible_count, v.queue_count
         from (${buildFollowUpVerificationQuery(10, { includeCycles: hasCycleColumn })}) v
         join bd b on b.id = v.owner_bd_id
@@ -48,14 +58,13 @@ async function main() {
   let carried = 0;
   let wouldExpire = 0;
   if (hasCycleColumn) {
-    const [c] = await db.execute(
+    const [c] = await tx.execute(
       sql`select count(*)::int as n from follow_up_queue_item where cycle_started_on is not null`,
     );
     carried = Number((c as { n: number }).n);
-    wouldExpire = await expireOverdueFollowUps(today, db, { dryRun: true });
+    wouldExpire = await expireOverdueFollowUps(today, tx, { dryRun: true });
   }
   console.log(`rows with a cycle date already: ${carried}; the expiry job would drop today: ${wouldExpire}`);
-  process.exit(0);
 }
 
 void main();

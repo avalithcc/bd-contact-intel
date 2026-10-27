@@ -8,6 +8,7 @@ import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 import { resolveEffectiveActivityAt } from "@/lib/contacts/effectiveActivityTime";
 import { FOLLOW_UP_DROPPED_TYPE, FOLLOW_UP_DROP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import { cycleStage, daysInQueue, expiryDate } from "@/lib/followUp/cycle";
+import { CYCLE_CLOSING_ACTIVITY_TYPES } from "@/lib/followUp/openCycle";
 import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 
 export interface RecordCycle {
@@ -31,10 +32,21 @@ export type FollowUpRecordState =
 
 const NO_PROGRESS = new Set<string>(NO_PROGRESS_ACTIVITY_TYPES);
 
-function touchTime(a: RecordActivity): Date | null {
-  if (NO_PROGRESS.has(a.type)) return null;
+const CLOSING = new Set<string>(CYCLE_CLOSING_ACTIVITY_TYPES);
+
+function timeOf(a: RecordActivity): Date | null {
   const metadata = a.metadata && typeof a.metadata === "object" ? (a.metadata as Record<string, unknown>) : {};
   return resolveEffectiveActivityAt({ id: a.id, type: a.type, createdAt: a.createdAt, metadata });
+}
+
+/** Any touch that moves the queue-entry clock (everything but NO_PROGRESS / NON_TOUCH): what a dropped contact needs to come back. */
+function touchTime(a: RecordActivity): Date | null {
+  return NO_PROGRESS.has(a.type) ? null : timeOf(a);
+}
+
+/** Only the owner's worked set plus a reply closes an open cycle (openCycle.ts); a Hunter lookup or a status change does not. */
+function closingTime(a: RecordActivity): Date | null {
+  return CLOSING.has(a.type) ? timeOf(a) : null;
 }
 
 export function deriveFollowUpRecordState(input: {
@@ -61,7 +73,9 @@ export function deriveFollowUpRecordState(input: {
 
   const { cycle } = input;
   if (!cycle) return null;
-  if (touches.some((t) => t > cycle.lastTouchAt)) return null;
+  const closes = input.activities.map(closingTime).filter((t): t is Date => t !== null);
+  if (input.connectionLastMessageAt) closes.push(input.connectionLastMessageAt);
+  if (closes.some((t) => t > cycle.lastTouchAt)) return null;
   const days = daysInQueue(cycle.cycleStartedOn, input.today);
   switch (cycleStage(days)) {
     case "normal":
