@@ -30,6 +30,7 @@ export function SendSplitButton({
   stackAdvice = false,
   disabled = false,
   title,
+  describedBy,
   busy = false,
   placement = "up",
   schedule,
@@ -46,6 +47,8 @@ export function SendSplitButton({
   disabled?: boolean;
   /** Why the control is disabled; shown on the group because a disabled button shows no tooltip in some browsers. */
   title?: string;
+  /** Id of the element that says why it is disabled (a help line the caller owns): read by assistive tech as the button's description. */
+  describedBy?: string;
   busy?: boolean;
   placement?: "up" | "down";
   schedule: ScheduleConfig;
@@ -130,7 +133,7 @@ export function SendSplitButton({
       {nowAdvice && !popOpen && <SendAdviceChip labels={l} advice={nowAdvice} />}
       <span className="anchor-split">
         <span className="btn-group split-btn" role="group" title={disabled ? title : undefined} aria-label={l.groupLabel} aria-busy={working ? "true" : undefined}>
-          <button type="button" className={`btn btn-primary${size}`} disabled={disabled || working} onClick={sendNow}>
+          <button type="button" className={`btn btn-primary${size}`} disabled={disabled || working} aria-describedby={disabled ? describedBy : undefined} onClick={sendNow}>
             {flight.kind ? <span className="spinner" aria-hidden="true" /> : <SendIcon className="icon" />}
             {primaryText}
           </button>

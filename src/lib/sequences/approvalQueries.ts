@@ -173,7 +173,8 @@ export async function cancelApproval(bdId: string, memberId: string, step: Appro
       .where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, step), step === 2 ? isNotNull(sequenceDraft.approvedAt) : undefined))
       .returning({ id: sequenceDraft.id });
     if (step === REMINDER_STEP && !cleared.length) return { ok: false, error: "not_approved" } as const;
-    if (step === 1) await tx.update(sequenceMember).set({ state: "drafted" }).where(eq(sequenceMember.id, memberId));
+    // Back to drafted (or a reminder without approval): the release re-check's hold belonged to the approval just withdrawn, so it goes too.
+    await tx.update(sequenceMember).set({ ...(step === 1 ? { state: "drafted" } : {}), holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));
     await tx.insert(auditLog).values(sequenceAuditRow("cancel", { actorBdId: bdId, personId: m.personId, memberId, sequenceId: m.sequenceId, step }));
     return { ok: true } as const;
   });

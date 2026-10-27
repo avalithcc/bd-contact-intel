@@ -83,7 +83,7 @@ export async function cancelScheduledSend(database: Database, memberId: string):
   return database.transaction(async (tx) => {
     const [row] = await tx.select({ state: sequenceMember.state }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");
     if (!row || row.state !== "approved") return false;
-    await tx.update(sequenceMember).set({ state: "drafted" }).where(and(eq(sequenceMember.id, memberId), eq(sequenceMember.state, "approved")));
+    await tx.update(sequenceMember).set({ state: "drafted", holdReason: null, holdAt: null }).where(and(eq(sequenceMember.id, memberId), eq(sequenceMember.state, "approved")));
     await tx
       .update(sequenceDraft)
       .set({ approvedAt: null, approvedByBdId: null, scheduledFor: null })

@@ -28,11 +28,16 @@ function Reason({ m, name, l }: { m: DetailMember; name: string; l: SequenceLabe
 export function LanguageMismatchAlert({ m, mismatch, name, l, ownView, explain = false, busy = false, locked = false, lockTitle, onRegenerate, onKeep }: { m: DetailMember; mismatch: LanguageMismatch; name: string; l: SequenceLabels; ownView: boolean; explain?: boolean; busy?: boolean; locked?: boolean; lockTitle?: string; onRegenerate?: () => void; onKeep?: () => void }) {
   const t = l.languageMismatch;
   const vars = { draft: languageWord(mismatch.draft, l), now: languageWord(mismatch.now, l) };
+  // The dialog says it in the mockup's longer words; the card says it short. `role="alert"` only in the dialog, where it opens on top of the page.
+  const [bodyBefore = "", bodyAfter = ""] = t.dialogBody.split("{reason}");
+  const reason = <Reason m={m} name={name} l={l} />;
   return (
-    <div className="alert alert-warn" role="alert" style={{ padding: "var(--space-sm) var(--space-md)" }}>
+    <div className="alert alert-warn" role={explain ? "alert" : "note"} style={{ padding: "var(--space-sm) var(--space-md)" }}>
       <WarningIcon className="icon" />
       <div className="grow">
-        <strong>{fill(t.lead, vars)}</strong> (<Reason m={m} name={name} l={l} />). {t.blocked}
+        {explain
+          ? <><strong>{fill(t.dialogLead, vars)}</strong> {fill(bodyBefore, vars)}{reason}{fill(bodyAfter, vars)}</>
+          : <><strong>{fill(t.lead, vars)}</strong> ({reason}). {t.blocked}</>}
         {m.draft?.edited && ownView && <> {fill(t.editedWarning, vars)}</>}
         {explain && <><br />{fill(t.dialogHowRegenerate, vars)} {fill(t.dialogHowKeep, vars)}</>}
       </div>

@@ -97,12 +97,16 @@ test("an opted-out member offers no 'Reincorporar': the state machine forbids it
   assert.deepEqual(ids(mapMemberCard(facts({ state: "discarded", discardReason: "opt_out" }), NOW)), []);
 });
 
-test("every hold reason reaches the card, in every state", () => {
+test("every hold reason reaches the card, in every state and kind, except an unapproved draft's: a hold belongs to an approval", () => {
   for (const state of MEMBER_STATES) {
     for (const holdReason of HOLD_REASONS) {
-      assert.equal(mapMemberCard(facts({ state, holdReason }), NOW).holdReason, holdReason, `${state}/${holdReason}`);
+      const card = mapMemberCard(facts({ state, holdReason }), NOW);
+      assert.equal(card.holdReason, card.kind === "draft" ? null : holdReason, `${state}/${holdReason}`);
     }
   }
+  // A drafted member with NO draft still shows its hold (unmapped_market is written there), and so does an approved one.
+  assert.equal(mapMemberCard(facts({ state: "drafted", hasDraft: false, holdReason: "unmapped_market" }), NOW).holdReason, "unmapped_market");
+  assert.equal(mapMemberCard(facts({ state: "approved", holdReason: "wrong_language" }), NOW).holdReason, "wrong_language");
 });
 
 test("a held approved member can still be cancelled", () => {

@@ -53,7 +53,7 @@ export async function runReviewIntent(intent: "save" | "approve", input: { store
   }
 }
 
-/** "Aprobar los N listos": N = drafted members with a draft, the same set the header counts, minus the drafts in another language (they cannot be selected). */
+/** "Aprobar los N listos": the set the click selects AND the number the header button shows (SequenceDetailView feeds it from here): drafted members with a draft, minus the drafts in another language, which cannot be selected. */
 export const readyMemberIds = (members: readonly DetailMember[]): string[] => members.filter((m) => m.state === "drafted" && m.draft !== null && !memberDraftMismatch(m)).map((m) => m.memberId);
 
 /** Bulk-bar rows for the selected ids. An id that left the roster or stopped being a drafted member is dropped, not counted. */
@@ -98,4 +98,14 @@ export function summarizeRefusals(rejected: readonly ApprovalRejection[], member
     if (name && group.names.length < REFUSAL_NAMES_SHOWN) group.names.push(name);
   }
   return [...groups].map(([reason, g]) => ({ reason, names: g.names, more: g.total - g.names.length }));
+}
+
+/** The drafts in another language than today's, by member id -> the name the screen shows (person name, else email, else the id). The bulk bar names them. */
+export const mismatchedNames = (members: readonly DetailMember[]): Record<string, string> =>
+  Object.fromEntries(members.filter((m) => memberDraftMismatch(m)).map((m) => [m.memberId, [m.firstName, m.lastName].filter(Boolean).join(" ") || m.email || m.memberId]));
+
+/** "A, B, C, +2 more": up to REFUSAL_NAMES_SHOWN names, then the rest counted with the dictionary's own `more` template ("+{n} más"). */
+export function nameList(names: readonly string[], more: (n: number) => string): string {
+  const shown = names.slice(0, REFUSAL_NAMES_SHOWN);
+  return (names.length > shown.length ? [...shown, more(names.length - shown.length)] : shown).join(", ");
 }

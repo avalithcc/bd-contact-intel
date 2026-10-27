@@ -74,12 +74,29 @@ test("an approved draft shows no exits: the release re-check holds it and the ho
   for (const needle of NOTHING) assert.ok(!html.includes(needle), needle);
 });
 
-test("the review dialog carries the alert, the two exits, the footer help and a disabled approve", () => {
+test("the review dialog carries the mockup's lead and body, the badge by the body label, the exits and a disabled approve", () => {
   const html = dialog(member("en"));
-  assert.ok(html.includes("El borrador está en inglés, pero ahora le escribiríamos en español") && html.includes("Regenerar en español") && html.includes("Mantener en inglés"), html);
+  assert.ok(html.includes("<strong>Este borrador está en inglés.</strong> Ahora le escribiríamos en español ("), html);
+  assert.ok(html.includes("Si lo aprobás así, el correo sale en inglés, por eso no se puede aprobar todavía."));
+  assert.match(html, /Cuerpo<span[^>]*> <span class="badge badge-warn">en inglés<\/span>|Cuerpo <span class="badge badge-warn">en inglés<\/span>/);
+  assert.ok(html.includes("Regenerar en español") && html.includes("Mantener en inglés"));
   assert.ok(html.includes("Regenerar abre el diálogo de idioma, con español elegido, y reemplaza este texto."));
-  assert.ok(html.includes("Aprobar se habilita cuando el idioma del borrador coincide con el que usaríamos hoy."));
   assert.match(html, /<button[^>]*class="btn btn-primary"[^>]*disabled=""[^>]*>(?:<svg.*?<\/svg>)?Aprobar y enviar ahora/);
+});
+
+test("the help line is inside the footer, so it stays with the disabled approve, and the approve points at it", () => {
+  const html = dialog(member("en"));
+  const footer = html.slice(html.indexOf('class="dialog-footer"'));
+  const help = /<p class="help" id="([^"]+)">Aprobar se habilita cuando el idioma del borrador coincide con el que usaríamos hoy\.<\/p>/.exec(footer);
+  assert.ok(help, "the help line is in the footer");
+  assert.ok(footer.includes(`aria-describedby="${help[1]}"`), "the disabled approve is described by it");
+  assert.equal(html.split("Aprobar se habilita").length - 1, 1, "and only there");
+});
+
+test("role=alert is only for the dialog: the card's alert is a note", () => {
+  const cardAlert = card(member("en")).split("alert-warn")[1] ?? "";
+  assert.ok(cardAlert.includes('role="note"') && !cardAlert.slice(0, 80).includes('role="alert"'), cardAlert.slice(0, 120));
+  assert.match(dialog(member("en")), /class="alert alert-warn" role="alert"/);
 });
 
 test("the review dialog of a matching draft is the dialog of always", () => {
@@ -94,4 +111,33 @@ test("the English dictionary words the card alert, and both dictionaries word th
   for (const dict of [en, es]) {
     assert.ok(dict.sequences.reviewErrors.wrong_language.length > 0 && dict.sequences.holdReasons.wrong_language.length > 0);
   }
+});
+
+// --- the header button: the number it shows is the number the click selects ----------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { SequenceDetailView } = require("@/app/(app)/sequences/_components/SequenceDetailView") as typeof import("@/app/(app)/sequences/_components/SequenceDetailView");
+const detailOf = (members: DetailMember[]) => ({ id: "s1", name: "Seq", ownerBdId: "bd1", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members });
+const header = (members: DetailMember[]) => {
+  const html = renderToStaticMarkup(createElement(SequenceDetailView, { detail: detailOf(members), labels: es.sequences, now: NOW, onAction: () => {}, viewerBdId: "bd1", lock: IDLE_LOCK, send: SEND }));
+  return /<button[^>]*>(Aprobar (?:los \d+ listos|el listo))<\/button>/.exec(html)?.[0] ?? "";
+};
+const withId = (id: string, m: DetailMember): DetailMember => ({ ...m, memberId: id, personId: `00000000-0000-4000-8000-00000000000${id}` });
+
+test("the header button counts only the drafts the click will select: 5 drafts, 2 in another language, says 3", () => {
+  const html = header([withId("1", member("es")), withId("2", member("es")), withId("3", member(null)), withId("4", member("en")), withId("5", member("en"))]);
+  assert.match(html, />Aprobar los 3 listos</);
+  assert.doesNotMatch(html, /disabled/);
+});
+
+test("when every draft is in another language the header button is disabled instead of doing nothing", () => {
+  const html = header([withId("1", member("en")), withId("2", member("en"))]);
+  assert.match(html, /disabled=""[^>]*>Aprobar los 0 listos</);
+});
+
+test("the hold line is shown on an approved card and never on an unapproved draft, where a stale hold would contradict the card", () => {
+  const prefix = `${es.sequences.holdPrefix} ${es.sequences.holdReasons.wrong_language}`;
+  const approved = card(member("en", { state: "approved", holdReason: "wrong_language", draft: draft("en", { approvedAt: NOW, scheduledFor: NOW }) }));
+  assert.ok(approved.includes(prefix), approved);
+  const drafted = card(member("es", { holdReason: "wrong_language" }));
+  assert.ok(!drafted.includes(es.sequences.holdPrefix), drafted);
 });

@@ -39,7 +39,7 @@ async function footedBody(language: "es" | "en" = "en") {
   return r.status === "ok" ? r.body : "";
 }
 
-type Over = { state?: string; country?: string; draftLanguage?: string | null; chosen?: "es" | "en"; preferred?: "es" | "en"; reviewed?: boolean; approved?: boolean; step1Language?: string | null; reminder?: boolean; noDraft?: boolean };
+type Over = { state?: string; country?: string; draftLanguage?: string | null; chosen?: "es" | "en"; preferred?: "es" | "en"; reviewed?: boolean; approved?: boolean; step1Language?: string | null; reminder?: boolean; noDraft?: boolean; hold?: string };
 /** The default person is in the United States, so today's language is English. */
 async function mkMember(name: string, over: Over = {}) {
   const { db } = await import("@/db");
@@ -51,6 +51,7 @@ async function mkMember(name: string, over: Over = {}) {
   const [m] = await db.insert(sequenceMember).values({
     sequenceId, personId: p.id, state: over.state ?? (sentStep2 ? "sent" : "drafted"),
     ...(over.chosen ? { draftLanguage: over.chosen, draftLanguageByBdId: bdId, draftLanguageAt: new Date() } : {}),
+    ...(over.hold ? { holdReason: over.hold, holdAt: new Date() } : {}),
     ...(sentStep2 ? { sentAt: new Date("2026-10-08T13:00:00Z"), reminderDueAt: DUE } : {}),
   }).returning();
   const stamp = over.approved ? { approvedAt: new Date("2026-10-14T20:00:00Z"), approvedByBdId: bdId, scheduledFor: DUE } : {};
@@ -168,16 +169,39 @@ test("today's language is the resolver's: a preferred language loaded after gene
 
 test("'Mantener' writes the one-off choice with who and when, and the draft then approves normally", async () => {
   const { approveMember } = await import("@/lib/sequences/approvalQueries");
-  const { setMemberDraftLanguage } = await import("@/lib/sequences/draftQueries");
+  const { keepDraftLanguage } = await import("@/lib/sequences/draftQueries");
   const m = await mkMember("keep", { draftLanguage: "es" });
   const textBefore = (await draftOf(m.memberId)).body;
   assert.ok(!(await approveMember(bdId, m.memberId)).ok);
-  assert.deepEqual(await setMemberDraftLanguage(bdId, m.memberId, "es"), { ok: true });
+  assert.deepEqual(await keepDraftLanguage(bdId, m.memberId), { ok: true, language: "es" });
   const row = await memberRow(m.memberId);
   assert.deepEqual([row.draftLanguage, row.draftLanguageByBdId], ["es", bdId]);
   assert.ok(row.draftLanguageAt instanceof Date);
   assert.equal((await draftOf(m.memberId)).body, textBefore, "the text itself is untouched");
   assert.deepEqual(await approveMember(bdId, m.memberId), { ok: true, approved: [m.memberId] });
+});
+
+test("'Mantener' reads the STORED language and refuses a stale tab: the draft was regenerated elsewhere and now matches, so nothing is written", async () => {
+  const { keepDraftLanguage } = await import("@/lib/sequences/draftQueries");
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const m = await mkMember("keep-stale", { draftLanguage: "es" });
+  // The tab still shows the draft in Spanish, but it was regenerated in English (today's language) in another tab.
+  await db.update(sequenceDraft).set({ language: "en" }).where(eq(sequenceDraft.id, (await draftOf(m.memberId)).id));
+  assert.deepEqual(await keepDraftLanguage(bdId, m.memberId), { ok: false, error: "no_mismatch" });
+  assert.deepEqual([(await memberRow(m.memberId)).draftLanguage, (await memberRow(m.memberId)).draftLanguageAt], [null, null], "no redundant one-off");
+});
+
+test("'Mantener' refuses an unknown draft language, a stranger's member and a member with no audience", async () => {
+  const { keepDraftLanguage } = await import("@/lib/sequences/draftQueries");
+  const unknown = await mkMember("keep-unknown", { draftLanguage: null });
+  assert.deepEqual(await keepDraftLanguage(bdId, unknown.memberId), { ok: false, error: "no_mismatch" });
+  const mine = await mkMember("keep-foreign", { draftLanguage: "es" });
+  assert.deepEqual(await keepDraftLanguage(randomUUID(), mine.memberId), { ok: false, error: "not_found" });
+  const nowhere = await mkMember("keep-nowhere", { country: "Cuba", draftLanguage: "es" });
+  assert.deepEqual(await keepDraftLanguage(bdId, nowhere.memberId), { ok: false, error: "held" });
+  for (const m of [unknown, mine, nowhere]) assert.equal((await memberRow(m.memberId)).draftLanguage, null);
 });
 
 test("bulk approval is all-or-nothing: one selected draft in another language refuses the whole request", async () => {
@@ -206,14 +230,13 @@ test("the reminder is measured against step 1's language when it is approved", a
   assert.equal((await approveMember(bdId, pinned.memberId, 2)).ok, true, "the pinned reminder is not measured against the country");
 });
 
-// --- release re-check -----------------------------------------------------------------------------------------------
+// --- release re-check ----------------------------------------------------------------------------------------------------
 
-test("the release re-check holds an approved-but-unsent draft in another language, and sends the one that matches", async () => {
+/** The real runner and the real ports, narrowed to these members, with a counting fake instead of Gmail. */
+async function releaseOnly(memberIds: string[]) {
   const { runSequenceRelease } = await import("@/lib/sequences/runSequenceRelease");
   const { liveRunnerPorts } = await import("@/lib/sequences/releaseQueries");
-  const wrong = await mkMember("rel-wrong", { state: "approved", approved: true, draftLanguage: "es" });
-  const fine = await mkMember("rel-fine", { state: "approved", approved: true, draftLanguage: "en" });
-  const mine = new Set([wrong.memberId, fine.memberId]);
+  const mine = new Set(memberIds);
   const sent: string[] = [];
   const ports = {
     ...liveRunnerPorts,
@@ -225,8 +248,81 @@ test("the release re-check holds an approved-but-unsent draft in another languag
     send: async (c: { id: string }) => (sent.push(c.id), { messageId: `g-${run}-${sent.length}`, threadId: `t-${run}-${sent.length}` }),
     draftReminder: async () => {},
   };
-  assert.deepEqual(await runSequenceRelease(ports), { released: 1, held: 1, deferred: 0, failed: 0 });
+  return { summary: await runSequenceRelease(ports), sent };
+}
+
+test("the release re-check holds an approved-but-unsent draft in another language, and sends the one that matches", async () => {
+  const wrong = await mkMember("rel-wrong", { state: "approved", approved: true, draftLanguage: "es" });
+  const fine = await mkMember("rel-fine", { state: "approved", approved: true, draftLanguage: "en" });
+  const { summary, sent } = await releaseOnly([wrong.memberId, fine.memberId]);
+  assert.deepEqual(summary, { released: 1, held: 1, deferred: 0, failed: 0 });
   assert.deepEqual(sent, [fine.memberId]);
   const row = await memberRow(wrong.memberId);
   assert.deepEqual([row.holdReason, row.state], ["wrong_language", "approved"]);
+});
+
+test("the release re-check judges against a ONE-OFF choice made after approval: the draft is en, a person chose es", async () => {
+  const m = await mkMember("rel-oneoff", { state: "approved", approved: true, draftLanguage: "en", chosen: "es" });
+  const { summary, sent } = await releaseOnly([m.memberId]);
+  assert.deepEqual([summary.held, summary.released, sent], [1, 0, []]);
+  assert.equal((await memberRow(m.memberId)).holdReason, "wrong_language");
+});
+
+test("the release re-check judges against a PREFERRED language loaded after approval", async () => {
+  const m = await mkMember("rel-pref", { state: "approved", approved: true, draftLanguage: "en", preferred: "es" });
+  const { summary, sent } = await releaseOnly([m.memberId]);
+  assert.deepEqual([summary.held, summary.released, sent], [1, 0, []]);
+  assert.equal((await memberRow(m.memberId)).holdReason, "wrong_language");
+});
+
+test("the release re-check holds a REMINDER that is not in step 1's language, and the country does not decide it", async () => {
+  // Mexico resolves to Spanish. Step 1 went out in English, so a Spanish reminder is the mixed thread; an English one is not held for language.
+  const mixed = await mkMember("rel-rem-mixed", { reminder: true, approved: true, country: "Mexico", step1Language: "en", draftLanguage: "es" });
+  const pinned = await mkMember("rel-rem-pinned", { reminder: true, approved: true, country: "Mexico", step1Language: "en", draftLanguage: "en" });
+  const { sent } = await releaseOnly([mixed.memberId, pinned.memberId]);
+  assert.deepEqual(sent, []);
+  assert.equal((await memberRow(mixed.memberId)).holdReason, "wrong_language");
+  assert.notEqual((await memberRow(pinned.memberId)).holdReason, "wrong_language", "held for something else (no thread headers in this fixture), not for language");
+});
+
+// --- a hold belongs to the approval it was written against ---------------------------------------------------------------
+
+test("withdrawing the approval clears the release hold: cancel, edit and regenerate each return the card to a clean draft", async () => {
+  const { cancelApproval } = await import("@/lib/sequences/approvalQueries");
+  const { regenerateDrafts, saveDraftEdit } = await import("@/lib/sequences/draftQueries");
+  const held = () => mkMember(`hold-${randomUUID().slice(0, 4)}`, { state: "approved", approved: true, hold: "wrong_language" });
+  const cancelled = await held();
+  assert.deepEqual(await cancelApproval(bdId, cancelled.memberId), { ok: true });
+  const edited = await held();
+  assert.equal((await saveDraftEdit(bdId, edited.memberId, { subject: "S", body: "B" })).ok, true);
+  const regenerated = await held();
+  await regenerateDrafts(bdId, sequenceId, [regenerated.memberId], deps);
+  for (const m of [cancelled, edited, regenerated]) {
+    const row = await memberRow(m.memberId);
+    assert.deepEqual([row.state, row.holdReason, row.holdAt], ["drafted", null, null]);
+  }
+});
+
+test("withdrawing a reminder's approval clears its hold too, and the member stays sent", async () => {
+  const { cancelApproval } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkMember("hold-rem", { reminder: true, approved: true, hold: "wrong_language" });
+  assert.deepEqual(await cancelApproval(bdId, m.memberId, 2), { ok: true });
+  const row = await memberRow(m.memberId);
+  assert.deepEqual([row.state, row.holdReason], ["sent", null]);
+});
+
+// --- the unsubscribe page follows the same pin ---------------------------------------------------------------------------
+
+test("the unsubscribe page of a pinned reminder is in step 1's language, not the country's; an unknown step 1 changes nothing", async () => {
+  const { issueUnsubscribeToken, unsubscribeAudienceForToken } = await import("@/lib/sequences/unsubscribeQueries");
+  const { hashUnsubscribeToken } = await import("@/lib/sequences/unsubscribeToken");
+  const localeOf = async (m: { memberId: string; email: string }) => (await unsubscribeAudienceForToken(hashUnsubscribeToken(await issueUnsubscribeToken({ sequenceMemberId: m.memberId, email: m.email }))))?.locale;
+  // Argentina resolves to Spanish today, but step 1 went out in English: its reminder's link opens in English.
+  const pinned = await mkMember("unsub-pinned", { reminder: true, country: "Argentina", step1Language: "en" });
+  assert.equal(await localeOf(pinned), "en");
+  const legacy = await mkMember("unsub-legacy", { reminder: true, country: "Argentina", step1Language: null });
+  assert.equal(await localeOf(legacy), "es");
+  // Step 1 not sent yet: nothing is pinned, the link is in the language of today.
+  const unsent = await mkMember("unsub-unsent", { country: "Argentina", draftLanguage: "en" });
+  assert.equal(await localeOf(unsent), "es");
 });

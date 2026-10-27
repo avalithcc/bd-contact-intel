@@ -74,6 +74,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   // An unapproved step 1 draft in another language than today's: the exits are in the alert, Aprobar waits (the server refuses it too).
   const mismatch = !view.readOnly && step === 1 && view.kind === "draft" ? memberDraftMismatch(m) : null;
+  const helpId = `${formId}-language-help`;
   const blockedTitle = mismatch ? fill(l.languageMismatch.approveTitle, { draft: languageWord(mismatch.draft, l), now: languageWord(mismatch.now, l) }) : undefined;
   const title = [name, [m.jobTitle?.trim() || l.noTitle, m.company && `${l.headlineAt} ${m.company}`].filter(Boolean).join(" ")].join(" · ");
   const when = (d: Date) => { const w = miamiWhen(d, now); return `${w.ddmm} ${w.hhmm}`; };
@@ -110,6 +111,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         busy={busy}
         disabled={mismatch !== null}
         title={blockedTitle}
+        describedBy={mismatch ? helpId : undefined}
         error={send.error}
         schedule={approvalSchedule(send, [{ name, zone: resolveRecipientZone(m.place ?? {}) }], "one")}
         cadence={{ hint: cadenceHint(now, send.schedule, l), onPick: () => approveWith({ kind: "cadence" }) }}
@@ -117,12 +119,15 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         onSchedule={async (slot) => { await approveWith({ kind: "at", ...slot }); }}
       />
     ) : (
-      <button key={id} type="submit" form={formId} value={id} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy || (id === "approve" && mismatch !== null)} title={id === "approve" ? blockedTitle : undefined}>{id === "approve" ? l.reviewApprove : l.reviewSave}</button>
+      <button key={id} type="submit" form={formId} value={id} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy || (id === "approve" && mismatch !== null)} title={id === "approve" ? blockedTitle : undefined} aria-describedby={id === "approve" && mismatch ? helpId : undefined}>{id === "approve" ? l.reviewApprove : l.reviewSave}</button>
     );
 
   return (
     <Dialog open={open} onClose={onClose} title={title} wide closeDisabled={busy}
-      footer={view.readOnly ? <button type="button" className="btn btn-secondary" onClick={onClose}>{l.reviewClose}</button> : view.footer.map(footerButton)}>
+      footer={view.readOnly ? <button type="button" className="btn btn-secondary" onClick={onClose}>{l.reviewClose}</button> : mismatch ? (
+        // The help line lives IN the footer so it cannot scroll away from the disabled button it explains.
+        <div className="stack-sm" style={{ width: "100%" }}><p className="help" id={helpId}>{l.languageMismatch.dialogApproveHelp}</p><div className="row" style={{ justifyContent: "flex-end" }}>{view.footer.map(footerButton)}</div></div>
+      ) : view.footer.map(footerButton)}>
       <form id={formId} className="stack" onSubmit={submit} key={`${m.memberId}-${step}-${reads}`}>
         {(stale || pending !== null) && (
           <div className="alert alert-warn" role="alert">
@@ -163,7 +168,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
               read-only variant is unaffected. */}
           <input className="input" id={`${formId}-subject`} name="subject" type="text" defaultValue={view.draft.subject} readOnly={view.readOnly} required />
         </div>
-        <div className="field"><label className="label" htmlFor={`${formId}-body`}>{l.reviewBody}</label>
+        <div className="field"><label className="label" htmlFor={`${formId}-body`}>{l.reviewBody}{mismatch && <> <span className="badge badge-warn">{fill(l.languageMismatch.dialogBodyBadge, { draft: languageWord(mismatch.draft, l) })}</span></>}</label>
           <textarea className="textarea" id={`${formId}-body`} name="body" rows={11} defaultValue={view.draft.body} readOnly={view.readOnly} required />
           {!view.readOnly && <p className="help">{l.reviewBodyHelp}</p>}
           {/* Plain `help`: the mockup never drew this warning, so it has no approved emphasis style. Styling it is a
@@ -184,7 +189,6 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
             </div>
           </div>
         )}
-        {mismatch && <p className="help">{l.languageMismatch.dialogApproveHelp}</p>}
         {error && <span className="error-text" role="alert">{error}</span>}
       </form>
     </Dialog>

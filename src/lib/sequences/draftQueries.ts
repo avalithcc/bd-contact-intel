@@ -18,8 +18,8 @@ import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { REGENERABLE_STATES } from "./detailFlow";
 import { blocksEditedOverwrite, composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult, type EditConfirmations, type SkippedEdit } from "./draftCompose";
 import { buildSequenceDraftInput, draftSignals, resolveDraftCompliance, senderIdentity } from "@/lib/sequences/draftInput";
-import { parseLanguageChoice, type DraftLanguageOverrides } from "./languageChoice";
-import { pinToStep1 } from "./languageMismatch";
+import { parseLanguageChoice, resolveDraftLanguage, type DraftLanguageOverrides } from "./languageChoice";
+import { languageMismatch, pinToStep1 } from "./languageMismatch";
 import type { AudienceLanguage } from "./complianceAudience";
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
@@ -165,11 +165,13 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
       });
       await tx.insert(auditLog).values(sequenceAuditRow("regenerate", { actorBdId: bdId, personId: r.person_id as string, memberId, sequenceId, step }));
     }
-    if (reminder) return "generated";
+    // A regenerate withdraws the approval, so a hold the release re-check wrote against that approval (wrong_language, missing_footer ...) is moot: clear it.
+    if (reminder) {
+      if (mode === "regenerate") await tx.update(sequenceMember).set({ holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));
+      return "generated";
+    }
     if (m.state === "approved") assertTransition("approved", "drafted", "regenerate");
-    const clearHold = (col: typeof sequenceMember.holdReason | typeof sequenceMember.holdAt) =>
-      sql`case when ${sequenceMember.holdReason} = ${UNMAPPED_MARKET_HOLD} then null else ${col} end`;
-    await tx.update(sequenceMember).set({ state: "drafted" as MemberState, holdReason: clearHold(sequenceMember.holdReason), holdAt: clearHold(sequenceMember.holdAt) }).where(eq(sequenceMember.id, memberId));
+    await tx.update(sequenceMember).set({ state: "drafted" as MemberState, holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));
     return "generated";
   });
 }
@@ -264,6 +266,30 @@ export async function setMemberDraftLanguage(bdId: string, memberId: string, lan
   return { ok: true };
 }
 
+export type KeepLanguageResult = { ok: true; language: AudienceLanguage } | Exclude<SetLanguageResult, { ok: true }> | { ok: false; error: "no_mismatch" };
+
+/**
+ * "Mantener en {idioma}": records the language the STORED step 1 draft is written in as this member's one-off choice, with who and when, so the
+ * draft matches and approves normally. The client sends only the member: the language is read here, inside the member row lock that every
+ * regenerate also takes, and refused (`no_mismatch`) when it is unknown or already the language of today, so a stale tab (the draft was
+ * regenerated elsewhere) writes nothing and a redundant one-off is never stored. Owner-checked, never for a HOLD. Generates nothing.
+ */
+export async function keepDraftLanguage(bdId: string, memberId: string): Promise<KeepLanguageResult> {
+  const facts = await loadFacts(bdId, memberId);
+  if (!facts) return { ok: false, error: "not_found" };
+  const refusal = languageWriteRefusal(facts);
+  if (refusal) return refusal;
+  const today = resolveDraftLanguage(facts.audience!.language, facts.overrides)?.language ?? null;
+  return db.transaction(async (tx) => {
+    await tx.select({ id: sequenceMember.id }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");
+    const [d] = await tx.select({ language: sequenceDraft.language }).from(sequenceDraft).where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, STEP)));
+    const stored = parseLanguageChoice(d?.language);
+    if (!stored || !languageMismatch(stored, today)) return { ok: false, error: "no_mismatch" } as const;
+    await tx.update(sequenceMember).set({ draftLanguage: stored, draftLanguageByBdId: bdId, draftLanguageAt: new Date() }).where(eq(sequenceMember.id, memberId));
+    return { ok: true, language: stored } as const;
+  });
+}
+
 /**
  * "Guardar como idioma preferido" in the language dialog: sets person.preferred_language through the contact property editor (so
  * person_property_history records the actor and any BD may do it) and clears this member's one-off choice, in ONE transaction. The
@@ -312,10 +338,9 @@ export async function saveDraftEdit(bdId: string, memberId: string, input: { sub
     if (!current) return false;
     const now = new Date();
     await tx.update(sequenceDraft).set({ subject, body: input.body, editedAt: now, editedByBdId: bdId, ...reviewAfterEdit(current, bdId, now) }).where(draftKey);
-    if (step === STEP && m.state === "approved") {
-      assertTransition("approved", "drafted", "edit");
-      await tx.update(sequenceMember).set({ state: "drafted" }).where(eq(sequenceMember.id, memberId));
-    }
+    // The edit withdraws the approval (reviewAfterEdit), and with it any hold the release re-check wrote against it.
+    if (step === STEP && m.state === "approved") assertTransition("approved", "drafted", "edit");
+    await tx.update(sequenceMember).set({ ...(step === STEP && m.state === "approved" ? { state: "drafted" } : {}), holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));
     return true;
   });
   return saved ? { ok: true, footerWarning: facts.audience ? footerRemovedOnSave(input.body, facts.audience.address) : false } : { ok: false, error: "not_editable" };

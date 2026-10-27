@@ -38,7 +38,7 @@ const detail: SequenceDetail = { id: "seq-1", name: "Test sequence", ownerBdId: 
 // Selecting only reviewed drafts means the bar is otherwise enabled, so a disabled button can only come from the lock.
 const SELECTION = [{ id: "m4", reviewed: true }, { id: "m5", reviewed: true }];
 const bulkSlot = (lock: import("@/lib/sequences/generationLock").GenerationLock) =>
-  createElement(BulkBar, { selection: SELECTION, labels: L, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: NOW, lock, leftOut: 0 });
+  createElement(BulkBar, { selection: SELECTION, labels: L, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: NOW, lock, mismatched: {} });
 
 const renderView = (generatingId: string | null) =>
   renderToStaticMarkup(createElement(SequenceDetailView, { detail, labels: L, send: SEND, now: NOW, onAction: () => {}, viewerBdId: "bd-1", lock: generationLock(generatingId, MEMBERS, L.unnamed), bulk: bulkSlot }));

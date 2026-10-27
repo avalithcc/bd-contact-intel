@@ -2,6 +2,7 @@ import { isReadOnlyView } from "@/lib/sequences/readOnly";
 import { fill } from "@/lib/sequences/viewText";
 import type { GenerationLock } from "@/lib/sequences/generationLock";
 import { EyeIcon } from "@/components/icons";
+import { readyMemberIds } from "@/lib/sequences/detailFlow";
 import { sequenceStats, toStatMember } from "@/lib/sequences/stats";
 import type { ReactNode } from "react";
 import type { SequenceDetail } from "@/lib/sequences/detailQueries";
@@ -36,7 +37,7 @@ export function SequenceDetailView({ detail, labels, now, onAction, viewerBdId, 
       {readOnly && (
         <div className="alert alert-neutral mb-lg" role="note"><EyeIcon className="icon" /><div><span className="title">{fill(labels.readOnlyTitle, { owner: detail.ownerName })}</span> {labels.readOnlyBody}</div></div>
       )}
-      <SequenceHeader name={detail.name} memberCount={stats.total} readyCount={stats.toReview} labels={labels} onAction={onAction} readOnly={readOnly ? { ownerName: detail.ownerName, fromAddress: detail.fromAddress } : null} lock={lock} />
+      <SequenceHeader name={detail.name} memberCount={stats.total} readyCount={readyMemberIds(detail.members).length} labels={labels} onAction={onAction} readOnly={readOnly ? { ownerName: detail.ownerName, fromAddress: detail.fromAddress } : null} lock={lock} />
       {lock.active && (
         <div className="alert alert-info mb-lg" role="status"><span className="spinner-standalone" aria-hidden="true" /><div><strong>{fill(labels.generatingBannerTitle, { name: lock.generatingName ?? "" })}</strong> {labels.generatingBannerBody} <span className="meta">{labels.generatingBannerFail}</span></div></div>
       )}

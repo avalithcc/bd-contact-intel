@@ -9,7 +9,7 @@ import { resolveDraftLanguage } from "@/lib/sequences/languageChoice";
 import { buildUnsubscribeUrl, generateUnsubscribeToken } from "@/lib/sequences/unsubscribeToken";
 import { bulkApprovalGate } from "@/lib/sequences/bulkApprovalGate";
 import { bulkBarView } from "@/lib/sequences/bulkBar";
-import { gateRows, readyMemberIds } from "@/lib/sequences/detailFlow";
+import { gateRows, mismatchedNames, nameList, readyMemberIds } from "@/lib/sequences/detailFlow";
 import { evaluatePreSendChecks, HOLD_REASONS } from "@/lib/sequences/preSendChecks";
 import { buildMemberAudience } from "@/lib/sequences/audienceView";
 import type { DetailDraft, DetailMember } from "@/lib/sequences/detailQueries";
@@ -111,7 +111,7 @@ test("a member card is flagged from the stored draft language against memberLang
   assert.equal(memberDraftMismatch(member("6", "en", { state: "approved" })), null, "only an unapproved draft is offered the exits; the release re-check holds an approved one");
 });
 
-test("'Aprobar los N listos' leaves a mismatched draft out, and the others stay", () => {
+test("readyMemberIds (the set 'Aprobar los N listos' selects) leaves a mismatched draft out, and the others stay", () => {
   const members = [member("ok", "es"), member("wrong", "en"), member("unknown", null)];
   assert.deepEqual(readyMemberIds(members), ["ok", "unknown"]);
 });
@@ -128,4 +128,12 @@ test("gate rows carry the mismatch, the gate refuses a selection that holds one,
   assert.equal(bulkApprovalGate(rows.filter((r) => r.id === "unread")).enabled, false, "still blocked by an unopened draft");
   assert.equal(bulkBarView(rows.filter((r) => r.id === "wrong")).approveEnabled, false);
   assert.deepEqual(bulkBarView(rows).wrongLanguage, 1);
+});
+
+test("mismatchedNames names only the unapproved drafts in another language, by person name else email; nameList counts the rest", () => {
+  const members = [member("a", "en", { firstName: "Ana", lastName: "Gómez" }), member("b", "es"), member("c", "en", { firstName: null, lastName: null, email: "c@acme.test" }), member("d", "en", { state: "approved" })];
+  assert.deepEqual(mismatchedNames(members), { a: "Ana Gómez", c: "c@acme.test" });
+  const more = (n: number) => `+${n} more`;
+  assert.equal(nameList(["A", "B"], more), "A, B");
+  assert.equal(nameList(["A", "B", "C", "D", "E"], more), "A, B, C, +2 more");
 });

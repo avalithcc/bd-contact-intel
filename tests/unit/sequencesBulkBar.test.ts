@@ -11,7 +11,7 @@ import { IDLE_LOCK, SEND } from "./sendContextFixture";
 const { BulkBar } = require("@/app/(app)/sequences/_components/BulkBar") as typeof import("@/app/(app)/sequences/_components/BulkBar");
 
 const rows = (...reviewed: boolean[]) => reviewed.map((r, i) => ({ id: `m${i + 1}`, reviewed: r }));
-const render = (selection: readonly { id: string; reviewed: boolean; wrongLanguage?: boolean }[], leftOut = 0) => renderToStaticMarkup(createElement(BulkBar, { selection, labels: es.sequences, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: new Date("2026-10-15T14:00:00Z"), lock: IDLE_LOCK, leftOut }));
+const render = (selection: readonly { id: string; reviewed: boolean; wrongLanguage?: boolean }[], mismatched: Record<string, string> = {}) => renderToStaticMarkup(createElement(BulkBar, { selection, labels: es.sequences, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: new Date("2026-10-15T14:00:00Z"), lock: IDLE_LOCK, mismatched }));
 
 test("view model: 1 of 3 reviewed disables approve, 3 of 3 enables it", () => {
   assert.deepEqual(bulkBarView(rows(true, false, false)), { visible: true, selected: 3, reviewed: 1, approveEnabled: false, allReviewed: false, ids: ["m1", "m2", "m3"], wrongLanguage: 0 });
@@ -68,23 +68,24 @@ test("an empty selection renders nothing", () => {
   assert.equal(render([]), "");
 });
 
-test("a selected draft in another language blocks the bulk, and the reason is inside the sticky bar, not the review reason", () => {
-  const html = render([{ id: "m1", reviewed: true }, { id: "m2", reviewed: true, wrongLanguage: true }]);
-  const reason = "1 de los seleccionados está en otro idioma. Sacalo de la selección o corregilo para aprobar.";
+test("a selected draft in another language blocks the bulk, and the reason names it inside the sticky bar, not the review reason", () => {
+  const html = render([{ id: "m1", reviewed: true }, { id: "m2", reviewed: true, wrongLanguage: true }], { m2: "Ana Gómez" });
+  const reason = "1 de los seleccionados está en otro idioma: Ana Gómez. Sacalo de la selección o corregilo para aprobar.";
   assert.ok(barOf(html).includes(`<p class="note">${reason}</p>`), html);
   assert.match(html, new RegExp(`title="${reason}"`));
   assert.match(html, /<button[^>]*class="btn btn-primary btn-sm"[^>]*disabled=""/);
   assert.ok(!html.includes("por abrir"), "every draft was opened: the review reason must not appear");
+  assert.ok(!html.includes("Quedó afuera"), "a selected mismatched draft is blocked, not left out");
 });
 
 test("the review gate is untouched when a language block joins it: both reasons show, and the review reason is not replaced", () => {
-  const html = render([{ id: "m1", reviewed: false }, { id: "m2", reviewed: true, wrongLanguage: true }, { id: "m3", reviewed: true, wrongLanguage: true }]);
+  const html = render([{ id: "m1", reviewed: false }, { id: "m2", reviewed: true, wrongLanguage: true }, { id: "m3", reviewed: true, wrongLanguage: true }], { m2: "Ana", m3: "Beto" });
   assert.ok(barOf(html).includes("<strong>Falta 1 borrador</strong> por abrir."));
-  assert.ok(barOf(html).includes("2 de los seleccionados están en otro idioma."));
+  assert.ok(barOf(html).includes("2 de los seleccionados están en otro idioma: Ana, Beto."));
 });
 
-test("drafts left out of the selection are named in the bar so the reason travels with the button", () => {
-  assert.ok(barOf(render(rows(true), 1)).includes("Quedó afuera 1 borrador en otro idioma."));
-  assert.ok(barOf(render(rows(true), 3)).includes("Quedaron afuera 3 borradores en otro idioma."));
-  assert.ok(!render(rows(true), 0).includes("afuera"));
+test("drafts left out of the selection are named in the bar so the reason travels with the button, with the rest counted", () => {
+  assert.ok(barOf(render(rows(true), { x: "Ana Gómez" })).includes("Quedó afuera 1 borrador en otro idioma: Ana Gómez. Regeneralo"));
+  assert.ok(barOf(render(rows(true), { a: "A", b: "B", c: "C", d: "D", e: "E" })).includes("Quedaron afuera 5 borradores en otro idioma: A, B, C, +2 más."));
+  assert.ok(!render(rows(true)).includes("afuera"));
 });

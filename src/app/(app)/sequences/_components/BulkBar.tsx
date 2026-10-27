@@ -9,6 +9,7 @@ import type { GenerationLock } from "@/lib/sequences/generationLock";
 import { capOutlook } from "@/lib/sequences/sendMoment";
 import type { GateRow } from "@/lib/sequences/bulkApprovalGate";
 import { bulkBarView } from "@/lib/sequences/bulkBar";
+import { nameList } from "@/lib/sequences/detailFlow";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnBulkAction } from "./actions";
 import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
@@ -16,16 +17,19 @@ import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendC
 /**
  * `selection` is every selected row with its reviewed flag: the counter and the gate are computed from it, nothing else.
  * "Aprobar y enviar ahora los N" is the shared split button (one choice for all N); before the BD confirms, a warning says how many
- * leave now and how many wait because of the account's daily cap. `leftOut` counts the drafts in another language that cannot be selected.
+ * leave now and how many wait because of the account's daily cap. `mismatched` is every draft on the page in another language than today's (id -> name): the selected ones block the bulk, the others were left out of the selection, and the bar names both.
  */
-export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now, lock, leftOut }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date; lock: GenerationLock; leftOut: number }) {
+export function BulkBar({ selection, labels: l, onAction, send, recipients, cap, now, lock, mismatched }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; send: SequenceSendContext; recipients: readonly SendRecipient[]; cap: { cap: number; sentToday: number }; now: Date; lock: GenerationLock; mismatched: Readonly<Record<string, string>> }) {
   const v = bulkBarView(selection);
   if (!v.visible) return null;
   const one = v.selected === 1;
   const unopened = v.selected - v.reviewed;
   const missing = fill(unopened === 1 ? l.bulkMissingOne : l.bulkMissing, { n: unopened });
   const wl = l.languageMismatch;
-  const blockedLanguage = v.wrongLanguage === 0 ? null : v.wrongLanguage === 1 ? wl.barBlocked : fill(wl.barBlockedMany, { n: v.wrongLanguage });
+  const more = (n: number) => fill(l.bulkRefusedMore, { n });
+  const blockedNames = v.ids.filter((id) => id in mismatched).map((id) => mismatched[id]!);
+  const leftOutNames = Object.keys(mismatched).filter((id) => !v.ids.includes(id)).map((id) => mismatched[id]!);
+  const blockedLanguage = v.wrongLanguage === 0 ? null : fill(v.wrongLanguage === 1 ? wl.barBlocked : wl.barBlockedMany, { n: v.wrongLanguage, names: nameList(blockedNames, more) });
   const gateTitle = blockedLanguage ?? `${missing} ${l.bulkMissingPending}`;
   const n = { n: v.selected };
   const outlook = capOutlook({ count: v.selected, cap: cap.cap, sentToday: cap.sentToday });
@@ -52,7 +56,7 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
         {/* Inside the sticky bar so the reason travels with the disabled button instead of being scrolled away. */}
         {unopened > 0 && <p className="note"><strong>{missing}</strong> {l.bulkMissingPending}. {l.bulkBlockedWhy}</p>}
         {blockedLanguage && <p className="note">{blockedLanguage}</p>}
-        {leftOut > 0 && <p className="note">{leftOut === 1 ? wl.barLeftOut : fill(wl.barLeftOutMany, { n: leftOut })}</p>}
+        {leftOutNames.length > 0 && <p className="note">{fill(leftOutNames.length === 1 ? wl.barLeftOut : wl.barLeftOutMany, { n: leftOutNames.length, names: nameList(leftOutNames, more) })}</p>}
       </div>
       {v.approveEnabled && outlook.deferred > 0 && (
         <div className="alert alert-warn mt-md" role="status">

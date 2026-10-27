@@ -70,7 +70,8 @@ function mapOwnCard(f: CardFacts, now: Date): CardView {
   switch (f.state) {
     case "drafted":
       if (!f.hasDraft) return { ...base, kind: "noDraft", tone: "neutral", actions: [act("generate", "primary")], menu: ["openContact", "remove"] };
-      return { ...base, kind: "draft", tone: "info", florida: f.florida, actions: [act("reviewDraft", "secondary"), act("approve", "primary")], menu: ["regenerate", "openContact", "remove"] };
+      // No hold line on a draft: a hold belongs to an approval (or to a missing draft, below), and the audience alert covers the no-audience case.
+      return { ...base, holdReason: null, kind: "draft", tone: "info", florida: f.florida, actions: [act("reviewDraft", "secondary"), act("approve", "primary")], menu: ["regenerate", "openContact", "remove"] };
     case "approved":
       // "Cambiar" and "Enviar ahora" are on both approved cards (send-now-or-schedule); only the cancel wording differs.
       return {
