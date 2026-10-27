@@ -122,27 +122,123 @@ test("accepted cost: a bare 'San José' with no country signal classifies as oth
   assert.equal(classifyMarket("San José, Costa Rica"), "latam");
 });
 
-// Known and DEFERRED, asserted at their CURRENT (wrong) values. These are
-// the precedence problem: LATAM_RULES is evaluated before US_RULES and
-// returns early, so plainly-US text carrying a state code that is also a
-// LATAM code (co 118, pa 47, ar 11 rows = 182; 40 open IT, 29 fresh IT) is
-// filed latam. Fixing it needs the precedence change in classifyMarket, not
-// a constants edit. When that lands, flip these expectations.
-test("deferred: US text carrying co/pa is still filed latam (precedence change needed)", () => {
-  assert.equal(classifyMarket("Denver, CO - Hybrid"), "latam");
-  assert.equal(classifyMarket("Colorado Springs, CO, United States"), "latam");
-  assert.equal(classifyMarket("Philadelphia, PA"), "latam");
+// The precedence fix of 2026-10-27 (country signal beats a bare 2-letter code). Every string below is a real
+// production location. Before it, LATAM rules ran first and returned, so "co"/"pa"/"ar" filed plainly-US text
+// latam (182 rows, 40 open IT, 29 fresh IT) and "ca"/"tn"/"il"/"md"/"ct" filed Canada, India, Israel and Spain us.
+test("an explicit country beats a bare co/pa/ar: plainly-US text is us", () => {
+  for (const location of [
+    "Colorado Springs, CO, United States",
+    "Denver, CO, USA",
+    "Denver, CO, us",
+    "Philadelphia, PA, United States",
+    "Little Rock, AR, us",
+    "Bensalem Township, PA, us",
+    "US-CO-Denver",
+    "US-PA-Remote",
+  ]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
 });
 
-// Also deferred: "mexico" matches as a substring inside "New Mexico" (2
-// rows), bare 'ca' is both Canada and California (67 rows: 30 Canada, 37
-// California), and 'peru' matches as a substring inside "Perugia" (1 row, not
-// live; tokenizing it would also require tokenizing 'brasil', which would
-// lose "Brasilia", and both live in LATAM_COUNTRY_NAMES).
-test("deferred: other known misclassifications remain at their current values", () => {
-  assert.equal(classifyMarket("Albuquerque, New Mexico"), "latam");
-  assert.equal(classifyMarket("CA-Ontario-Toronto"), "us");
+test("a named US place beats a bare co/pa/ar even with no country (Denver, Philadelphia, Colorado Springs)", () => {
+  for (const location of ["Denver, CO - Hybrid", "Philadelphia, PA", "Colorado Springs, CO", "Denver, CO"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+});
+
+test("a named LATAM place or a LATAM country still files latam with the same codes", () => {
+  for (const location of ["Bogotá, CO", "Medellín, CO", "Buenos Aires, AR", "Medellín, Antioquia, co", "Palermo, CABA, ar", "Envigado, Envigado, co", "CO-Colombia-Remote", "San Jose, Costa Rica", "San Jose, CR"]) {
+    assert.equal(classifyMarket(location), "latam", location);
+  }
+});
+
+test("a bare co/pa/ar with no place or country is ambiguous: counts for neither side (other)", () => {
+  for (const location of ["Erie, PA", "Boulder, CO", "Bentonville, AR", "Capital Department, AR", "Antioquia, CO"]) {
+    assert.equal(classifyMarket(location), "other", location);
+  }
+});
+
+test("a trailing foreign country code decides: the state-like token before it is a region", () => {
+  for (const location of ["Cork, CO, ie", "Cadorago, CO, it", "Madrid, MD, es", "Barcelona, CT, es", "Almere, FL, nl", "Angers, Pays de la Loire, fr", "Ikorodu, LA, ng", "Al Sheikh Zayed, Giza Governorate, eg", "IL-Israel-Remote"]) {
+    assert.equal(classifyMarket(location), "other", location);
+  }
+});
+
+test("CA by position: a trailing country after a province is Canada, directly after a city is California", () => {
+  for (const location of ["Toronto, ON, ca", "Montreal, QC, ca", "Vancouver, BC, ca", "CA-Ontario-Toronto", "CA-British Columbia-Remote"]) {
+    assert.equal(classifyMarket(location), "other", location);
+  }
+  for (const location of ["San Francisco, CA", "San Jose, CA", "San Francisco, CA - Hybrid", "Irvine, CA, us", "Los Angeles, CA, United States", "US-CA-Menlo Park", "US-CA-Remote", "USA - San Francisco, CA"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+});
+
+test("CA that is not directly after a city is ambiguous and counts for neither side", () => {
+  assert.equal(classifyMarket("CA Remote (BC & ON only)"), "other");
+  assert.equal(classifyMarket("Remote CA"), "other");
+});
+
+test("TN by position: the trailing country wins (Chennai), directly after a city it is Tennessee", () => {
+  for (const location of ["Chennai, TN, in", "Navi Mumbai, TN, in", "Oragadam, TN, in"]) {
+    assert.equal(classifyMarket(location), "other", location);
+  }
+  for (const location of ["Nashville, TN", "Nashville, TN, USA", "Mt. Juliet, TN, us", "Chattanooga, TN"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+});
+
+test("New Mexico is a US state, not Mexico; Mexico itself is still latam", () => {
+  assert.equal(classifyMarket("Albuquerque, New Mexico"), "us");
+  assert.equal(classifyMarket("Santa Fe, New Mexico "), "us");
+  assert.equal(classifyMarket("Mexico City"), "latam");
+  assert.equal(classifyMarket("MX-Mexico-Remote"), "latam");
+  assert.equal(classifyMarket("Remote, Mexico"), "latam");
+});
+
+test("a list of places is classified part by part and the best part wins, LATAM first", () => {
+  assert.equal(classifyMarket("Denver, CO - Hybrid; New York, NY - Hybrid; San Francisco, CA - Hybrid"), "us");
+  assert.equal(classifyMarket("Atlanta, GA - Hybrid; Denver, CO - Hybrid; New York, NY - Hybrid; Toronto, Ontario - Remote"), "us");
+  assert.equal(classifyMarket("Denver, CO; Bogotá, CO"), "latam");
+  assert.equal(classifyMarket("Toronto, ON, ca; Cork, CO, ie"), "other");
+});
+
+test("a list of places inside one part ends in a state, not a country", () => {
+  for (const location of ["Arlington, VA or Clearwater, FL", "Washington, DC & Bethesda, MD", "Corpus Christi, TX and St. Francisville, LA", "Dallas, TX, Austin, TX", "Miami, FL / Corpus Christi, TX"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+});
+
+test("U.S. written with dots is the United States (16 rows were other)", () => {
+  assert.equal(classifyMarket("U.S. Remote"), "us");
+  assert.equal(classifyMarket("U.S. Anywhere"), "us");
+  assert.equal(classifyMarket("Chicago, U.S. (Hybrid)"), "us");
+  assert.equal(classifyMarket("CA Remote (BC & ON only); U.S. Remote"), "us");
+});
+
+test("genuinely mixed explicit countries keep the old order: LATAM wins", () => {
+  assert.equal(classifyMarket("Remote (US, AR, BR, CA)"), "latam");
+  assert.equal(classifyMarket("Argentina & US "), "latam");
+});
+
+// Left alone on purpose (documented in markets.ts): Perugia matches the "peru" country-name phrase, which also feeds
+// the contact form's country list, and "Lima, OH" has the Lima token. "Toronto, CA" has nothing but the code after
+// a city, which is California by the owner's position rule.
+test("left alone: Perugia, Lima OH and Toronto, CA keep their old values", () => {
   assert.equal(classifyMarket("Perugia, IT"), "latam");
+  assert.equal(classifyMarket("Lima, OH"), "latam");
+  assert.equal(classifyMarket("Toronto, CA"), "us");
+});
+
+test("the market of a location never depends on how many times it is asked (no shared state)", () => {
+  const locations = ["Denver, CO - Hybrid; Toronto, ON, ca", "Chennai, TN, in", "U.S. Remote", "Albuquerque, New Mexico"];
+  const first = locations.map(classifyMarket);
+  const second = locations.map(classifyMarket);
+  assert.deepEqual(second, first);
+});
+
+test("isMiamiArea is untouched by the country-signal rewrite", () => {
+  assert.equal(isMiamiArea("Tampa, FL, United States"), true);
+  assert.equal(isMiamiArea("Denver, CO, USA"), false);
 });
 
 test("blank and null locations classify as other", () => {
