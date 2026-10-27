@@ -149,6 +149,8 @@ test("day 10: the page hides the item, the job drops it once, and selection does
     assert.equal((await read(tx, bdId, d9)).length, 1, "day 9 still shows it");
     assert.equal((await read(tx, bdId, d10)).length, 0, "day 10 is past the deadline even if the job has not run");
     const { expireOverdueFollowUps } = await import("@/lib/followUp/dropQueries");
+    assert.equal(await expireOverdueFollowUps(d10, tx as never, { dryRun: true }), 1);
+    assert.equal((await activitiesOf(tx, id, "follow_up_expired")).length, 0, "a dry run writes nothing");
     assert.equal(await expireOverdueFollowUps(d10, tx as never), 1);
     assert.equal(await expireOverdueFollowUps(d10, tx as never), 0, "idempotent");
     const [expired] = await activitiesOf(tx, id, "follow_up_expired");

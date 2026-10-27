@@ -67,7 +67,11 @@ export async function dropFollowUp(input: DropFollowUpInput, executor: Executor 
  * `follow_up_expired` activity with no actor. Idempotent (an expired item is no longer open), bounded, one transaction.
  * Returns how many were dropped.
  */
-export async function expireOverdueFollowUps(today: string, executor: Executor = db): Promise<number> {
+export async function expireOverdueFollowUps(
+  today: string,
+  executor: Executor = db,
+  options: { dryRun?: boolean } = {},
+): Promise<number> {
   return executor.transaction(async (tx) => {
     const due = await tx
       .select({
@@ -88,7 +92,7 @@ export async function expireOverdueFollowUps(today: string, executor: Executor =
       .limit(EXPIRY_BATCH_CAP);
     // One expiry per contact even if a merge left it two open rows.
     const perPerson = [...new Map(due.map((d) => [d.personId, d])).values()];
-    if (perPerson.length === 0) return 0;
+    if (perPerson.length === 0 || options.dryRun) return perPerson.length;
     await tx.insert(activity).values(
       perPerson.map((d) => ({
         personId: d.personId,
