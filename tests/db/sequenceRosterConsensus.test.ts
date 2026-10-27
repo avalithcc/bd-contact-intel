@@ -19,6 +19,7 @@ let sequenceId: string;
 const personIds: string[] = [];
 const companyKeys: string[] = [];
 const ids = new Map<string, string>();
+const personsWithOwnCountry: string[] = [];
 
 async function mkCompany(name: string, country: string | null) {
   const { db } = await import("@/db");
@@ -40,6 +41,7 @@ async function mkPerson(name: string, ck: string | null, over: { country?: strin
     .returning();
   personIds.push(p.id);
   ids.set(name, p.id);
+  if (over.country?.trim()) personsWithOwnCountry.push(p.id);
   if (over.merged) await db.execute(sql`update person set merged_into_id = ${personIds[0]}::uuid where id = ${p.id}::uuid`);
   return p;
 }
@@ -109,9 +111,12 @@ test("the by-id roster and the picker's set-based roster are the same set for ev
   const picker = (await db.execute(buildPickerPageQuery({ ...DEFAULT_PICKER_QUERY, search: `ros- ${run}`, showBlocked: true }, ownerId, { unmapped: [], us: [] }))) as unknown as { person_id: string; roster_countries: unknown }[];
   const fromPicker = new Map(picker.map((r) => [r.person_id, normalized(r.roster_countries)]));
   assert.ok(fromPicker.size >= 10, "the picker page returned the fixtures");
+  const ownCountry = new Set(personsWithOwnCountry);
   for (const r of byId) {
     if (!fromPicker.has(r.id)) continue; // merged contacts are not in the picker pool
-    assert.deepEqual(fromPicker.get(r.id), normalized(r.roster), `person ${r.id}`);
+    // The by-id read skips the roster for a person with a country of their own (the resolver never asks); the picker keeps it.
+    if (ownCountry.has(r.id)) assert.deepEqual(normalized(r.roster), [], `person ${r.id} has a country of their own`);
+    else assert.deepEqual(fromPicker.get(r.id), normalized(r.roster), `person ${r.id}`);
   }
   const target = byId.find((r) => r.id === ids.get("g-target"))!;
   // Merged and blank colleagues are out; the alias-key colleague and the canonical ones pool into one company; spellings stay per filed text.

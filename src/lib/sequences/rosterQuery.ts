@@ -72,20 +72,25 @@ export const postingMarketsSql = sql`coalesce((select json_agg(distinct jp.marke
  * Seq Scans `person` once per contact (measured on production, 100 contacts of the largest companies: 1,028 ms with the OR,
  * 18-25 ms with the array, same rows). Do not "simplify" it back.
  *
- * The person is not excluded by `q.id <> p.id`, on purpose: the resolver reads the roster only when the person has no country of
- * their own, and a person without a country is not in a list of filed countries. That also keeps this the same set the picker's
- * set-based `pk_roster` produces (pickerQuery.ts), so the two cannot disagree by one row.
+ * The roster is read ONLY for a person with no country of their own (`case when btrim(...) = ''`), because that is the only
+ * time the resolver consults it; otherwise `[]` and no read at all. For such a person the person is not excluded by
+ * `q.id <> p.id`, on purpose: a person without a country is not in a list of filed countries. So this is the same set the
+ * picker's set-based `pk_roster` produces for that person (pickerQuery.ts), which keeps the roster for everyone because its SQL
+ * also uses it to decide what to hide. The SQL "blank" is btrim of spaces; the resolver's is JS trim(), which also strips tabs and
+ * no-break spaces: a country made only of those reads as filed here, so it gets `[]`; the measurement script counts such rows.
  */
 const canonicalCompanyKeySql = sql`coalesce((select ca.company_key from company_alias ca where ca.alias_key = p.company_key), p.company_key)`;
 export const rosterCountriesSql = sql`coalesce((
-  select json_agg(json_build_object('country', g.c, 'n', g.n))
-  from (
-    select btrim(q.country) as c, count(*)::int as n
-    from person q
-    where q.merged_into_id is null and btrim(coalesce(q.country, '')) <> '' and p.company_key is not null
-      and q.company_key = any(array(select ${canonicalCompanyKeySql} union select ca.alias_key from company_alias ca where ca.company_key = ${canonicalCompanyKeySql}))
-    group by 1
-  ) g
+  case when btrim(coalesce(p.country, '')) = '' then (
+    select json_agg(json_build_object('country', g.c, 'n', g.n))
+    from (
+      select btrim(q.country) as c, count(*)::int as n
+      from person q
+      where q.merged_into_id is null and btrim(coalesce(q.country, '')) <> '' and p.company_key is not null
+        and q.company_key = any(array(select ${canonicalCompanyKeySql} union select ca.alias_key from company_alias ca where ca.company_key = ${canonicalCompanyKeySql}))
+      group by 1
+    ) g
+  ) end
 ), '[]'::json)`;
 
 /**

@@ -37,6 +37,7 @@ test("the roster read pools the canonical company, skips merged contacts and bla
   assert.match(text, /btrim\(coalesce\(q\.country, ''\)\) <> ''/);
   assert.match(text, /company_alias/);
   assert.match(text, /group by 1/);
+  assert.match(text, /^coalesce\(\(\s*case when btrim\(coalesce\(p\.country, ''\)\) = ''/, "the roster is read only for a person with no country of their own: the resolver never consults it otherwise");
   assert.doesNotMatch(text, /limit \d/i, "a grouped read per distinct filed text: bounded by the distinct countries, never by a row cap that could drop a colleague");
 });
 
