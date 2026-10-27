@@ -26,6 +26,7 @@ import { pickGenerateMessageLabels, signalLabelsFromDict } from "@/lib/outreach/
 import { getDictionary } from "@/lib/i18n/server";
 import {
   generateMemberDraft as generateMemberDraftRow,
+  keepDraftLanguage as keepDraftLanguageRow,
   memberDraftSignals,
   regenerateReminderDraft,
   regenerateDrafts,
@@ -33,6 +34,7 @@ import {
   setMemberDraftLanguage,
   setMemberPreferredLanguage,
   type DraftBatchResult,
+  type KeepLanguageResult,
   type SaveEditResult,
   type SetLanguageResult,
 } from "@/lib/sequences/draftQueries";
@@ -111,6 +113,13 @@ export async function chooseDraftLanguage(memberId: string, language: unknown): 
   if (!chosen || !isUuid(memberId)) return { ok: false, error: !chosen ? "invalid_language" : "not_found" };
   const me = await getCurrentBd();
   return setMemberDraftLanguage(me.id, memberId, chosen);
+}
+
+/** "Mantener en {idioma}": the server reads the stored draft's language itself and refuses when there is nothing to keep (draftQueries.keepDraftLanguage). */
+export async function keepDraftLanguage(memberId: string): Promise<KeepLanguageResult> {
+  if (!isUuid(memberId)) return { ok: false, error: "not_found" };
+  const me = await getCurrentBd();
+  return keepDraftLanguageRow(me.id, memberId);
 }
 
 /**

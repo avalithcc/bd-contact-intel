@@ -245,7 +245,7 @@ test("changing the preference leaves an existing draft exactly as it was", async
   assert.equal(calls.length, 0);
 });
 
-test("PRODUCER step 2 reminder: written in the preference as it stands when it is generated, with the Spanish opt-out sentence", async () => {
+test("PRODUCER step 2 reminder: stays in the language step 1 was written in even when the preference changed since, with that language's opt-out sentence", async () => {
   const { db } = await import("@/db");
   const { sequenceDraft, sequenceMember } = await import("@/db/schema");
   const { and, eq } = await import("drizzle-orm");
@@ -258,7 +258,8 @@ test("PRODUCER step 2 reminder: written in the preference as it stands when it i
   await db.update(sequenceMember).set({ state: "sent" }).where(eq(sequenceMember.id, m.memberId));
   await updateContactProperty(m.personId, "preferredLanguage", "es", bdId);
   assert.equal(await generateReminderDraft(bdId, sequenceId, m.memberId, deps), "generated");
-  assert.deepEqual(languagesFor("reminder"), ["en", "es"], "step 1 went out in the audience's language, the reminder follows the new preference");
+  assert.deepEqual(languagesFor("reminder"), ["en", "en"], "step 1 went out in the audience's language, and the reminder is pinned to it: a thread never mixes languages");
   const [reminder] = await db.select().from(sequenceDraft).where(and(eq(sequenceDraft.sequenceMemberId, m.memberId), eq(sequenceDraft.step, 2)));
-  assert.ok(reminder.body.includes(OPT_OUT_TEXT.es) && !reminder.body.includes(OPT_OUT_TEXT.en));
+  assert.ok(reminder.body.includes(OPT_OUT_TEXT.en) && !reminder.body.includes(OPT_OUT_TEXT.es));
+  assert.equal(reminder.language, "en");
 });

@@ -99,7 +99,7 @@ test("a Cuban contact is HELD at every gate: no draft input, no roster add, no s
   const facts: PreSendFacts = {
     step: 1, memberState: "approved", draftApproved: true, merged: false, email: "a@b.test", hasClientStatus: false,
     address: (audience as ComplianceAudience | null)?.address ?? null, body: footed, accountStatus: "connected", activeClaim: null, repliedAt: null,
-    inboundReplyAt: null, lastSyncedAt: NOW, step1RfcMessageId: null, step1ThreadId: null,
+    inboundReplyAt: null, lastSyncedAt: NOW, step1RfcMessageId: null, step1ThreadId: null, draftLanguage: null, languageToday: null,
   };
   assert.deepEqual(evaluatePreSendChecks(facts, { now: NOW, suppression: [] }), { ok: false, reason: "unmapped_market" }, "send");
 });

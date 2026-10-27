@@ -10,17 +10,17 @@
 
 /**
  * The last journal idx that production's ledger has already applied and recorded (2026-10-27:
- * 0063 applied, 64 ledger rows = 64 files, idx 0..63). Entries up to here are grandfathered.
+ * 0064 applied, 65 ledger rows = 65 files, idx 0..64). Entries up to here are grandfathered.
  */
-export const LAST_APPLIED_IDX = 63;
+export const LAST_APPLIED_IDX = 64;
 
 /**
- * The ledger's max `created_at`, which is the `when` of idx LAST_APPLIED_IDX (2026-11-17, future-dated
+ * The ledger's max `created_at`, which is the `when` of idx LAST_APPLIED_IDX (2026-11-18, future-dated
  * by the repo's hand-set cadence). Every newer entry must carry a `when` strictly above it, or the
  * migrator skips it silently. Bump LAST_APPLIED_IDX and this together only after a new migration has
  * been applied to production and recorded in the ledger. README "Migrations" explains the rule.
  */
-export const LEDGER_MAX_WHEN = 1_794_946_800_000;
+export const LEDGER_MAX_WHEN = 1_795_033_200_000;
 
 const DAY_MS = 86_400_000;
 

@@ -5,7 +5,9 @@
  */
 import type { MemberAudience } from "./audienceView";
 import { formatArgentinaDayMonth } from "@/lib/i18n/format";
+import type { DetailMember } from "./detailQueries";
 import { resolveDraftLanguage, type ResolvedDraftLanguage } from "./languageChoice";
+import { languageMismatch, type LanguageMismatch } from "./languageMismatch";
 
 /** Who set the preferred language and when, as the card and the dialog quote it. Null when there is no history row: they then say nothing about it rather than "cargado por ?". */
 export function preferredStamp(p: { byName: string | null; at: Date | null }): { by: string; when: string } | null {
@@ -15,6 +17,12 @@ export function preferredStamp(p: { byName: string | null; at: Date | null }): {
 /** The language of a member's draft as the card and the dialog show it: the same resolveDraftLanguage the draft is generated with. */
 export function memberLanguage(m: { audience?: MemberAudience; languageChoice?: { language: string } | null; preferredLanguage?: { language: string } | null }): ResolvedDraftLanguage | null {
   return resolveDraftLanguage(m.audience?.audience?.language ?? null, { chosen: m.languageChoice?.language, preferred: m.preferredLanguage?.language });
+}
+
+/** The card and the dialog: an UNAPPROVED step 1 draft against memberLanguage. An approved one is held by the release re-check instead. */
+export function memberDraftMismatch(m: Pick<DetailMember, "state" | "draft" | "audience" | "languageChoice" | "preferredLanguage">): LanguageMismatch | null {
+  if (m.state !== "drafted" || !m.draft) return null;
+  return languageMismatch(m.draft.language, memberLanguage(m)?.language ?? null);
 }
 
 /**

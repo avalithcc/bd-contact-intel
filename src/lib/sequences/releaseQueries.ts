@@ -23,6 +23,7 @@ import { miamiCalendarDate } from "./miamiTime";
 import { assertTransition } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { resolveComplianceAudience } from "./complianceAudience";
+import { languageNow } from "./languageMismatch";
 import { audienceFactsSql, sameCompanyAs } from "./rosterQuery";
 import { audienceInputsFromRow } from "./audienceInputs";
 import { generateReminderDraft } from "./draftQueries";
@@ -60,12 +61,15 @@ function toCandidate(r: Row): ReleaseCandidate {
   // The same helper that ordered the cap (releaseSelection): "Adelantar recordatorio" moves only member.reminder_due_at, so a
   // reminder's release instant is derived, not stored.
   const dueAt = releaseInstant({ step, scheduledFor: toDate(r.scheduled_for), reminderDueAt: toDate(r.reminder_due_at), approvedAt, schedule });
+  const audience = resolveComplianceAudience(audienceInputsFromRow(r));
   return {
     id: r.member_id as string, sequenceId: r.sequence_id as string, ownerBdId: r.owner_bd_id as string, personId: r.person_id as string,
     accountId: r.account_id as string, dailyCap: Number(r.daily_send_cap), step, dueAt, approvedAt, schedule,
     memberState: r.state as string, draftApproved: true, repliedAt: toDate(r.replied_at), inboundReplyAt: toDate(r.inbound_reply_at), holdReason: (r.hold_reason ?? null) as HoldReason | null,
     email: (r.email ?? null) as string | null, merged: Boolean(r.merged), hasClientStatus: Boolean(r.has_client_status),
-    address: resolveComplianceAudience(audienceInputsFromRow(r))?.address ?? null,
+    address: audience?.address ?? null,
+    draftLanguage: (r.draft_stored_language ?? null) as string | null,
+    languageToday: languageNow(step, audience?.language ?? null, { chosen: r.draft_language, preferred: r.preferred_language }, r.step1_language),
     subject: r.subject as string, body: r.body as string, signatureHtml: (r.signature_html ?? null) as string | null, accountStatus: r.account_status as string, accountEmail: r.account_email as string,
     lastSyncedAt: toDate(r.last_synced_at), activeClaim: (r.active_claim ?? null) as "pending" | "sent" | null, activeClaimAt: toDate(r.active_claim_at),
     step1RfcMessageId: (r.step1_rfc ?? null) as string | null, step1ThreadId: (r.step1_thread ?? null) as string | null,
@@ -85,7 +89,8 @@ export const buildCandidateFactsQuery = (keys: SQL, iso: string, scoped: SQL) =>
       select sm.id::text as member_id, sm.sequence_id::text as sequence_id, s.owner_bd_id::text as owner_bd_id, sm.person_id::text as person_id,
              s.email_account_id::text as account_id, s.daily_send_cap, s.schedule, d.step, d.subject, d.body, d.scheduled_for, d.approved_at,
              sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged,
-             ${audienceFactsSql},
+             ${audienceFactsSql}, sm.draft_language, p.preferred_language, d.language as draft_stored_language,
+             case when d.step = 2 then (select d1.language from sequence_draft d1 where d1.sequence_member_id = sm.id and d1.step = 1) end as step1_language,
              exists (select 1 from company c where ${sameCompanyAs("c")} and c.client_status is not null) as has_client_status,
              ea.status as account_status, ea.email_address as account_email, ea.last_synced_at,
              (select cl.outcome from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim,

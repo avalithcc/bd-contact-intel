@@ -11,7 +11,9 @@ import { sequenceAuditRow } from "./approvalAudit";
 import { checkStep1Subject } from "./approvalChecks";
 import { bulkApprovalGate } from "./bulkApprovalGate";
 import { parseDraftVersion } from "./draftVersion";
-import { resolveComplianceAudience, type ComplianceAddress } from "./complianceAudience";
+import { resolveComplianceAudience, type AudienceLanguage, type ComplianceAddress } from "./complianceAudience";
+import { clearDraftHold } from "./draftHold";
+import { languageNow } from "./languageMismatch";
 import { complianceRefusal, type ComplianceRefusal } from "./complianceGate";
 import { COMPLIANCE_CONFIG } from "./config";
 import { SEQUENCE_DETAIL_MEMBER_LIMIT } from "./detailQueries";
@@ -72,16 +74,20 @@ export async function markDraftReviewed(bdId: string, memberId: string, version:
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
- * The footer address each person's audience resolves to NOW (null = no audience), for all of them in ONE read. Same inputs
- * and same resolver as the draft step and the roster add, so approval, drafting and the release re-check cannot disagree.
+ * The footer address and the audience language each person resolves to NOW (null = no audience), with their preferred language, for
+ * all of them in ONE read. Same inputs and same resolver as the draft step and the roster add, so approval, drafting and the release
+ * re-check cannot disagree.
  */
-async function addressesNow(tx: Tx, personIds: readonly string[]): Promise<Map<string, ComplianceAddress | null>> {
+async function audiencesNow(tx: Tx, personIds: readonly string[]): Promise<Map<string, { address: ComplianceAddress | null; language: AudienceLanguage | null; preferred: unknown }>> {
   if (!personIds.length) return new Map();
   const ids = sql.join(personIds.map((id) => sql`${id}::uuid`), sql`, `);
   const rows = (await tx.execute(sql`
-    select p.id::text as person_id, ${audienceFactsSql}
-    from person p where p.id in (${ids})`)) as unknown as ({ person_id: string } & Record<string, unknown>)[];
-  return new Map(rows.map((r) => [r.person_id, resolveComplianceAudience(audienceInputsFromRow(r))?.address ?? null]));
+    select p.id::text as person_id, p.preferred_language, ${audienceFactsSql}
+    from person p where p.id in (${ids})`)) as unknown as ({ person_id: string; preferred_language: unknown } & Record<string, unknown>)[];
+  return new Map(rows.map((r) => {
+    const audience = resolveComplianceAudience(audienceInputsFromRow(r));
+    return [r.person_id, { address: audience?.address ?? null, language: audience?.language ?? null, preferred: r.preferred_language }];
+  }));
 }
 
 /**
@@ -94,24 +100,30 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
   if (ids.length > SEQUENCE_DETAIL_MEMBER_LIMIT) return { ok: false, error: "too_many", limit: SEQUENCE_DETAIL_MEMBER_LIMIT };
   return db.transaction(async (tx) => {
     const members = await tx
-      .select({ id: sequenceMember.id, state: sequenceMember.state, personId: sequenceMember.personId, sequenceId: sequenceMember.sequenceId, schedule: sequence.schedule, reminderDueAt: sequenceMember.reminderDueAt })
+      .select({ id: sequenceMember.id, state: sequenceMember.state, personId: sequenceMember.personId, sequenceId: sequenceMember.sequenceId, draftLanguage: sequenceMember.draftLanguage, schedule: sequence.schedule, reminderDueAt: sequenceMember.reminderDueAt })
       .from(sequenceMember)
       .innerJoin(sequence, eq(sequence.id, sequenceMember.sequenceId))
       .where(and(inArray(sequenceMember.id, ids), eq(sequence.ownerBdId, bdId)))
       .for("update", { of: sequenceMember });
     const byId = new Map(members.map((m) => [m.id, m]));
-    const drafts = new Map((await tx.select().from(sequenceDraft).where(and(inArray(sequenceDraft.sequenceMemberId, ids), eq(sequenceDraft.step, step)))).map((d) => [d.sequenceMemberId, d]));
+    // A reminder is measured against step 1's language, so step 1's row is read too.
+    const draftRows = await tx.select().from(sequenceDraft).where(and(inArray(sequenceDraft.sequenceMemberId, ids), inArray(sequenceDraft.step, step === 1 ? [1] : [1, step])));
+    const drafts = new Map(draftRows.filter((d) => d.step === step).map((d) => [d.sequenceMemberId, d]));
+    const step1Language = new Map(draftRows.filter((d) => d.step === 1).map((d) => [d.sequenceMemberId, d.language]));
 
     // The footer was written at draft time; the audience can have moved since (country edited, posting closed, policy change).
     // Refuse here, with the BD present, instead of at release hours later. Applies to the step 2 reminder too.
-    const addresses = await addressesNow(tx, members.map((m) => m.personId));
+    const audiences = await audiencesNow(tx, members.map((m) => m.personId));
     const now = new Date();
     const moments = new Map<string, Date>();
     const rejected: ApprovalRejection[] = [];
     for (const id of ids) {
       const m = byId.get(id);
       const d = drafts.get(id);
-      const refusal = m && d ? complianceRefusal(addresses.get(m.personId) ?? null, d.body, COMPLIANCE_CONFIG) : null;
+      const a = m ? audiences.get(m.personId) : undefined;
+      // The language of today is the resolver's (one-off > preferred > audience); a reminder is pinned to step 1's. A stored language that differs refuses the approval.
+      const language = m && d ? { draft: d.language, today: languageNow(step, a?.language ?? null, { chosen: m.draftLanguage, preferred: a?.preferred }, step1Language.get(m.id)) } : undefined;
+      const refusal = m && d ? complianceRefusal(a?.address ?? null, d.body, COMPLIANCE_CONFIG, language) : null;
       if (!m) rejected.push({ memberId: id, reason: "not_found" });
       else if (!(step === 1 ? canTransition(m.state as MemberState, "approved", "approve") : m.state === "sent" && m.reminderDueAt !== null)) rejected.push({ memberId: id, reason: "not_approvable" });
       else if (!d) rejected.push({ memberId: id, reason: "no_draft" });
@@ -162,7 +174,8 @@ export async function cancelApproval(bdId: string, memberId: string, step: Appro
       .where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, step), step === 2 ? isNotNull(sequenceDraft.approvedAt) : undefined))
       .returning({ id: sequenceDraft.id });
     if (step === REMINDER_STEP && !cleared.length) return { ok: false, error: "not_approved" } as const;
-    if (step === 1) await tx.update(sequenceMember).set({ state: "drafted" }).where(eq(sequenceMember.id, memberId));
+    // Back to drafted (or a reminder without approval): a hold about the DRAFT (wrong language, footer, address) goes with the approval just withdrawn; a send-side hold stays.
+    await tx.update(sequenceMember).set({ ...(step === 1 ? { state: "drafted" } : {}), ...clearDraftHold() }).where(eq(sequenceMember.id, memberId));
     await tx.insert(auditLog).values(sequenceAuditRow("cancel", { actorBdId: bdId, personId: m.personId, memberId, sequenceId: m.sequenceId, step }));
     return { ok: true } as const;
   });

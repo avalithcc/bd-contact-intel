@@ -37,6 +37,8 @@ function facts(over: Partial<PreSendFacts> = {}): PreSendFacts {
     lastSyncedAt: new Date(NOW.getTime() - 3 * 3600_000),
     step1RfcMessageId: "<abc@mail.gmail.test>",
     step1ThreadId: "thread-1",
+    draftLanguage: null,
+    languageToday: null,
     ...over,
   };
 }

@@ -18,7 +18,7 @@ const { generationLock } = require("@/lib/sequences/generationLock") as typeof i
 
 const L = es.sequences;
 const NOW = new Date("2026-10-15T14:00:00Z");
-const draft = { subject: "s", body: "b", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null };
+const draft = { subject: "s", body: "b", language: null, edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null };
 
 // Synthetic people only.
 function member(i: number, over: Partial<DetailMember>): DetailMember {
@@ -38,7 +38,7 @@ const detail: SequenceDetail = { id: "seq-1", name: "Test sequence", ownerBdId: 
 // Selecting only reviewed drafts means the bar is otherwise enabled, so a disabled button can only come from the lock.
 const SELECTION = [{ id: "m4", reviewed: true }, { id: "m5", reviewed: true }];
 const bulkSlot = (lock: import("@/lib/sequences/generationLock").GenerationLock) =>
-  createElement(BulkBar, { selection: SELECTION, labels: L, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: NOW, lock });
+  createElement(BulkBar, { selection: SELECTION, labels: L, onAction: () => {}, send: SEND, recipients: [], cap: { cap: 5, sentToday: 0 }, now: NOW, lock, mismatched: {} });
 
 const renderView = (generatingId: string | null) =>
   renderToStaticMarkup(createElement(SequenceDetailView, { detail, labels: L, send: SEND, now: NOW, onAction: () => {}, viewerBdId: "bd-1", lock: generationLock(generatingId, MEMBERS, L.unnamed), bulk: bulkSlot }));

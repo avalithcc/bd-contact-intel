@@ -18,7 +18,9 @@ import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { REGENERABLE_STATES } from "./detailFlow";
 import { blocksEditedOverwrite, composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult, type EditConfirmations, type SkippedEdit } from "./draftCompose";
 import { buildSequenceDraftInput, draftSignals, resolveDraftCompliance, senderIdentity } from "@/lib/sequences/draftInput";
-import { parseLanguageChoice, type DraftLanguageOverrides } from "./languageChoice";
+import { parseLanguageChoice, resolveDraftLanguage, type DraftLanguageOverrides } from "./languageChoice";
+import { clearDraftHold } from "./draftHold";
+import { languageMismatch, pinToStep1 } from "./languageMismatch";
 import type { AudienceLanguage } from "./complianceAudience";
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
@@ -65,6 +67,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
              ${audienceFactsSql},
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as has_reminder_draft,
+             (select d.language from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as step1_language,
              (select d.edited_at from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as draft_edited_at,
              (select d.edited_at from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as reminder_edited_at
       from sequence_member sm
@@ -78,7 +81,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   // The recorded human statements about the language, if any: this member's one-off choice and the contact's preferred language.
   // A stored value that is not es/en reads as nothing, so it can never reach the generator (resolveDraftLanguage decides).
   const overrides: DraftLanguageOverrides = { chosen: parseLanguageChoice(r.draft_language), preferred: parseLanguageChoice(r.preferred_language) };
-  return { r, audience, overrides, state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };
+  return { r, audience, overrides, step1Language: parseLanguageChoice(r.step1_language), state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };
 }
 
 /** Everything the model may see, loaded as the signed-in owner (R6: counts and shared notes only, never messages). */
@@ -118,7 +121,9 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
   const facts = await loadFacts(bdId, memberId, sequenceId);
   if (!facts || !editable.includes(facts.state)) return "skipped";
   if (reminder ? !facts.hasDraft || (mode === "missing" && facts.hasReminderDraft) : mode === "missing" && (facts.state !== "drafted" || facts.hasDraft)) return "skipped";
-  const { r, audience, overrides } = facts;
+  const { r, audience } = facts;
+  // A reminder is pinned to the language step 1 was written in, so the thread never mixes languages (unknown: the resolver decides as before).
+  const overrides = reminder ? pinToStep1(facts.overrides, facts.step1Language) : facts.overrides;
   // The address is the audience's; only the language can be a recorded human statement (draftInput.ts).
   const compliance = resolveDraftCompliance(audience, overrides);
   // Cheap early exit so a refused overwrite does not spend a model call. The authoritative check is inside the transaction below.
@@ -151,21 +156,23 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
       guard.skippedEdited.push({ memberId, editedAt: current!.editedAt!.getTime() });
       return "skipped";
     }
-    const values = { sequenceMemberId: memberId, step, ...draft };
+    const values = { sequenceMemberId: memberId, step, ...draft, language: compliance.language };
     if (mode === "missing") {
       if (!(await tx.insert(sequenceDraft).values(values).onConflictDoNothing().returning({ id: sequenceDraft.id })).length) return "skipped";
     } else {
       await tx.insert(sequenceDraft).values(values).onConflictDoUpdate({
         target: [sequenceDraft.sequenceMemberId, sequenceDraft.step],
-        set: { ...draft, generatedAt: new Date(), editedAt: null, editedByBdId: null, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null },
+        set: { ...draft, language: compliance.language, generatedAt: new Date(), editedAt: null, editedByBdId: null, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null },
       });
       await tx.insert(auditLog).values(sequenceAuditRow("regenerate", { actorBdId: bdId, personId: r.person_id as string, memberId, sequenceId, step }));
     }
-    if (reminder) return "generated";
+    // A regenerate withdraws the approval, so a hold about the draft (wrong_language, missing_footer, unmapped_market) is moot: clear it. A send-side hold stays.
+    if (reminder) {
+      if (mode === "regenerate") await tx.update(sequenceMember).set(clearDraftHold()).where(eq(sequenceMember.id, memberId));
+      return "generated";
+    }
     if (m.state === "approved") assertTransition("approved", "drafted", "regenerate");
-    const clearHold = (col: typeof sequenceMember.holdReason | typeof sequenceMember.holdAt) =>
-      sql`case when ${sequenceMember.holdReason} = ${UNMAPPED_MARKET_HOLD} then null else ${col} end`;
-    await tx.update(sequenceMember).set({ state: "drafted" as MemberState, holdReason: clearHold(sequenceMember.holdReason), holdAt: clearHold(sequenceMember.holdAt) }).where(eq(sequenceMember.id, memberId));
+    await tx.update(sequenceMember).set({ state: "drafted" as MemberState, ...clearDraftHold() }).where(eq(sequenceMember.id, memberId));
     return "generated";
   });
 }
@@ -180,8 +187,9 @@ export async function memberDraftSignals(bdId: string, memberId: string, step: 1
   const facts = await loadFacts(bdId, memberId);
   if (!facts) return null;
   if (!facts.audience) return [];
-  const language = resolveDraftCompliance(facts.audience, facts.overrides)!.language;
-  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first", facts.overrides);
+  const overrides = step === REMINDER_STEP ? pinToStep1(facts.overrides, facts.step1Language) : facts.overrides;
+  const language = resolveDraftCompliance(facts.audience, overrides)!.language;
+  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first", overrides);
   return input ? draftSignals(input) : [];
 }
 
@@ -259,6 +267,30 @@ export async function setMemberDraftLanguage(bdId: string, memberId: string, lan
   return { ok: true };
 }
 
+export type KeepLanguageResult = { ok: true; language: AudienceLanguage } | Exclude<SetLanguageResult, { ok: true }> | { ok: false; error: "no_mismatch" };
+
+/**
+ * "Mantener en {idioma}": records the language the STORED step 1 draft is written in as this member's one-off choice, with who and when, so the
+ * draft matches and approves normally. The client sends only the member: the language is read here, inside the member row lock that every
+ * regenerate also takes, and refused (`no_mismatch`) when it is unknown or already the language of today, so a stale tab (the draft was
+ * regenerated elsewhere) writes nothing and a redundant one-off is never stored. Owner-checked, never for a HOLD. Generates nothing.
+ */
+export async function keepDraftLanguage(bdId: string, memberId: string): Promise<KeepLanguageResult> {
+  const facts = await loadFacts(bdId, memberId);
+  if (!facts) return { ok: false, error: "not_found" };
+  const refusal = languageWriteRefusal(facts);
+  if (refusal) return refusal;
+  const today = resolveDraftLanguage(facts.audience!.language, facts.overrides)?.language ?? null;
+  return db.transaction(async (tx) => {
+    await tx.select({ id: sequenceMember.id }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");
+    const [d] = await tx.select({ language: sequenceDraft.language }).from(sequenceDraft).where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, STEP)));
+    const stored = parseLanguageChoice(d?.language);
+    if (!stored || !languageMismatch(stored, today)) return { ok: false, error: "no_mismatch" } as const;
+    await tx.update(sequenceMember).set({ draftLanguage: stored, draftLanguageByBdId: bdId, draftLanguageAt: new Date() }).where(eq(sequenceMember.id, memberId));
+    return { ok: true, language: stored } as const;
+  });
+}
+
 /**
  * "Guardar como idioma preferido" in the language dialog: sets person.preferred_language through the contact property editor (so
  * person_property_history records the actor and any BD may do it) and clears this member's one-off choice, in ONE transaction. The
@@ -307,10 +339,9 @@ export async function saveDraftEdit(bdId: string, memberId: string, input: { sub
     if (!current) return false;
     const now = new Date();
     await tx.update(sequenceDraft).set({ subject, body: input.body, editedAt: now, editedByBdId: bdId, ...reviewAfterEdit(current, bdId, now) }).where(draftKey);
-    if (step === STEP && m.state === "approved") {
-      assertTransition("approved", "drafted", "edit");
-      await tx.update(sequenceMember).set({ state: "drafted" }).where(eq(sequenceMember.id, memberId));
-    }
+    // The edit withdraws the approval (reviewAfterEdit), and with it a hold about the draft; a send-side hold (manual_check ...) stays.
+    if (step === STEP && m.state === "approved") assertTransition("approved", "drafted", "edit");
+    await tx.update(sequenceMember).set({ ...(step === STEP && m.state === "approved" ? { state: "drafted" } : {}), ...clearDraftHold() }).where(eq(sequenceMember.id, memberId));
     return true;
   });
   return saved ? { ok: true, footerWarning: facts.audience ? footerRemovedOnSave(input.body, facts.audience.address) : false } : { ok: false, error: "not_editable" };

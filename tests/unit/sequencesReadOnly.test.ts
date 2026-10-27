@@ -58,7 +58,7 @@ test("viewReminder opens step 2, the other read actions step 1; only read action
   for (const id of [...WRITES, "editSequence", "approveReady", "changeCadence", "createNext"]) assert.equal(isReadOnlyAction(id), false, id);
 });
 
-const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "S", body: "B", edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
+const draft = (over: Partial<DetailDraft> = {}): DetailDraft => ({ subject: "S", body: "B", language: null, edited: false, generatedAt: new Date("2026-10-10T09:00:00Z"), editedAt: null, reviewedAt: null, approvedAt: null, scheduledFor: null, ...over });
 const member = (over: Partial<DetailMember> = {}): DetailMember => ({
   memberId: "m1", personId: "00000000-0000-4000-8000-000000000001", state: "drafted", holdReason: null, firstName: "Test1", lastName: "Person",
   jobTitle: "Lead", company: "Acme 1", companyKey: "acme-1", email: "p1@example.test", emailVerified: true, openIt: 2, florida: false,

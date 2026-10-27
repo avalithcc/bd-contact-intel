@@ -14,6 +14,8 @@ export type DetailAction =
   | { type: "reschedule"; memberId: string; when: SendChoice }
   /** The card's "idioma" menu: open the language dialog for this member, or clear the stored choice. */
   | { type: "chooseLanguage" | "resetLanguage"; memberId: string }
+  /** "Mantener en {idioma}" on a draft in another language: record the draft's own language as this member's one-off choice. Generates nothing. */
+  | { type: "keepLanguage"; memberId: string }
   /** Only asks to start: the confirmation is `OptOutDialog`, which states the scope before anything is recorded. */
   | { type: "optOut"; memberId: string };
 /** May answer with a promise of `true` once the server accepted it: a popover that asked for it then closes. */
@@ -29,6 +31,8 @@ export type ReviewAction =
   | { type: "markReviewed"; memberId: string; step: 1 | 2; version: string }
   /** "Ver la versión actual" after a refused mark: refetch, then the dialog shows (and reports) the stored text. */
   | { type: "reloadCurrent"; memberId: string; step: 1 | 2 }
+  /** "Mantener en {idioma}" in the review dialog (see DetailAction). */
+  | { type: "keepLanguage"; memberId: string; step: 1 | 2 }
   /** `confirmedEdits` (member id -> the `editedAt` the BD was shown) is set only after the BD confirmed losing exactly that text; the server refuses to overwrite an edit otherwise. */
   | { type: "regenerate"; memberId: string; step: 1 | 2; confirmedEdits?: Record<string, number> }
   | { type: "save"; memberId: string; step: 1 | 2; subject: string; body: string }

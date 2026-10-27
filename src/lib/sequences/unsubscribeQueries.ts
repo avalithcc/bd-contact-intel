@@ -11,6 +11,7 @@ import { audienceInputsFromRow } from "@/lib/sequences/audienceInputs";
 import { OPT_OUT_DISCARD_REASON, planOptOutDiscards } from "@/lib/sequences/optOut";
 import { normalizeSuppressionValue } from "@/lib/sequences/suppression";
 import type { UnsubscribePort } from "@/lib/sequences/unsubscribeHandlers";
+import { pinToStep1 } from "@/lib/sequences/languageMismatch";
 import { unsubscribePageAudience, type UnsubscribePageAudience } from "@/lib/sequences/unsubscribePageAudience";
 import { generateUnsubscribeToken, hashUnsubscribeToken } from "@/lib/sequences/unsubscribeToken";
 
@@ -118,15 +119,17 @@ export async function suppressByToken(tokenHash: string): Promise<{ email: strin
  */
 export async function unsubscribeAudienceForToken(tokenHash: string): Promise<UnsubscribePageAudience | undefined> {
   const rows = (await db.execute(sql`
-    select sm.draft_language, p.preferred_language, ${audienceFactsSql}
+    select sm.draft_language, p.preferred_language, ${audienceFactsSql},
+           case when sm.sent_at is not null then (select d.language from sequence_draft d where d.sequence_member_id = sm.id and d.step = 1) end as step1_language
     from sequence_unsubscribe_token t
     join sequence_member sm on sm.id = t.sequence_member_id
     join person p on p.id = sm.person_id
     where t.token_hash = ${tokenHash}
-    limit 1`)) as unknown as ({ draft_language: string | null; preferred_language: string | null } & Record<string, unknown>)[];
+    limit 1`)) as unknown as ({ draft_language: string | null; preferred_language: string | null; step1_language: string | null } & Record<string, unknown>)[];
   const row = rows[0];
   if (!row) return undefined;
-  return unsubscribePageAudience(audienceInputsFromRow(row), { chosen: row.draft_language, preferred: row.preferred_language });
+  // Once step 1 went out, both of its links (step 1 and the reminder) are in step 1's language: the same pin the reminder is drafted with.
+  return unsubscribePageAudience(audienceInputsFromRow(row), pinToStep1({ chosen: row.draft_language, preferred: row.preferred_language }, row.step1_language));
 }
 
 /** The port the unsubscribe route (PR 13) is given. */
