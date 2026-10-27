@@ -212,6 +212,14 @@ test("when the page relaxes today's work, a reply stays in the strict clause and
   assert.equal(text.match(/< \$\d+::timestamptz/g)?.length, 1, "only one clause is relaxed, and not the LinkedIn clock");
 });
 
+test("the born-closed guard sits in BOTH the strict and the relaxed closing clause when the page relaxes today's work", () => {
+  const guard = /and \(activity\.deleted_at is null or activity\.created_at >= follow_up_queue_item\.created_at\)/g;
+  const relaxed = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27", "2026-10-27T03:00:00.000Z")).sql;
+  const strict = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27")).sql;
+  assert.equal(relaxed.match(guard)?.length, 2);
+  assert.equal(strict.match(guard)?.length, 1);
+});
+
 test("the open-cycle work time is workDoneAtSql (a soft-deleted note still counts), and only the page read relaxes today's work", () => {
   const strict = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27")).sql;
   assert.doesNotMatch(strict.slice(strict.indexOf("follow_up_queue_item.last_touch_at") - 400), /"activity"\."deleted_at" is not null then null/);

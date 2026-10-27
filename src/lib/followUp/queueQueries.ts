@@ -17,6 +17,7 @@ import { addDaysToDateString, argentinaCalendarDate, argentinaInstantDayWindow }
 import { WORKED_ACTIVITY_TYPES, workedTodayAtSql } from "@/lib/followUp/queueSelection";
 import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
 import { buildFollowUpInsertQuery, buildFollowUpReentryQuery } from "@/lib/followUp/candidateQuery";
+import { shouldAttemptPageBuild, type PageBuildState } from "@/lib/followUp/pageBuildBackoff";
 import { carriedOpenItemSql } from "@/lib/followUp/openCycle";
 
 export interface FollowUpQueueRow {
@@ -202,22 +203,23 @@ export async function getFollowUpQueuePage(
   // A BD with nothing new due keeps `rows` free of today's date all day: build once per instance and day (like the shell badge),
   // not on every visit, because the selection scans every person.
   const attemptKey = `${bdId}:${queueDate}`;
-  if (pageBuildAttempted.has(attemptKey)) return rows;
+  if (!shouldAttemptPageBuild(pageBuildState.get(attemptKey), now.getTime())) return rows;
   try {
     await ensureTodayFollowUpQueue(bdId, now, executor);
   } catch (err) {
-    // Same as the shell badge: a failed build must not take the page down. Not memoized, so the next visit retries; logged
-    // (BD id, error class and message, no PII) so it lands in the Vercel logs.
+    // Same as the shell badge: a failed build must not take the page down. A later visit retries, at most once per
+    // PAGE_BUILD_RETRY_MS; logged (BD id, error class and message, no PII) so it lands in the Vercel logs.
     const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     console.error(`[follow-ups] today's queue build failed for bd ${bdId}: ${detail}`);
+    pageBuildState.set(attemptKey, { status: "failed", at: now.getTime() });
     return rows;
   }
-  pageBuildAttempted.add(attemptKey);
+  pageBuildState.set(attemptKey, { status: "built" });
   return readQueueRows(bdId, queueDate, now, executor);
 }
 
-/** (bd, ART day) pairs this server instance already tried to build from the page. */
-const pageBuildAttempted = new Set<string>();
+/** (bd, ART day) -> outcome of this server instance's last attempt to build from the page. */
+const pageBuildState = new Map<string, PageBuildState>();
 
 /**
  * "Posponer a mañana" / "Omitir hoy" (mockup README decision 5): both leave

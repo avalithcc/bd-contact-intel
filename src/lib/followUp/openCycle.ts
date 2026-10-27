@@ -15,10 +15,11 @@
  * every activity that is not NO_PROGRESS: a Hunter lookup, a status change or other system row moves that clock, but must not
  * reset a Vencido's deadline. `person_bd_connection.last_message_at` (a LinkedIn message) stays a closing touch in both.
  *
- * `workedBeforeIso` relaxes the "closed" test for the PAGE read only, and only for the BD's own WORK (WORKED_ACTIVITY_TYPES): work done
- * at or after that instant (the start of today) does not close the row, so an item the BD worked today stays visible as done for the rest of the day, like a worked day-0 item. A
- * reply or a LinkedIn message stays a strict closer even today (the contact answered; the item leaves the page, the badge and the
- * drop together). The badge, the cap and the job leave it unset (strict).
+ * `workedBeforeIso` relaxes the "closed" test for the PAGE read only, and only for the BD's own WORK (WORKED_ACTIVITY_TYPES):
+ * work done at or after that instant (the start of today) does not close the row, so an item the BD worked today stays visible as
+ * done for the rest of the day, like a worked day-0 item. A reply or a LinkedIn message (`last_message_at` is a signal in either
+ * direction, sent or received) stays a strict closer even today: it is not the BD's work shown as done, so the item leaves the
+ * page, the badge and the drop together. The badge, the cap and the job leave it unset (strict).
  *
  * The queue row is referenced by `rowRef` (default UNALIASED `follow_up_queue_item`) and every other table through its schema
  * object, like candidateQuery.ts. Callers add the date window and the state filter that fit them.
@@ -52,7 +53,8 @@ export function openCycleRowSql({ rowRef = "follow_up_queue_item", workedBeforeI
   // happens, and is then deleted, after the row exists still closes it (deleting a note never un-counts work).
   const notBornClosed = sql`and (activity.deleted_at is null or activity.created_at >= ${row}.created_at)`;
   // Relaxed (page read): the BD's own work today stays visible as done, so it is split from the strict closers. A reply or a
-  // LinkedIn message is the CONTACT answering: it ends the item for the page, the badge, the cap and the drop alike.
+  // LinkedIn message (a signal in either direction) is not the BD's work shown as done: it ends the item for the page, the badge, the
+  // cap and the drop alike.
   const strictTypes = workedBeforeIso ? ["reply_received"] : CYCLE_CLOSING_ACTIVITY_TYPES;
   const relaxedWork = workedBeforeIso
     ? sql`and not exists (
