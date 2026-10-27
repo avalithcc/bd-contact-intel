@@ -32,6 +32,7 @@ import {
   type EmailThreadGroup,
 } from "@/lib/contacts/emailThreads";
 import { callWhatLabel, emailRecipientText, entryBody, readSentEmailExtras } from "@/lib/contacts/timelineEntryBody";
+import { followUpEntryText } from "@/lib/followUp/entryText";
 import { AttachmentChips, RecipientsLine } from "@/components/email/AttachmentChips";
 import { summarizeRecipients } from "@/lib/email/recipients/summary";
 import { readBounceMetadata } from "@/lib/gmail/bouncePlan";
@@ -57,6 +58,7 @@ import {
   CloseIcon,
   DiscardIcon,
   ExternalLinkIcon,
+  FollowUpIcon,
   HistoryIcon,
   LinkedInIcon,
   LockIcon,
@@ -244,6 +246,9 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   task_updated: "timelineFilterTaskUpdated",
   task_completed: "timelineFilterTaskCompleted",
   task_reopened: "timelineFilterTaskReopened",
+  follow_up_dropped: "timelineFilterFollowUpDropped",
+  follow_up_expired: "timelineFilterFollowUpExpired",
+  follow_up_reentered: "timelineFilterFollowUpReentered",
 };
 
 // contact-record.html's `.tl-icon`/`.tl-icon.{modifier}` per activity type
@@ -276,6 +281,10 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   task_updated: TasksIcon,
   task_completed: TasksIcon,
   task_reopened: TasksIcon,
+  // Drawn by the follow-up row below.
+  follow_up_dropped: FollowUpIcon,
+  follow_up_expired: FollowUpIcon,
+  follow_up_reentered: HistoryIcon,
 };
 
 const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
@@ -1454,6 +1463,25 @@ export function Timeline({
                       writtenAtText={formatWhen(at)}
                       deletedAtText={formatWhen(timelineEntry.deleted.at)}
                     />
+                  );
+                }
+                // Leaving or re-entering Seguimientos: a BD's drop is a regular card, the system ones the dashed variant.
+                const followUpView = followUpEntryText(timelineEntry, l);
+                if (followUpView) {
+                  const FollowUpRowIcon = TYPE_ICON[timelineEntry.type as TimelineActivityType];
+                  return (
+                    <div key={timelineEntry.id} className="tl-item">
+                      <div className={followUpView.system ? "tl-icon system" : "tl-icon"}>
+                        <FollowUpRowIcon className="icon" />
+                      </div>
+                      <div className={followUpView.system ? "tl-card system" : "tl-card"}>
+                        <div className="tl-head">
+                          <span className="what">{followUpView.headline}</span>
+                          <span className="when">{formatWhen(at)}</span>
+                        </div>
+                        <div className="tl-body">{followUpView.body}</div>
+                      </div>
+                    </div>
                   );
                 }
                 // A visible bounce has its own layout (hard: danger card with effect chips; soft: neutral dotted card).

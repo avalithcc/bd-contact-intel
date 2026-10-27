@@ -21,6 +21,7 @@
  * is fully unit-testable.
  */
 
+import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import { MEETING_ACTIVITY_TYPES } from "@/lib/meetings/status";
 
 export type StatusStage = "new" | "contacted" | "replied" | "meeting";
@@ -130,6 +131,8 @@ export const STATUS_NEUTRAL_ACTIVITY_TYPES = [
   "task_created",
   // Only a held meeting (`meeting_logged`, "Se hizo") moves the stage: scheduled, no-show, cancelled and rescheduled never do.
   ...MEETING_ACTIVITY_TYPES,
+  // Dropping a contact from Seguimientos never changes where it is in the pipeline (follow-up-expiry).
+  ...FOLLOW_UP_ACTIVITY_TYPES,
 ] as const;
 
 export function activityStageCandidate(event: ActivityStatusEvent): StageCandidate | null {

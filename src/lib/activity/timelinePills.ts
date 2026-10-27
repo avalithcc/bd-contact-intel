@@ -36,6 +36,8 @@
  * @/db) so this stays a pure, DB-free module a plain `node:test` file can
  * import directly.
  */
+import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
+
 export const TIMELINE_PILL_KEYS = ["note", "call", "email_sent", "meeting_logged", "system"] as const;
 
 export type TimelinePillKey = (typeof TIMELINE_PILL_KEYS)[number];
@@ -55,7 +57,7 @@ export const TIMELINE_PILL_GROUPS: Record<TimelinePillKey, readonly string[]> = 
   // to a BD reading the timeline.
   email_sent: ["email_sent", "reply_received", "auto_reply_received", "email_bounced"],
   meeting_logged: ["meeting_logged", "meeting_no_show", "meeting_cancelled", "meeting_rescheduled"],
-  system: ["hunter_lookup", "status_change", "discarded", "status_backfill", "lusha_reveal"],
+  system: ["hunter_lookup", "status_change", "discarded", "status_backfill", "lusha_reveal", ...FOLLOW_UP_ACTIVITY_TYPES],
 };
 
 export function isTimelinePillKey(value: string): value is TimelinePillKey {

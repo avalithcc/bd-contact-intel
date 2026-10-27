@@ -90,6 +90,7 @@ function queueItemRow(overrides: Partial<FollowUpQueueItemRow> & { id: string; b
     lastTouchAt: DEFAULT_LAST_TOUCH_AT,
     state: "pending",
     snoozedUntil: null,
+    cycleStartedOn: null,
     createdAt: DEFAULT_CREATED_AT,
     updatedAt: DEFAULT_UPDATED_AT,
     ...overrides,
@@ -646,4 +647,13 @@ test("parseMergeSnapshot: round-trips follow_up_queue_item collisions, reviving 
   assert.ok(collision.mergedOriginal.createdAt instanceof Date);
   assert.ok(collision.mergedOriginal.updatedAt instanceof Date);
   assert.equal(collision.mergedOriginal.lastTouchAt.getTime(), DEFAULT_LAST_TOUCH_AT.getTime());
+});
+
+test("parseMergeSnapshot keeps the follow-up cycle date of a colliding queue row (follow-up-expiry)", () => {
+  const mergedRow = queueItemRow({ id: "q-merged", bdId: "bd-1", queueDate: "2026-10-20", personId: "merged", cycleStartedOn: "2026-10-20" });
+  const survivorRow = queueItemRow({ id: "q-survivor", bdId: "bd-1", queueDate: "2026-10-20", personId: "survivor", cycleStartedOn: null });
+  const plan = planMerge(baseInput({ queueItemRowsOnMerged: [mergedRow], survivorQueueItemRows: [survivorRow] }));
+  const parsed = parseMergeSnapshot(JSON.parse(JSON.stringify(plan.snapshot)));
+  assert.equal(parsed.queueItemCollisions[0]?.mergedOriginal.cycleStartedOn, "2026-10-20");
+  assert.equal(parsed.queueItemCollisions[0]?.survivorOriginal.cycleStartedOn, null);
 });

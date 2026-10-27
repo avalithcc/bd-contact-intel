@@ -128,6 +128,7 @@ function toQueueItemRow(row: typeof followUpQueueItem.$inferSelect): FollowUpQue
     lastTouchAt: row.lastTouchAt,
     state: row.state,
     snoozedUntil: row.snoozedUntil,
+    cycleStartedOn: row.cycleStartedOn,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -670,6 +671,7 @@ export async function unmergeContact(database: typeof db, mergeEventId: string, 
         lastTouchAt: restore.mergedOriginal.lastTouchAt,
         state: restore.mergedOriginal.state,
         snoozedUntil: restore.mergedOriginal.snoozedUntil,
+        cycleStartedOn: restore.mergedOriginal.cycleStartedOn,
         createdAt: restore.mergedOriginal.createdAt,
         updatedAt: restore.mergedOriginal.updatedAt,
       });

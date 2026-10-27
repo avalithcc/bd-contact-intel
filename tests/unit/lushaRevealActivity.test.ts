@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
+import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import { TIMELINE_PILL_GROUPS, resolveTimelinePillKey } from "@/lib/activity/timelinePills";
 import { NON_TOUCH_ACTIVITY_TYPES, resolveEffectiveActivityAt } from "@/lib/contacts/effectiveActivityTime";
 import { entryBody } from "@/lib/contacts/timelineEntryBody";
@@ -94,14 +95,14 @@ test("a reveal after a reply leaves the stage where the reply put it", () => {
 });
 
 test("the owner rule and the follow-up clock read the shared no-progress list, which carries the reveal", () => {
-  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], [ATTEMPT, REVEAL, "auto_reply_received", "email_bounced"]);
+  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], [ATTEMPT, REVEAL, "auto_reply_received", "email_bounced", ...FOLLOW_UP_ACTIVITY_TYPES]);
   const dialect = new PgDialect();
   const { sql: text, params } = dialect.sqlToQuery(buildFollowUpVerificationQuery());
   const cte = text.slice(text.indexOf("fuq_activity as ("), text.indexOf("fuq_connection as ("));
   const match = cte.match(/activity\.type not in \(([^)]*)\)/);
   assert.ok(match);
   const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
-  assert.deepEqual(bound, [ATTEMPT, REVEAL, "auto_reply_received", "email_bounced"]);
+  assert.deepEqual(bound, [ATTEMPT, REVEAL, "auto_reply_received", "email_bounced", ...FOLLOW_UP_ACTIVITY_TYPES]);
   const ownerSource = readFileSync(join(__dirname, "..", "..", "src", "lib", "identity", "ownerRuleDb.ts"), "utf8");
   assert.match(ownerSource, /notInArray\(activity\.type, \[\.\.\.NO_PROGRESS_ACTIVITY_TYPES\]\)/);
 });
