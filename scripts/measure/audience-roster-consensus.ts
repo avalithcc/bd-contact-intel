@@ -21,7 +21,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../src/db";
 import { audienceInputsFromRow } from "../../src/lib/sequences/audienceInputs";
-import { explainComplianceAudience, resolveCountry, rosterBreakdown, type ColleagueCountry, type ComplianceAudience, type ComplianceAudienceInputs } from "../../src/lib/sequences/complianceAudience";
+import { explainComplianceAudience, resolveCountry, ROSTER_MIN_COLLEAGUES, rosterBreakdown, SANCTIONED_COUNTRIES, type ColleagueCountry, type ComplianceAudience, type ComplianceAudienceInputs } from "../../src/lib/sequences/complianceAudience";
 import { buildPickerPageQuery, countryFacts, distinctCountriesSql, rosterFacts } from "../../src/lib/sequences/pickerQuery";
 import { DEFAULT_PICKER_QUERY } from "../../src/lib/sequences/pickerFilters";
 import { audienceFactsSql, canonicalCompanyJoinSql, companyCountrySql, postingMarketsSql, rosterCountriesSql } from "../../src/lib/sequences/rosterQuery";
@@ -70,6 +70,42 @@ function summarize(title: string, rows: { row: Row; before: ReturnType<typeof ex
   for (const [k, c] of sorted(unblockedCompanies).slice(0, 8)) console.log(`  ${c} x ${k}`);
   console.log(`miami/* -> mdp/es by company (top 25):`);
   for (const [k, c] of sorted(flipCompanies).slice(0, 25)) console.log(`  ${k}: ${c}`);
+}
+
+/**
+ * Compliance counts over the contacts whose roster is consulted (no country of their own): where a majority could override a
+ * company country the audience must not trust blindly, and where a roster carries an embargoed country.
+ */
+function complianceCounts(rows: Row[]) {
+  let consulted = 0, withMajority = 0, embargoedCompanyOverridden = 0, unrecognizedCompanyOverridden = 0, embargoedMinority = 0, embargoedMinorityAndMajority = 0, embargoedMajority = 0, jsBlankSqlFilled = 0;
+  for (const row of rows) {
+    const i = audienceInputsFromRow(row);
+    const own = i.personCountry;
+    if (own && !own.trim() && own.replace(/ /g, "")) jsBlankSqlFilled += 1;
+    if (own?.trim()) continue;
+    consulted += 1;
+    const breakdown = rosterBreakdown(i.rosterCountries);
+    const total = breakdown.reduce((sum, c) => sum + c.n, 0);
+    const top = breakdown[0];
+    const majority = top && total >= ROSTER_MIN_COLLEAGUES && top.n * 2 > total ? top : null;
+    if (majority) withMajority += 1;
+    const company = i.companyCountry?.trim();
+    const companyIso = company ? resolveCountry(company) : null;
+    if (majority && companyIso && SANCTIONED_COUNTRIES.has(companyIso) && !SANCTIONED_COUNTRIES.has(majority.iso)) embargoedCompanyOverridden += 1;
+    if (majority && company && !companyIso) unrecognizedCompanyOverridden += 1;
+    if (majority && SANCTIONED_COUNTRIES.has(majority.iso)) embargoedMajority += 1;
+    if (breakdown.some((c) => SANCTIONED_COUNTRIES.has(c.iso) && c.iso !== majority?.iso)) {
+      embargoedMinority += 1;
+      if (majority) embargoedMinorityAndMajority += 1;
+    }
+  }
+  console.log(`\n=== compliance counts over contacts with no country of their own (roster consulted): ${consulted} ===`);
+  console.log(`with a roster majority: ${withMajority}`);
+  console.log(`(a) embargoed COMPANY country overridden by a non-embargoed majority BEFORE the fix: ${embargoedCompanyOverridden}`);
+  console.log(`(b) unrecognized company TEXT overridden by a majority (still allowed): ${unrecognizedCompanyOverridden}`);
+  console.log(`(c) roster contains an embargoed country that is not the majority: ${embargoedMinority} (of those, a majority elsewhere decides: ${embargoedMinorityAndMajority})`);
+  console.log(`    embargoed MAJORITY (holds): ${embargoedMajority}`);
+  console.log(`own country blank to JS trim() but not to SQL btrim() (by-id roster skipped, resolver would consult it): ${jsBlankSqlFilled}`);
 }
 
 /** Hide the contact's own country and predict it; compare the predicted language/address with the truth. */
@@ -136,8 +172,8 @@ async function main() {
       where p.merged_into_id is null and btrim(coalesce(p.email, '')) <> ''`)) as unknown as Row[];
     console.log(`read ${rows.length} live emailable contacts in ${Date.now() - started} ms (one statement, set-based roster)`);
 
-    // The two roster producers must agree on production data, not only on fixtures: compare a sample of 300 contacts.
-    const sample = rows.filter((_, i) => i % Math.max(1, Math.floor(rows.length / 300)) === 0).slice(0, 300);
+    // The two roster producers must agree on production data, not only on fixtures: compare a sample of 300 contacts with no country of their own (the by-id read skips the roster for the others, by design).
+    const sample = rows.filter((r) => !String(r.person_country ?? "").trim()).filter((_, i) => i % Math.max(1, Math.floor(rows.length / 300)) === 0).slice(0, 300);
     const byId = (await tx.execute(sql`select p.id::text as id, ${rosterCountriesSql} as roster from person p where p.id in (${sql.join(sample.map((r) => sql`${r.person_id}::uuid`), sql`, `)})`)) as unknown as { id: string; roster: ColleagueCountry[] }[];
     const norm = (r: ColleagueCountry[]) => JSON.stringify(r.map((c) => `${c.country}:${Number(c.n)}`).sort());
     const setBased = new Map(sample.map((r) => [r.person_id, norm(r.roster_countries as ColleagueCountry[])]));
@@ -150,6 +186,7 @@ async function main() {
     });
     summarize("live contacts WITH an email (the picker's pool)", evaluated);
     leaveOneOut(rows);
+    complianceCounts(rows);
 
     // Aliases that chain (an alias key that is itself an alias target) would make the by-id and set-based rosters differ.
     const chained = (await tx.execute(sql`select count(*)::int as n from company_alias a join company_alias b on b.alias_key = a.company_key and b.company_key <> a.company_key`)) as unknown as { n: number }[];

@@ -26,7 +26,8 @@
  *   - company country: with no majority (a split roster, or fewer than 2 recognized colleagues) it is still used when filed,
  *     even if some colleague contradicts it (owner decision 2026-10-27: a thin or split roster must not revoke a usable
  *     country and hold the contact); `colleaguesDisagree` tells the screen the colleagues do not back it. Only with no
- *     company country at all does a split roster fall through to postings, phone and HOLD.
+ *     company country at all does a split roster fall through to postings, phone and HOLD. An EMBARGOED company country is
+ *     the exception: no majority overrides it, it holds exactly as it did before the roster existed (fail closed).
  *
  * Free text -> country. `person.country` / `company.country` are free text and `classifyMarket` is a lossy substring matcher
  * (it files "New Mexico" under latam). It must not be reused here. `resolveCountry` matches the WHOLE normalized string
@@ -319,18 +320,21 @@ export function explainComplianceAudience(input: ComplianceAudienceInputs): Comp
   const person = input.personCountry?.trim();
   if (person) return { audience: audienceOfIso(resolveCountry(person)), reason: "person_country", evidence: person };
   const tally = tallyRoster(input.rosterCountries);
+  const company = input.companyCountry?.trim();
+  const companyIso = company ? resolveCountry(company) : null;
+  const dissent = companyIso !== null && [...tally.byIso.keys()].some((iso) => iso !== companyIso);
+  const companyDecision = (): ComplianceAudienceExplained =>
+    ({ audience: audienceOfIso(companyIso), reason: "company_country", evidence: company!, ...(dissent ? { colleaguesDisagree: true as const } : {}) });
+  // An embargoed company country is never overridden: fail closed, exactly as before the roster existed. (A sanctioned
+  // MAJORITY below still holds, and an unrecognized company text may yield to a majority.)
+  if (companyIso !== null && SANCTIONED_COUNTRIES.has(companyIso)) return companyDecision();
   const majority = rosterMajority(tally);
   if (majority) {
     return { audience: audienceOfCountry(majority.iso), reason: "roster_consensus", evidence: majority.iso, colleagues: { agree: majority.agree, of: tally.total } };
   }
   // No majority. A filed company country decides, as it always did, whoever dissents; the dissent is only reported. Unrecognized
   // text cannot be compared with anyone, so it keeps deciding (and holding).
-  const company = input.companyCountry?.trim();
-  if (company) {
-    const companyIso = resolveCountry(company);
-    const dissent = companyIso !== null && [...tally.byIso.keys()].some((iso) => iso !== companyIso);
-    return { audience: audienceOfIso(companyIso), reason: "company_country", evidence: company, ...(dissent ? { colleaguesDisagree: true as const } : {}) };
-  }
+  if (company) return companyDecision();
   // No company country: a roster that splits (two or more recognized colleagues, no majority) is worth telling the screen about.
   const flag = tally.total >= ROSTER_MIN_COLLEAGUES ? { colleaguesDisagree: true as const } : {};
   const posted = fromPostingBucket(input.postingMarkets);

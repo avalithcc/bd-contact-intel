@@ -87,6 +87,22 @@ test("the Rappi shape: company Colombia, two colleagues elsewhere and apart, sta
   assert.equal(e.colleaguesDisagree, true);
 });
 
+test("sanctioned company + non-sanctioned majority HOLDS: the roster never overrides an embargoed company country", () => {
+  for (const company of ["Cuba", "Iran", "North Korea", "Syria"]) {
+    const e = explainComplianceAudience({ ...base, companyCountry: company, mobilePhone: "+54 223 632 4960", rosterCountries: roster(["Argentina", 5], ["Chile", 1]) });
+    assert.equal(e.audience, null, company);
+    assert.equal(e.reason, "company_country", company);
+    assert.equal(e.evidence, company, company);
+    assert.equal(e.colleagues, undefined, company);
+  }
+});
+
+test("a sanctioned MINORITY in the roster changes nothing: the majority still decides", () => {
+  const e = explainComplianceAudience({ ...base, companyCountry: "United States", rosterCountries: roster(["Argentina", 5], ["Cuba", 1]) });
+  assert.equal(e.reason, "roster_consensus");
+  assert.deepEqual(e.audience, MDP_ES);
+});
+
 test("a company country that is a sanctioned jurisdiction still holds even when colleagues dissent", () => {
   const e = explainComplianceAudience({ ...base, companyCountry: "Cuba", rosterCountries: roster(["Argentina", 1]) });
   assert.deepEqual(e, { audience: null, reason: "company_country", evidence: "Cuba", colleaguesDisagree: true });
