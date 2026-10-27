@@ -10,6 +10,7 @@ import {
   FOLLOW_UP_EXPIRED_TYPE,
   FOLLOW_UP_REENTERED_TYPE,
 } from "@/lib/followUp/activityTypes";
+import type { FollowUpRecordState } from "@/lib/followUp/recordState";
 import { fillTemplate } from "@/lib/i18n/template";
 
 export interface FollowUpEntryView {
@@ -32,6 +33,40 @@ export function followUpReasonLabel(reason: unknown, l: ContactRecordLabels): st
 
 function statusLabel(status: unknown, l: ContactRecordLabels): string {
   return typeof status === "string" ? (l.leadStatuses[status as keyof typeof l.leadStatuses] ?? status) : "";
+}
+
+export interface FollowUpPropertyView {
+  value: string;
+  tone: "neutral" | "warn";
+  why: string;
+}
+
+/** The "Seguimiento" row of the contact record (value + the usual `why` line); null hides the row. */
+export function followUpPropertyText(state: FollowUpRecordState, l: ContactRecordLabels): FollowUpPropertyView | null {
+  if (!state) return null;
+  switch (state.kind) {
+    case "in_queue":
+      return {
+        value: fillTemplate(l.followUpPropInQueue, { date: formatCycleDate(state.since) }),
+        tone: "neutral",
+        why: fillTemplate(l.followUpWhyInQueue, { date: formatCycleDate(state.since) }),
+      };
+    case "overdue":
+      return {
+        value: l.followUpPropOverdue,
+        tone: "warn",
+        why: fillTemplate(l.followUpWhyOverdue, { date: formatCycleDate(state.since), expires: formatCycleDate(state.expiresOn) }),
+      };
+    case "out":
+      return {
+        value: l.followUpPropOut,
+        tone: "neutral",
+        why:
+          state.by === "system"
+            ? fillTemplate(l.followUpWhyOutSystem, { date: formatCycleDate(state.on) })
+            : fillTemplate(l.followUpWhyOutBd, { date: formatCycleDate(state.on), reason: followUpReasonLabel(state.reason, l) }),
+      };
+  }
 }
 
 export function followUpEntryText(

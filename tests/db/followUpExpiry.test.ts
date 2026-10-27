@@ -285,3 +285,23 @@ test("the sidebar badge counts Vencidos plus the rest of the page, and reports t
     assert.equal((await read(tx, bdId, d3)).length, 5, "the page and the badge report the same number");
   });
 });
+
+test("the record page reads the owner's latest cycle row and the derived state matches the page", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { readOwnerWithFollowUpCycle } = await import("@/lib/contacts/queries");
+    const { deriveFollowUpRecordState } = await import("@/lib/followUp/recordState");
+    const bdId = await seedBd(tx);
+    const other = await seedBd(tx);
+    const d0 = await today();
+    const id = await seedPerson(tx, bdId, "rec", "contacted", 6);
+    await materialize(tx, bdId, d0);
+    const [owner] = await readOwnerWithFollowUpCycle(tx as never, bdId, id);
+    assert.equal(owner!.name, "ZZ Expiry");
+    assert.equal(owner!.followUpCycle?.cycleStartedOn, d0);
+    const [stranger] = await readOwnerWithFollowUpCycle(tx as never, other, id);
+    assert.equal(stranger!.followUpCycle, null, "another BD's queue is not this person's cycle");
+    const cycle = { cycleStartedOn: owner!.followUpCycle!.cycleStartedOn, lastTouchAt: new Date(owner!.followUpCycle!.lastTouchAt), createdAt: new Date(owner!.followUpCycle!.createdAt) };
+    const state = deriveFollowUpRecordState({ cycle, activities: [], connectionLastMessageAt: null, today: await plusDays(d0, 3) });
+    assert.equal(state?.kind, "overdue");
+  });
+});

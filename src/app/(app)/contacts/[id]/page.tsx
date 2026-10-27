@@ -6,6 +6,7 @@ import { formatTaskDueDate } from "@/lib/tasks/argentinaDate";
 import { formatArgentinaDayMonth, formatArgentinaDayMonthYear } from "@/lib/i18n/format";
 import { emailBounceHint } from "@/lib/contacts/bounceView";
 import { getContactRecord } from "@/lib/contacts/queries";
+import { followUpPropertyText } from "@/lib/followUp/entryText";
 import { listOwnerOptions } from "@/lib/contacts/bulkOwnerDb";
 import { getPersonTimeline } from "@/lib/activity/queries";
 import { getScheduledMeetingsForPerson } from "@/lib/meetings/queries";
@@ -483,6 +484,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
           statusLabel={statusLabel}
           statusValue={record.person.status}
           statusReasonText={statusReasonText}
+          followUp={followUpPropertyText(record.followUp, l)}
           emailVerified={record.person.emailStatus === "verified"}
           emailInferred={record.person.emailSource === "pattern_inferred"}
           emailBounced={record.person.emailStatus === "bounced"}

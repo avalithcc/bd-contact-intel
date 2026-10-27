@@ -58,6 +58,8 @@ export interface JobTitleRoleGroupHint {
   guideHref: string;
 }
 
+import type { FollowUpPropertyView } from "@/lib/followUp/entryText";
+
 export interface PropertyListProps {
   personId: string;
   /** Named in the call outcome bar after a tel: click. */
@@ -66,6 +68,8 @@ export interface PropertyListProps {
   statusLabel: string;
   statusValue: string;
   statusReasonText: string | null;
+  /** The derived "Seguimiento" row (follow-up-expiry); null hides it. */
+  followUp: FollowUpPropertyView | null;
   ownerLabel: string | null;
   ownerBdId: string | null;
   ownerOptions: OwnerOption[];
@@ -109,6 +113,7 @@ export function PropertyList({
   statusLabel,
   statusValue,
   statusReasonText,
+  followUp,
   ownerLabel,
   ownerBdId,
   ownerOptions,
@@ -150,6 +155,18 @@ export function PropertyList({
           </dd>
         )}
       </div>
+
+      {followUp && (
+        <div className="prop derived">
+          <dt>{l.propFollowUp}</dt>
+          <dd>
+            <span className={`badge ${followUp.tone === "warn" ? "badge-warn" : "badge-neutral"} no-dot`}>{followUp.value}</span>
+          </dd>
+          <dd className="why">
+            <InfoIcon className="icon" /> {followUp.why}
+          </dd>
+        </div>
+      )}
 
       <div className="prop">
         <dt id="contact-prop-owner-label">{l.propOwner}</dt>

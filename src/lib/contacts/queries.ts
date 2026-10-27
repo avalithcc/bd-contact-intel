@@ -4,9 +4,11 @@
  * shared team-wide record" — this change's proposal explicitly drops
  * per-BD scoping on Contact reads).
  */
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { latestHardBounce, type HardBounceFact } from "@/lib/contacts/bounceView";
+import { deriveFollowUpRecordState, type FollowUpRecordState } from "@/lib/followUp/recordState";
+import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 import {
   activity,
   bd,
@@ -91,6 +93,8 @@ export interface ContactRecord {
   source: ContactSourceEvidence;
   merge: ContactMergeEvidence;
   statusReason: StatusReasonEvidence | null;
+  /** Where the contact stands in Seguimientos (follow-up-expiry); null when it was never queued or dropped. */
+  followUp: FollowUpRecordState;
   /** The newest hard bounce, only while the email is bounced (feeds the email row hint). */
   emailBounce: HardBounceFact | null;
 }
@@ -123,6 +127,28 @@ export async function assertContactEditableById(personId: string): Promise<void>
 }
 
 /**
+ * The record's owner name plus that owner's latest queue row that opened a follow-up cycle, in ONE query (no extra round trip on
+ * the record page). Bounded by the (bd_id, queue_date, person_id) key: one BD's rows, newest first, one row out. Exported for the
+ * scratch-database test. The correlation is written as literal `bd.id` text, not `${bd.id}`: in a single-table select drizzle
+ * renders that column unqualified, which would resolve inside the subquery's own table (PERFORMANCE.md, the Drizzle gotcha).
+ */
+export function readOwnerWithFollowUpCycle(executor: Pick<typeof db, "select">, ownerBdId: string, personId: string) {
+  return executor
+    .select({
+      name: bd.name,
+      followUpCycle: sql<{ cycleStartedOn: string; lastTouchAt: string; createdAt: string } | null>`(
+        select json_build_object('cycleStartedOn', q.cycle_started_on::text, 'lastTouchAt', q.last_touch_at, 'createdAt', q.created_at)
+        from follow_up_queue_item q
+        where q.bd_id = bd.id and q.person_id = ${personId}::uuid and q.cycle_started_on is not null
+        order by q.queue_date desc
+        limit 1
+      )`,
+    })
+    .from(bd)
+    .where(eq(bd.id, ownerBdId));
+}
+
+/**
  * Follows `merged_into_id` to the live survivor row, or `undefined` if the
  * chain is broken/too long. Exported for reuse by the legacy `/leads/[id]`
  * and `/contact/[id]` redirects (task 11.4, design D8) — those resolve a
@@ -148,9 +174,7 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
 
   const [ownerRow, connectionRows, historyRows, statusEventActivityRows, leadSourceRows, unifiedFromRows, mergeEventRows] =
     await Promise.all([
-    row.ownerBdId
-      ? db.select({ name: bd.name }).from(bd).where(eq(bd.id, row.ownerBdId))
-      : Promise.resolve([]),
+    row.ownerBdId ? readOwnerWithFollowUpCycle(db, row.ownerBdId, row.id) : Promise.resolve([]),
     db
       .select({
         bdId: personBdConnection.bdId,
@@ -216,6 +240,8 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
     statusEventActivityRows,
   );
 
+  const followUpCycle = ownerRow[0]?.followUpCycle ?? null;
+
   // First row per property wins (rows are ordered newest-first).
   const latestEditByProperty = new Map<string, { bdName: string | null; at: Date }>();
   for (const h of historyRows) {
@@ -238,6 +264,16 @@ export async function getContactRecord(id: string): Promise<ContactRecordResult>
       properties,
       connections: connectionRows,
       statusReason,
+      followUp: deriveFollowUpRecordState({
+        cycle: followUpCycle && {
+          cycleStartedOn: followUpCycle.cycleStartedOn,
+          lastTouchAt: new Date(followUpCycle.lastTouchAt),
+          createdAt: new Date(followUpCycle.createdAt),
+        },
+        activities: statusEventActivityRows,
+        connectionLastMessageAt: connectionRows.reduce<Date | null>((best, c) => (c.lastMessageAt && (!best || c.lastMessageAt > best) ? c.lastMessageAt : best), null),
+        today: argentinaCalendarDate(new Date()),
+      }),
       emailBounce: row.emailStatus === "bounced" ? latestHardBounce(statusEventActivityRows) : null,
       source: {
         linkedinConnectionCount: connectionRows.length,

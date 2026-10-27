@@ -9,6 +9,7 @@ import { initialsFromName } from "@/components/initials";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { HistoryIcon, LinkedInIcon } from "@/components/icons";
 import type { LushaView } from "@/lib/lusha/revealView";
+import type { FollowUpPropertyView } from "@/lib/followUp/entryText";
 import { PropertyList, type AboutPaneProperty, type JobTitleRoleGroupHint, type OwnerOption } from "./PropertyList";
 import { QuickActions, type QuickActionsProps, type TaskAssigneeOption } from "./QuickActions";
 import { UpcomingMeetingStrip, type RecordMeeting } from "./UpcomingMeetings";
@@ -29,6 +30,7 @@ export interface AboutPaneProps {
   // server-side (see describeStatusReason, src/lib/contacts/labels.ts).
   // `null` when there's no evidence yet (status "new").
   statusReasonText: string | null;
+  followUp: FollowUpPropertyView | null;
   emailVerified: boolean;
   // Pattern-inferred email (scripts/backfill-inferred-emails.ts) — only ever
   // passed through to PropertyList (see its own doc comment); not used in
@@ -96,6 +98,7 @@ export function AboutPane({
   statusLabel,
   statusValue,
   statusReasonText,
+  followUp,
   emailVerified,
   emailInferred,
   emailBounced,
@@ -196,6 +199,7 @@ export function AboutPane({
         statusLabel={statusLabel}
         statusValue={statusValue}
         statusReasonText={statusReasonText}
+        followUp={followUp}
         ownerLabel={ownerLabel}
         ownerBdId={ownerBdId}
         ownerOptions={ownerOptions}

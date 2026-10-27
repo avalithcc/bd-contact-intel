@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { pickContactRecordLabels } from "@/lib/contacts/labels";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { buildDroppedMetadata, buildExpiredMetadata } from "@/lib/followUp/cycle";
-import { followUpEntryText } from "@/lib/followUp/entryText";
+import { followUpEntryText, followUpPropertyText } from "@/lib/followUp/entryText";
 
 const l = pickContactRecordLabels(es as never);
 
@@ -39,6 +39,22 @@ test("the re-entry row and a type that is not ours", () => {
   assert.equal(view?.headline, "Volvió a Seguimientos — hubo actividad nueva");
   assert.equal(view?.system, true);
   assert.equal(followUpEntryText({ type: "note", actorName: null, metadata: {} }, l), null);
+});
+
+test("the record property names the state and explains it, as in the mockup", () => {
+  assert.deepEqual(followUpPropertyText({ kind: "out", by: "system", on: "2026-10-27", reason: null }, l), {
+    value: "Fuera de seguimiento",
+    tone: "neutral",
+    why: "Dado de baja automáticamente el 27 oct por 10 días en la cola sin seguimiento. Vuelve solo si responde o si alguien lo contacta de nuevo.",
+  });
+  assert.equal(
+    followUpPropertyText({ kind: "out", by: "bd", on: "2026-09-24", reason: "no_response" }, l)?.why,
+    "Dado de baja el 24 sep — Sin respuesta después de varios intentos. Vuelve solo si responde o si alguien lo contacta de nuevo.",
+  );
+  assert.deepEqual(followUpPropertyText({ kind: "in_queue", since: "2026-10-20" }, l)?.value, "En la cola desde 20 oct");
+  const overdue = followUpPropertyText({ kind: "overdue", since: "2026-10-20", expiresOn: "2026-10-30" }, l);
+  assert.deepEqual([overdue?.value, overdue?.tone], ["Vencido", "warn"]);
+  assert.equal(followUpPropertyText(null, l), null);
 });
 
 test("missing or malformed metadata never prints a placeholder", () => {
