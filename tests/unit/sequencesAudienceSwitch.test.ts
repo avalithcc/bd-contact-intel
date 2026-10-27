@@ -25,7 +25,7 @@ const ARGS: SequenceDraftInputArgs = {
   connection: null, signalBodies: [], company: null, senderName: "Cristian Civita", senderTitle: "COO at Avalith",
 };
 
-const inputs = (over: Partial<ComplianceAudienceInputs>): ComplianceAudienceInputs => ({ mobilePhone: null, phone: null, ...over });
+const inputs = (over: Partial<ComplianceAudienceInputs>): ComplianceAudienceInputs => ({ mobilePhone: null, phone: null, rosterCountries: [], ...over });
 
 const resolveOrNull = (over: Partial<ComplianceAudienceInputs>): ComplianceAudience | null => resolveComplianceAudience(inputs(over));
 

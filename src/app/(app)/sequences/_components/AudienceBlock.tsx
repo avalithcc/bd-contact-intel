@@ -1,6 +1,8 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { ChevronDownIcon, WarningIcon } from "@/components/icons";
+import { fixMenuItems, formatColleagueBreakdown, holdKind } from "@/lib/sequences/audienceCard";
 import type { MemberAudience } from "@/lib/sequences/audienceView";
 import { countryNameEs, flagEmoji } from "@/lib/sequences/countryDisplay";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
@@ -14,9 +16,19 @@ function FixMenu({ m, a, name, first, l }: { m: DetailMember; a: MemberAudience;
   return (
     <DropdownMenu trigger={<>{t.fix}<ChevronDownIcon className="icon" /></>} triggerClassName="btn btn-ghost btn-sm" ariaLabel={fill(t.fixAria, { name })}>
       <div className="menu-label">{t.fixMenuLabel}</div>
-      {(a.reason !== "person_country" || !a.audience) && <Link role="menuitem" className="menu-item" href={`/contacts/${m.personId}`}>{fill(t.fixPerson, { name: first })}</Link>}
-      {m.companyKey && m.company && <Link role="menuitem" className="menu-item" href={`/companies/${encodeURIComponent(m.companyKey)}`}>{fill(t.fixCompany, { company: m.company })}</Link>}
-      {a.reason !== "phone" && !a.unusedPhone && <Link role="menuitem" className="menu-item" href={`/contacts/${m.personId}`}>{t.fixPhone}</Link>}
+      {fixMenuItems(a, Boolean(m.companyKey && m.company)).map((item, i, all) => {
+        if (item === "person") return <Link key={item} role="menuitem" className="menu-item" href={`/contacts/${m.personId}`}>{fill(t.fixPerson, { name: first })}</Link>;
+        if (item === "company") return <Link key={item} role="menuitem" className="menu-item" href={`/companies/${encodeURIComponent(m.companyKey!)}`}>{fill(t.fixCompany, { company: m.company! })}</Link>;
+        if (item === "phone") return <Link key={item} role="menuitem" className="menu-item" href={`/contacts/${m.personId}`}>{t.fixPhone}</Link>;
+        // The company record lists only a few of its contacts; the Contacts list filtered by company shows every colleague.
+        // Set apart from the fixes by a separator once there are three or more items (approved mockup).
+        return (
+          <Fragment key={item}>
+            {all.length > 2 && <div className="menu-sep" />}
+            <Link role="menuitem" className="menu-item" href={`/contacts?company=${encodeURIComponent(m.company!)}`}>{fill(t.rosterViewColleagues, { company: m.company! })}</Link>
+          </Fragment>
+        );
+      })}
     </DropdownMenu>
   );
 }
@@ -29,7 +41,11 @@ export function AudienceWhy({ m, name, l }: { m: DetailMember; name: string; l: 
   const first = m.firstName?.trim() || name;
   const company = m.company ?? "";
   if (a.reason === "person_country") return <>{t.byPersonCountry} <strong>{first}</strong> ({a.evidence})</>;
-  if (a.reason === "company_country") return <>{t.byCompanyCountry} <strong>{company}</strong> ({a.evidence})<br />{fill(t.noOwnCountry, { name: first })}</>;
+  if (a.reason === "roster_consensus") {
+    const agree = a.colleagues?.agree ?? 0;
+    return <>{t.rosterBy} <strong>{fill(t.rosterColleagues, { n: agree })}</strong>{company.trim() && <> {fill(t.rosterAt, { company })}</>} ({a.isoName})<br />{fill(t.rosterNote, { name: first, k: agree, total: a.colleagues?.of ?? 0 })}{a.companyIgnored && <><br />{fill(t.rosterCompanyIgnored, { filed: a.companyIgnored })}</>}</>;
+  }
+  if (a.reason === "company_country") return <>{t.byCompanyCountry} <strong>{company}</strong> ({a.evidence})<br />{fill(t.noOwnCountry, { name: first })}{!a.colleaguesDisagree && a.colleaguesKnown > 0 && <><br />{t.companyUncontradicted}</>}</>;
   if (a.reason === "posting_markets") return <>{t.byPostings} <strong>{t.postingsStrong}</strong> {fill(t.postingsOf, { company })} ({a.evidence === "latam" ? t.zoneLatam : t.zoneUs})<br />{fill(t.postingsNote, { name: first })}</>;
   return <>{t.byPhone} <span className="badge badge-outline">{a.evidence}</span></>;
 }
@@ -56,7 +72,11 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
   const fix = a.reason === "person_country" && a.audience ? null : <FixMenu m={m} a={a} name={name} first={first} l={l} />;
 
   if (!a.audience) {
-    const text = a.reason === null ? t.holdNoSignal : fill(a.iso ? t.holdSanctioned : t.holdUnrecognised, { value: a.evidence ?? "" });
+    const kind = holdKind(a, m.company);
+    const text =
+      kind === "splitRoster" ? fill(t.holdSplitRoster, { company: m.company!, k: a.colleagueCountries.length, breakdown: formatColleagueBreakdown(a.colleagueCountries, t.rosterListAnd), name: first })
+      : kind === "noSignal" ? t.holdNoSignal
+      : fill(kind === "sanctioned" ? t.holdSanctioned : t.holdUnrecognised, { value: a.reason === "roster_consensus" ? (a.isoName ?? "") : (a.evidence ?? "") });
     return (
       <div className="alert alert-danger" role="alert">
         <WarningIcon className="icon" />
@@ -71,8 +91,6 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
   const language = choice?.language ?? a.audience.language;
   const lc = l.languageChoice;
   const why = <AudienceWhy m={m} name={name} l={l} />;
-  const impact = a.companyImpact;
-  const decided = impact ? impact.decides + 1 : 0;
   return (
     <div className="stack-sm" aria-label={t.label}>
       <div className="row wrap" style={{ gap: ".5rem" }}>
@@ -86,12 +104,17 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
         <div className="meta">↳ {choice ? <>{lc.chosenBy} <strong>{choice.byName ?? "?"}</strong> {fill(lc.chosenOn, { when: choice.at ? stampLabel(choice.at) : "", resolved: a.audience.language === "es" ? t.langEs : t.langEn })}<br />{lc.addressNote} {why}</> : why}</div>
         <div className="row" style={{ gap: ".25rem" }}>{onAction && <LanguageMenu m={m} name={name} lockTitle={lockTitle} onAction={onAction} l={l} />}{fix}</div>
       </div>
-      {impact && (
+      {company.trim() && a.colleaguesDisagree && a.reason === "company_country" && (
+        <div className="alert alert-warn" style={{ padding: "var(--space-sm) var(--space-md)" }}>
+          <div>{fill(t.companyDespiteSplit, { company, filed: a.evidence ?? "", breakdown: formatColleagueBreakdown(a.colleagueCountries, t.rosterListAnd) })}</div>
+        </div>
+      )}
+      {company.trim() && a.colleaguesDisagree && a.reason !== "company_country" && (
         <div className="alert alert-warn" style={{ padding: "var(--space-sm) var(--space-md)" }}>
           <div>
-            <strong>{fill(t.companyDecides, { n: decided })}</strong>{" "}
-            {fill(impact.contradicting === 1 ? t.companyContradictsOne : t.companyContradictsMany, { company, k: impact.contradicting, country: impact.topCountry, filed: a.evidence ?? "" })}{" "}
-            <span className="meta">{fill(t.companyFixNote, { n: decided })}</span>
+            <strong>{fill(t.rosterSplitTitle, { company, k: a.colleagueCountries.length })}</strong>{" "}
+            {fill(t.rosterSplitBody, { breakdown: formatColleagueBreakdown(a.colleagueCountries, t.rosterListAnd) })}
+            {a.reason === "phone" && <> <span className="meta">{fill(t.rosterSplitToPhone, { name: first })}</span></>}
           </div>
         </div>
       )}

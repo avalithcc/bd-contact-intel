@@ -12,7 +12,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, sequence, sequenceMember } from "@/db/schema";
 import { resolveComplianceAudience, type ComplianceAddress } from "./complianceAudience";
-import { clientStatusSql, companyCountrySql, sameCompanyAs } from "./rosterQuery";
+import { audienceFactsSql, clientStatusSql, sameCompanyAs } from "./rosterQuery";
+import { audienceInputsFromRow } from "./audienceInputs";
 import { DEFAULT_SCHEDULE } from "./schedule";
 import {
   SEED_DAILY_SEND_CAP,
@@ -24,7 +25,7 @@ import {
   type SeedRosterEntry,
 } from "./seedRoster";
 import { listSuppressionRules } from "./suppressionQueries";
-import { openFreshPostingSql, openPostingSql } from "@/lib/hiring/openPosting";
+import { openFreshPostingSql } from "@/lib/hiring/openPosting";
 
 export const SEED_AUDIT_ACTION = "seed_outreach_sequence";
 
@@ -90,12 +91,10 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
     const rows = rowsOf<Row>(
       await tx.execute(sql`
         select p.id::text as person_id, p.email, p.email_status, p.email_source, p.merged_into_id::text as merged_into_id,
-               p.company_key, p.country as person_country, p.mobile_phone, p.phone, ${clientStatusSql} as client_status,
-               ${companyCountrySql} as company_country,
+               p.company_key, ${clientStatusSql} as client_status,
+               ${audienceFactsSql},
                exists (select 1 from job_posting jp where jp.is_it = true and ${openFreshPostingSql("jp")} and jp.market = 'us'
-                  and ${sameCompanyAs("jp")}) as has_open_it_posting,
-               coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
-                  and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets
+                  and ${sameCompanyAs("jp")}) as has_open_it_posting
         from person p
         where lower(btrim(concat_ws(' ', p.first_name, p.last_name))) = lower(${entry.name})
           and exists (select 1 from company c where lower(btrim(c.display_name)) = lower(${entry.company})
@@ -106,7 +105,7 @@ async function loadCandidates(tx: Tx, roster: readonly SeedRosterEntry[]) {
   }
   if (problems.length) throw new Error(`Cannot resolve the roster, nothing written. Never guessing between matches:\n- ${problems.join("\n- ")}`);
   return found.map(({ entry, row: r }): SeedLine => {
-    const audience = resolveComplianceAudience({ mobilePhone: r.mobile_phone as string | null, phone: r.phone as string | null, personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] });
+    const audience = resolveComplianceAudience(audienceInputsFromRow(r));
     const candidate: SeedCandidate = {
       label: `${entry.name} @ ${entry.company}`,
       personId: r.person_id as string,

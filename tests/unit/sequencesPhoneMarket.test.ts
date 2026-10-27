@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { resolveComplianceAudience, type ComplianceAudienceInputs } from "../../src/lib/sequences/complianceAudience";
 import { phoneCallingCodes, phoneCountryIso } from "../../src/lib/sequences/phoneMarket";
 
-const audience = (over: Partial<ComplianceAudienceInputs>) => resolveComplianceAudience({ mobilePhone: null, phone: null, ...over });
+const audience = (over: Partial<ComplianceAudienceInputs>) => resolveComplianceAudience({ mobilePhone: null, phone: null, rosterCountries: [], ...over });
 
 // Valid numbers per region (national significant parts chosen so libphonenumber accepts them).
 const AR = "+5491155551234";
@@ -62,9 +62,9 @@ test("Georgia (+995) is a located country: Miami in English, the same answer as 
 });
 
 test("the resolver does not mutate its input and answers the same twice", () => {
-  const input = Object.freeze({ mobilePhone: AR, phone: null, postingMarkets: Object.freeze(["us", "latam"]) });
+  const input = Object.freeze({ mobilePhone: AR, phone: null, rosterCountries: [], postingMarkets: Object.freeze(["us", "latam"]) });
   assert.deepEqual(resolveComplianceAudience(input), resolveComplianceAudience(input));
-  assert.deepEqual(input, { mobilePhone: AR, phone: null, postingMarkets: ["us", "latam"] });
+  assert.deepEqual(input, { mobilePhone: AR, phone: null, rosterCountries: [], postingMarkets: ["us", "latam"] });
 });
 
 test("the calling-code list is every country's code, once, with the bare NANP 1 and no area-code splits", () => {

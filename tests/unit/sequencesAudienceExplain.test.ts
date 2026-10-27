@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { explainComplianceAudience, resolveComplianceAudience, type ComplianceAudienceInputs } from "@/lib/sequences/complianceAudience";
 
-const none = { mobilePhone: null, phone: null };
+const none = { mobilePhone: null, phone: null, rosterCountries: [] };
 
 test("person country decides and is quoted back", () => {
   const e = explainComplianceAudience({ ...none, personCountry: "Argentina", companyCountry: "United States" });
@@ -20,7 +20,7 @@ test("posting markets decide when no country is filed", () => {
 });
 
 test("the phone decides last", () => {
-  const e = explainComplianceAudience({ mobilePhone: "+54 223 632 4960", phone: null });
+  const e = explainComplianceAudience({ mobilePhone: "+54 223 632 4960", phone: null, rosterCountries: [] });
   assert.equal(e.reason, "phone");
   assert.equal(e.evidence, "+54 223 632 4960");
   assert.deepEqual(e.audience, { address: "mdp", language: "es" });
@@ -53,9 +53,9 @@ test("anti-drift: resolveComplianceAudience is exactly the audience of the expla
     { ...none, postingMarkets: ["us"] },
     { ...none, postingMarkets: ["latam"] },
     { ...none, postingMarkets: ["us", "latam"], phone: "+54 223 632 4960" },
-    { mobilePhone: "+1 305 555 0100", phone: null },
-    { mobilePhone: "+54 223 632 4960", phone: "+1 305 555 0100" },
-    { mobilePhone: "garbage", phone: null },
+    { mobilePhone: "+1 305 555 0100", phone: null, rosterCountries: [] },
+    { mobilePhone: "+54 223 632 4960", phone: "+1 305 555 0100", rosterCountries: [] },
+    { mobilePhone: "garbage", phone: null, rosterCountries: [] },
     { ...none, personCountry: "   ", companyCountry: "" },
   ];
   for (const i of table) assert.deepEqual(resolveComplianceAudience(i), explainComplianceAudience(i).audience, JSON.stringify(i));

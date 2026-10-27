@@ -10,7 +10,8 @@ import { validateDailySendCap, type CapRejection } from "./capValidation";
 import { canTransition, type MemberState } from "./memberState";
 import { DEFAULT_SCHEDULE } from "./schedule";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
-import { clientStatusSql, buildRosterCandidatesQuery, companyCountrySql, postingMarketsSql } from "./rosterQuery";
+import { clientStatusSql, buildRosterCandidatesQuery, audienceFactsSql } from "./rosterQuery";
+import { audienceInputsFromRow } from "./audienceInputs";
 import { resolveComplianceAudience } from "./complianceAudience";
 import { evaluateRosterAdds, type RosterCandidate, type RosterDecision, type RosterRejection } from "./rosterGuards";
 import { listSuppressionRules } from "./suppressionQueries";
@@ -43,11 +44,11 @@ export async function listRosterCandidates(opts: { limit: number; search?: strin
  */
 async function loadCandidates(tx: Tx, personIds: readonly string[], judgeMarket = false): Promise<RosterCandidate[]> {
   if (!personIds.length) return [];
-  const rows = rowsOf<{ person_id: string; email: string | null; email_status: string; email_source: string | null; merged_into_id: string | null; company_key: string | null; client_status: string | null; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }>(
+  const rows = rowsOf<{ person_id: string; email: string | null; email_status: string; email_source: string | null; merged_into_id: string | null; company_key: string | null; client_status: string | null } & Record<string, unknown>>(
     await tx.execute(sql`
       select p.id::text as person_id, p.email, p.email_status, p.email_source, p.merged_into_id::text as merged_into_id,
              p.company_key, ${clientStatusSql} as client_status,
-             p.country as person_country, p.mobile_phone, p.phone, ${companyCountrySql} as company_country, ${postingMarketsSql} as posting_markets
+             ${audienceFactsSql}
       from person p where p.id in (${idList(personIds)})`),
   );
   return rows.map((r) => ({
@@ -58,7 +59,7 @@ async function loadCandidates(tx: Tx, personIds: readonly string[], judgeMarket 
     mergedIntoId: r.merged_into_id,
     companyKey: r.company_key,
     clientStatus: r.client_status,
-    ...(judgeMarket ? { marketMapped: resolveComplianceAudience({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }) !== null } : {}),
+    ...(judgeMarket ? { marketMapped: resolveComplianceAudience(audienceInputsFromRow(r)) !== null } : {}),
   }));
 }
 

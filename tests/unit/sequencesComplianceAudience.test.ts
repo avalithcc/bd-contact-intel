@@ -16,7 +16,7 @@ import { phoneCountryIso } from "../../src/lib/sequences/phoneMarket";
 import { LATAM_COUNTRY_NAMES } from "../../src/lib/hiring/markets";
 
 const audience = (over: Partial<ComplianceAudienceInputs>) =>
-  resolveComplianceAudience({ mobilePhone: null, phone: null, ...over });
+  resolveComplianceAudience({ mobilePhone: null, phone: null, rosterCountries: [], ...over });
 
 const AR_PHONE = "+5491155551234";
 const ES_PHONE = "+34612345678";
@@ -272,16 +272,17 @@ test("pure: the same input twice gives the same answer and the input is not muta
     personCountry: null,
     companyCountry: " Spain ",
     postingMarkets: ["latam", "us"],
+    rosterCountries: [{ country: "Argentina", n: 2 }],
   };
   const snapshot = structuredClone(input);
   const first = resolveComplianceAudience(input);
   const second = resolveComplianceAudience(input);
   assert.deepEqual(first, second);
   assert.deepEqual(input, snapshot);
-  const out = resolveComplianceAudience({ mobilePhone: null, phone: null, personCountry: "Argentina" });
+  const out = resolveComplianceAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: "Argentina" });
   assert.ok(out);
   (out as { address: string }).address = "tampered";
-  assert.deepEqual(resolveComplianceAudience({ mobilePhone: null, phone: null, personCountry: "Argentina" }), MDP);
+  assert.deepEqual(resolveComplianceAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: "Argentina" }), MDP);
 });
 
 test("every country that was mailable before the switch is still mailable: the table covers the old LATAM list, the US and Canada", () => {

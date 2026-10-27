@@ -16,8 +16,18 @@
  * market-keyed helpers were deleted rather than kept alongside: a second, unused resolver is how the footer-writing path and
  * the admission path drift apart.
  *
- * The input chain, in order: person country, company country, the open postings' markets, the phone's dial code. A link
- * "has data" when non-empty, and a present but unrecognized country DECIDES (hold); it does not fall through to a weaker link.
+ * The input chain, in order: person country, the ROSTER's consensus (what the company's other contacts say), company country,
+ * the open postings' markets, the phone's dial code. A link "has data" when non-empty, and a present but unrecognized country
+ * DECIDES (hold); it does not fall through to a weaker link. Two links are conditional, both added 2026-10-27:
+ *   - roster consensus: a strict majority (> 50%) of the OTHER live contacts at the company that have a recognized country,
+ *     with at least 2 of them. `company.country` describes one filing, not where a multinational's people sit (Globant was
+ *     filed "United States" with an all-Argentine roster); measured leave-one-out, the company country predicts the draft
+ *     language 85.2% of the time and the roster majority 97.8%. A sanctioned majority HOLDS like any sanctioned country.
+ *   - company country: with no majority (a split roster, or fewer than 2 recognized colleagues) it is still used when filed,
+ *     even if some colleague contradicts it (owner decision 2026-10-27: a thin or split roster must not revoke a usable
+ *     country and hold the contact); `colleaguesDisagree` tells the screen the colleagues do not back it. Only with no
+ *     company country at all does a split roster fall through to postings, phone and HOLD. An EMBARGOED company country is
+ *     the exception: no majority overrides it, it holds exactly as it did before the roster existed (fail closed).
  *
  * Free text -> country. `person.country` / `company.country` are free text and `classifyMarket` is a lossy substring matcher
  * (it files "New Mexico" under latam). It must not be reused here. `resolveCountry` matches the WHOLE normalized string
@@ -42,7 +52,17 @@ export interface ComplianceAudienceInputs {
   readonly companyCountry?: string | null;
   /** job_posting.market of the company's open IT postings; null where the backfill has not run. */
   readonly postingMarkets?: readonly (string | null)[] | null;
+  /**
+   * The countries filed on the OTHER live contacts of the person's company, grouped by filed text (`rosterCountriesSql`).
+   * REQUIRED, like the phones: an optional field would let one caller skip the roster and disagree with the others about who is
+   * mailable and at which address. Pass `[]` only when there is genuinely no company to ask (a person-country-only question).
+   * The contact itself is never in it where it matters: the roster is read only when the person has no country of their own.
+   */
+  readonly rosterCountries: readonly ColleagueCountry[];
 }
+
+/** Colleagues of the same company that have a country of their own, grouped by the text filed (as the read returns them). */
+export interface ColleagueCountry { readonly country: string; readonly n: number }
 
 /** The posting bucket, only when the open postings agree on exactly one of `us` / `latam`; `other` otherwise (no signal). */
 export function fromPostings(markets: readonly (string | null)[] | null | undefined): MarketKey {
@@ -241,7 +261,7 @@ export function resolveComplianceAudience(input: ComplianceAudienceInputs): Comp
 }
 
 /** Which link of the chain decided. */
-export type AudienceReason = "person_country" | "company_country" | "posting_markets" | "phone";
+export type AudienceReason = "person_country" | "roster_consensus" | "company_country" | "posting_markets" | "phone";
 
 export interface ComplianceAudienceExplained {
   readonly audience: ComplianceAudience | null;
@@ -249,6 +269,46 @@ export interface ComplianceAudienceExplained {
   readonly reason: AudienceReason | null;
   /** The raw value that link read, for the UI to quote back ("United States", "+54 223..."). Null when nothing decided. */
   readonly evidence: string | null;
+  /** Only with `roster_consensus`: how many recognized colleagues hold the winning country (`evidence` is its ISO), out of how many are recognized. */
+  readonly colleagues?: { readonly agree: number; readonly of: number };
+  /**
+   * Only when true, and only without a strict majority: some recognized colleague has a different country than the company
+   * (the company country still decided), or the recognized colleagues split among themselves with no company country (postings,
+   * phone or nobody decided).
+   */
+  readonly colleaguesDisagree?: true;
+}
+
+interface RosterTally {
+  /** Colleagues per resolved ISO; texts that are not a country are dropped, they are neither for nor against. */
+  readonly byIso: ReadonlyMap<string, number>;
+  readonly total: number;
+}
+
+function tallyRoster(roster: readonly ColleagueCountry[]): RosterTally {
+  const byIso = new Map<string, number>();
+  let total = 0;
+  for (const { country, n } of roster) {
+    const iso = resolveCountry(country);
+    if (!iso || !Number.isFinite(n) || n <= 0) continue;
+    byIso.set(iso, (byIso.get(iso) ?? 0) + n);
+    total += n;
+  }
+  return { byIso, total };
+}
+
+/** The recognized colleagues grouped by country, biggest first (ties by ISO): what the card quotes when the roster is split. */
+export function rosterBreakdown(roster: readonly ColleagueCountry[]): { iso: string; n: number }[] {
+  return [...tallyRoster(roster).byIso].map(([iso, n]) => ({ iso, n })).sort((x, y) => y.n - x.n || x.iso.localeCompare(y.iso));
+}
+
+/** Fewest recognized colleagues that can make a consensus. One colleague is an anecdote, and a company filed by one person is not a roster. */
+export const ROSTER_MIN_COLLEAGUES = 2;
+/** The country held by MORE than half of at least `ROSTER_MIN_COLLEAGUES` recognized colleagues, or null. */
+function rosterMajority({ byIso, total }: RosterTally): { iso: string; agree: number } | null {
+  if (total < ROSTER_MIN_COLLEAGUES) return null;
+  for (const [iso, agree] of byIso) if (agree * 2 > total) return { iso, agree };
+  return null;
 }
 
 /**
@@ -259,15 +319,31 @@ export interface ComplianceAudienceExplained {
 export function explainComplianceAudience(input: ComplianceAudienceInputs): ComplianceAudienceExplained {
   const person = input.personCountry?.trim();
   if (person) return { audience: audienceOfIso(resolveCountry(person)), reason: "person_country", evidence: person };
+  const tally = tallyRoster(input.rosterCountries);
   const company = input.companyCountry?.trim();
-  if (company) return { audience: audienceOfIso(resolveCountry(company)), reason: "company_country", evidence: company };
+  const companyIso = company ? resolveCountry(company) : null;
+  const dissent = companyIso !== null && [...tally.byIso.keys()].some((iso) => iso !== companyIso);
+  const companyDecision = (): ComplianceAudienceExplained =>
+    ({ audience: audienceOfIso(companyIso), reason: "company_country", evidence: company!, ...(dissent ? { colleaguesDisagree: true as const } : {}) });
+  // An embargoed company country is never overridden: fail closed, exactly as before the roster existed. (A sanctioned
+  // MAJORITY below still holds, and an unrecognized company text may yield to a majority.)
+  if (companyIso !== null && SANCTIONED_COUNTRIES.has(companyIso)) return companyDecision();
+  const majority = rosterMajority(tally);
+  if (majority) {
+    return { audience: audienceOfCountry(majority.iso), reason: "roster_consensus", evidence: majority.iso, colleagues: { agree: majority.agree, of: tally.total } };
+  }
+  // No majority. A filed company country decides, as it always did, whoever dissents; the dissent is only reported. Unrecognized
+  // text cannot be compared with anyone, so it keeps deciding (and holding).
+  if (company) return companyDecision();
+  // No company country: a roster that splits (two or more recognized colleagues, no majority) is worth telling the screen about.
+  const flag = tally.total >= ROSTER_MIN_COLLEAGUES ? { colleaguesDisagree: true as const } : {};
   const posted = fromPostingBucket(input.postingMarkets);
-  if (posted) return { audience: posted, reason: "posting_markets", evidence: fromPostings(input.postingMarkets) };
+  if (posted) return { audience: posted, reason: "posting_markets", evidence: fromPostings(input.postingMarkets), ...flag };
   const iso = phoneCountryIso(input.mobilePhone, input.phone);
-  if (!iso) return { audience: null, reason: null, evidence: null };
+  if (!iso) return { audience: null, reason: null, evidence: null, ...flag };
   // The raw number that placed the country: the first of mobile, phone that places one on its own (same order as phoneCountryIso).
   const raw = [input.mobilePhone, input.phone].find((n) => phoneCountryIso(n, null) !== null)?.trim() ?? null;
-  return { audience: audienceOfCountry(iso), reason: "phone", evidence: raw };
+  return { audience: audienceOfCountry(iso), reason: "phone", evidence: raw, ...flag };
 }
 
 function audienceOfIso(iso: string | null): ComplianceAudience | null {

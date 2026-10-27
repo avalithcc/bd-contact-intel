@@ -1,6 +1,7 @@
 /**
  * DB-backed test for the audience each Sequence member carries (getSequenceDetail): the reason the draft's language and
- * address come from, and how many colleagues the company country decides or contradicts. Scratch database only.
+ * address come from (own country, the colleagues' majority, the company, ...). The roster's own contract is in
+ * sequenceRosterConsensus.test.ts. Scratch database only.
  */
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -55,22 +56,22 @@ after(async () => {
   await db.delete(bd).where(eq(bd.id, ownerId));
 });
 
-test("company country decides: counts other emailable colleagues without a country and those who contradict it", async () => {
+test("the roster decides over the company country: the colleagues' majority, not the filed United States", async () => {
   const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
   const d = await getSequenceDetail({ id: ownerId, role: "bd" }, sequenceId);
   const a = d!.members.find((m) => m.memberId === members.target)!.audience!;
-  assert.equal(a.reason, "company_country");
-  assert.equal(a.evidence, "United States");
-  assert.deepEqual(a.audience, { address: "miami", language: "en" });
-  assert.deepEqual(a.unusedPhone, { number: "+54 223 632 4960", iso: "AR" });
-  // Decided with no country of their own: blankA, blankB (noemail and merged are excluded). Contradicting: "own" and "ar" (Argentina); "us" agrees.
-  assert.deepEqual(a.companyImpact, { decides: 2, contradicting: 2, topCountry: "Argentina" });
+  // Colleagues with a country: own and ar (Argentina), us (USA). blankA, blankB and noemail have none; merged is not a colleague.
+  assert.equal(a.reason, "roster_consensus");
+  assert.equal(a.evidence, "AR");
+  assert.deepEqual(a.colleagues, { agree: 2, of: 3 });
+  assert.deepEqual(a.audience, { address: "mdp", language: "es" });
+  assert.equal(a.companyIgnored, "United States");
+  assert.equal(a.unusedPhone, null, "the phone cannot change a roster answer, so it is not offered");
 });
 
-test("a person's own country decides and carries no company warning", async () => {
+test("a person's own country decides and the roster is ignored", async () => {
   const { getSequenceDetail } = await import("@/lib/sequences/detailQueries");
   const d = await getSequenceDetail({ id: ownerId, role: "bd" }, sequenceId);
   const a = d!.members.find((m) => m.memberId === members.own)!.audience!;
   assert.equal(a.reason, "person_country");
-  assert.equal(a.companyImpact, null);
 });

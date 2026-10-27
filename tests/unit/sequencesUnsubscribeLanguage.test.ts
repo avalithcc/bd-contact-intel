@@ -62,7 +62,7 @@ test("address and language are independent: Argentina is mdp+es, Mexico miami+es
     { country: "Ireland", address: "miami", locale: "en" },
   ] as const;
   for (const c of cases) {
-    const page = unsubscribePageAudience({ mobilePhone: null, phone: null, personCountry: c.country });
+    const page = unsubscribePageAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: c.country });
     assert.ok(page, c.country);
     assert.equal(page.locale, c.locale, c.country);
     const expected = COMPLIANCE_CONFIG[c.address]?.postalAddress;
@@ -125,7 +125,7 @@ test("an invalid token is English with lang=en, 404, no address, and never asks 
 });
 
 test("Mexico through the full wiring: Miami address with Spanish copy and lang=es", async () => {
-  const mexico = unsubscribePageAudience({ mobilePhone: null, phone: null, personCountry: "Mexico" });
+  const mexico = unsubscribePageAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: "Mexico" });
   assert.ok(mexico);
   const html = await (await getPage(`?t=${TOKEN}`, requestDeps("es", async () => mexico))).text();
   const miami = COMPLIANCE_CONFIG.miami?.postalAddress;
@@ -136,7 +136,7 @@ test("Mexico through the full wiring: Miami address with Spanish copy and lang=e
 });
 
 // The recorded language choice (sequence_member.draft_language) decides the page's language; the audience decides the address.
-const usCompany = { mobilePhone: null, phone: null, personCountry: null, companyCountry: "United States" } as const;
+const usCompany = { mobilePhone: null, phone: null, rosterCountries: [], personCountry: null, companyCountry: "United States" } as const;
 const usAddress = unsubscribePageAudience(usCompany)?.postalAddress;
 
 test("a chosen language that differs from the audience wins for the locale, and the address stays the audience's (production case)", () => {
@@ -150,14 +150,14 @@ test("a chosen language that differs from the audience wins for the locale, and 
 });
 
 test("nobody chose (null or undefined): the audience language still applies", () => {
-  const argentina = { mobilePhone: null, phone: null, personCountry: "Argentina" } as const;
+  const argentina = { mobilePhone: null, phone: null, rosterCountries: [], personCountry: "Argentina" } as const;
   assert.equal(unsubscribePageAudience(argentina, null)?.locale, "es");
   assert.equal(unsubscribePageAudience(argentina)?.locale, "es");
   assert.equal(unsubscribePageAudience(usCompany, null)?.locale, "en");
 });
 
 test("a chosen language with no audience gives that locale and no address", () => {
-  const none = { mobilePhone: null, phone: null, personCountry: null } as const;
+  const none = { mobilePhone: null, phone: null, rosterCountries: [], personCountry: null } as const;
   assert.equal(unsubscribePageAudience(none), undefined);
   assert.deepEqual(unsubscribePageAudience(none, "es"), { locale: "es" });
   assert.deepEqual(unsubscribePageAudience(none, "en"), { locale: "en" });
@@ -168,12 +168,12 @@ test("a stored value that is not es/en reads as no choice: the audience language
   for (const garbage of ["pt", "ES", "", " es", "fr", 3, {}]) {
     assert.deepEqual(unsubscribePageAudience(usCompany, garbage), unsubscribePageAudience(usCompany), String(garbage));
   }
-  assert.equal(unsubscribePageAudience({ mobilePhone: null, phone: null, personCountry: null }, "pt"), undefined);
+  assert.equal(unsubscribePageAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: null }, "pt"), undefined);
 });
 
 test("a language choice never changes the postal address", () => {
   for (const country of ["Argentina", "Mexico", "Spain", "Ireland", "United States"]) {
-    const input = { mobilePhone: null, phone: null, personCountry: country } as const;
+    const input = { mobilePhone: null, phone: null, rosterCountries: [], personCountry: country } as const;
     const base = unsubscribePageAudience(input)?.postalAddress;
     for (const choice of ["es", "en", null, "garbage"]) assert.equal(unsubscribePageAudience(input, choice)?.postalAddress, base, `${country}/${choice}`);
   }

@@ -17,7 +17,8 @@ import { COMPLIANCE_CONFIG } from "./config";
 import { SEQUENCE_DETAIL_MEMBER_LIMIT } from "./detailQueries";
 import { canTransition, type MemberState } from "./memberState";
 import { LOCK_MS } from "@/lib/scheduledEmail/plan";
-import { companyCountrySql, postingMarketsSql } from "./rosterQuery";
+import { audienceFactsSql } from "./rosterQuery";
+import { audienceInputsFromRow } from "./audienceInputs";
 import { parseSchedule, reminderReleaseAt } from "./schedule";
 import { resolveSequenceSend, type SendChoice, type SendMomentRefusal } from "./sendMoment";
 
@@ -78,10 +79,9 @@ async function addressesNow(tx: Tx, personIds: readonly string[]): Promise<Map<s
   if (!personIds.length) return new Map();
   const ids = sql.join(personIds.map((id) => sql`${id}::uuid`), sql`, `);
   const rows = (await tx.execute(sql`
-    select p.id::text as person_id, p.country as person_country, p.mobile_phone, p.phone,
-           ${companyCountrySql} as company_country, ${postingMarketsSql} as posting_markets
-    from person p where p.id in (${ids})`)) as unknown as { person_id: string; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }[];
-  return new Map(rows.map((r) => [r.person_id, resolveComplianceAudience({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets })?.address ?? null]));
+    select p.id::text as person_id, ${audienceFactsSql}
+    from person p where p.id in (${ids})`)) as unknown as ({ person_id: string } & Record<string, unknown>)[];
+  return new Map(rows.map((r) => [r.person_id, resolveComplianceAudience(audienceInputsFromRow(r))?.address ?? null]));
 }
 
 /**

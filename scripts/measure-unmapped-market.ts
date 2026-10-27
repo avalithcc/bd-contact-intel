@@ -40,10 +40,10 @@ import { sql } from "drizzle-orm";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { db } from "../src/db";
 import { explainComplianceAudience } from "../src/lib/sequences/complianceAudience";
-import { companyCountrySql, sameCompanyAs } from "../src/lib/sequences/rosterQuery";
-import { openPostingSql } from "../src/lib/hiring/openPosting";
+import { audienceFactsSql } from "../src/lib/sequences/rosterQuery";
+import { audienceInputsFromRow } from "../src/lib/sequences/audienceInputs";
 
-type Row = {
+type Row = Record<string, unknown> & {
   person_country: string | null;
   company_country: string | null;
   posting_markets: string[] | null;
@@ -81,10 +81,7 @@ async function main() {
     // Live persons (a merged-away row is hidden from every read) with a non-blank email: the
     // population the create-sequence picker lists.
     const rows = (await tx.execute(sql`
-      select p.country as person_country, p.phone, p.mobile_phone,
-             ${companyCountrySql} as company_country,
-             coalesce((select json_agg(distinct jp.market) from job_posting jp
-                        where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets
+      select ${audienceFactsSql}
         from person p
        where p.merged_into_id is null
          and nullif(btrim(p.email), '') is not null
@@ -99,13 +96,7 @@ async function main() {
     let blocked = 0;
 
     for (const row of rows) {
-      const out = explainComplianceAudience({
-        mobilePhone: row.mobile_phone,
-        phone: row.phone,
-        personCountry: row.person_country,
-        companyCountry: row.company_country,
-        postingMarkets: row.posting_markets ?? [],
-      });
+      const out = explainComplianceAudience(audienceInputsFromRow(row));
 
       if (out.audience) {
         mailable += 1;

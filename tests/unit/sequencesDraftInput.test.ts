@@ -84,7 +84,7 @@ test("the sender title follows the draft language, and only the owner has one", 
 
 test("language and postal address are two fields of ONE audience: every recognized country has both, in the config", () => {
   for (const { iso, names } of RECOGNIZED_COUNTRIES) {
-    const a = resolveComplianceAudience({ mobilePhone: null, phone: null, personCountry: names[0] });
+    const a = resolveComplianceAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: names[0] });
     if (!a) continue; // an embargoed jurisdiction: held, nothing to compose
     assert.ok(Object.hasOwn(COMPLIANCE_CONFIG, a.address), `${iso} resolves to an address with no config entry`);
     assert.equal(buildSequenceDraftInput(base, a)?.language, a.language, iso);

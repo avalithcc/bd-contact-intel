@@ -23,13 +23,14 @@ import { miamiCalendarDate } from "./miamiTime";
 import { assertTransition } from "./memberState";
 import type { HoldReason } from "./preSendChecks";
 import { resolveComplianceAudience } from "./complianceAudience";
-import { companyCountrySql, sameCompanyAs } from "./rosterQuery";
+import { audienceFactsSql, sameCompanyAs } from "./rosterQuery";
+import { audienceInputsFromRow } from "./audienceInputs";
 import { generateReminderDraft } from "./draftQueries";
 import { parseSchedule, reminderDueAt } from "./schedule";
 import { pickReleaseKeys, releaseInstant, type SlimRow } from "./releaseSelection";
 import type { HoldChange, ReleaseCandidate, RunnerPorts } from "./runSequenceRelease";
 import { listSuppressionRules } from "./suppressionQueries";
-import { openPostingSql } from "@/lib/hiring/openPosting";
+
 
 const MAX_CANDIDATES = 500;
 /** The members an immediate release may look at, and whose Sequences they must belong to. */
@@ -64,7 +65,7 @@ function toCandidate(r: Row): ReleaseCandidate {
     accountId: r.account_id as string, dailyCap: Number(r.daily_send_cap), step, dueAt, approvedAt, schedule,
     memberState: r.state as string, draftApproved: true, repliedAt: toDate(r.replied_at), inboundReplyAt: toDate(r.inbound_reply_at), holdReason: (r.hold_reason ?? null) as HoldReason | null,
     email: (r.email ?? null) as string | null, merged: Boolean(r.merged), hasClientStatus: Boolean(r.has_client_status),
-    address: resolveComplianceAudience({ mobilePhone: r.mobile_phone as string | null, phone: r.phone as string | null, personCountry: r.person_country as string | null, companyCountry: r.company_country as string | null, postingMarkets: r.posting_markets as string[] })?.address ?? null,
+    address: resolveComplianceAudience(audienceInputsFromRow(r))?.address ?? null,
     subject: r.subject as string, body: r.body as string, signatureHtml: (r.signature_html ?? null) as string | null, accountStatus: r.account_status as string, accountEmail: r.account_email as string,
     lastSyncedAt: toDate(r.last_synced_at), activeClaim: (r.active_claim ?? null) as "pending" | "sent" | null, activeClaimAt: toDate(r.active_claim_at),
     step1RfcMessageId: (r.step1_rfc ?? null) as string | null, step1ThreadId: (r.step1_thread ?? null) as string | null,
@@ -83,10 +84,8 @@ const dueWhere = (iso: string) => sql`d.approved_at is not null
 export const buildCandidateFactsQuery = (keys: SQL, iso: string, scoped: SQL) => sql`
       select sm.id::text as member_id, sm.sequence_id::text as sequence_id, s.owner_bd_id::text as owner_bd_id, sm.person_id::text as person_id,
              s.email_account_id::text as account_id, s.daily_send_cap, s.schedule, d.step, d.subject, d.body, d.scheduled_for, d.approved_at,
-             sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged, p.country as person_country, p.mobile_phone, p.phone,
-             ${companyCountrySql} as company_country,
-             coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")}
-                and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets,
+             sm.state, sm.replied_at, case when d.step = 2 then (select min(g.sent_at) from (${genuineReplyAfterSend}) g) end as inbound_reply_at, sm.reminder_due_at, sm.hold_reason, p.email, (p.merged_into_id is not null) as merged,
+             ${audienceFactsSql},
              exists (select 1 from company c where ${sameCompanyAs("c")} and c.client_status is not null) as has_client_status,
              ea.status as account_status, ea.email_address as account_email, ea.last_synced_at,
              (select cl.outcome from sequence_send_claim cl where cl.sequence_member_id = sm.id and cl.step = d.step and cl.outcome <> 'failed' limit 1) as active_claim,

@@ -23,11 +23,12 @@ import type { AudienceLanguage } from "./complianceAudience";
 import type { OutreachSignal } from "@/lib/outreach/messageSignals";
 import { assertTransition, type MemberState } from "./memberState";
 import { resolveComplianceAudience, type ComplianceAudience } from "./complianceAudience";
-import { companyCountrySql, sameCompanyAs } from "./rosterQuery";
+import { audienceFactsSql } from "./rosterQuery";
+import { audienceInputsFromRow } from "./audienceInputs";
 import { reviewAfterEdit } from "./editReview";
 import { issueUnsubscribeToken } from "./unsubscribeQueries";
 import { buildUnsubscribeUrl } from "./unsubscribeToken";
-import { openPostingSql } from "@/lib/hiring/openPosting";
+
 
 const STEP = 1;
 const REMINDER_STEP = 2;
@@ -57,10 +58,8 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   const [r] = rowsOf<Row>(
     await db.execute(sql`
       select sm.state, sm.hold_reason, sm.draft_language, sm.sequence_id::text, p.id::text as person_id, p.email, p.first_name, p.last_name,
-             p.job_title, p.role_group, p.industry, p.company_key, p.country as person_country, p.mobile_phone, p.phone, b.name as sender_name,
-             ${companyCountrySql} as company_country,
-             coalesce((select json_agg(distinct jp.market) from job_posting jp
-                where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets,
+             p.job_title, p.role_group, p.industry, p.company_key, b.name as sender_name,
+             ${audienceFactsSql},
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as has_reminder_draft,
              (select d.edited_at from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as draft_edited_at,
@@ -72,13 +71,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
       where sm.id = ${memberId}::uuid ${sequenceId ? sql`and sm.sequence_id = ${sequenceId}::uuid` : sql``}`),
   );
   if (!r) return null;
-  const audience: ComplianceAudience | null = resolveComplianceAudience({
-    mobilePhone: r.mobile_phone as string | null,
-    phone: r.phone as string | null,
-    personCountry: r.person_country as string | null,
-    companyCountry: r.company_country as string | null,
-    postingMarkets: r.posting_markets as string[],
-  });
+  const audience: ComplianceAudience | null = resolveComplianceAudience(audienceInputsFromRow(r));
   // The recorded human choice, if any. A stored value that is not es/en reads as no choice, so it can never reach the generator.
   const chosenLanguage = parseLanguageChoice(r.draft_language);
   return { r, audience, chosenLanguage, state: r.state as string, hasDraft: r.has_draft as boolean, hasReminderDraft: r.has_reminder_draft as boolean, draftEditedAt: r.draft_edited_at == null ? null : parseDbTimestamp(r.draft_edited_at as string | Date), reminderEditedAt: r.reminder_edited_at == null ? null : parseDbTimestamp(r.reminder_edited_at as string | Date) };

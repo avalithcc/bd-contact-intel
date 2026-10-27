@@ -25,7 +25,7 @@ const base: SequenceDraftInputArgs = {
 const AUDIENCES: ComplianceAudience[] = [
   ...new Map(
     RECOGNIZED_COUNTRIES.flatMap((c) => {
-      const a = resolveComplianceAudience({ mobilePhone: null, phone: null, personCountry: c.names[0] ?? c.iso });
+      const a = resolveComplianceAudience({ mobilePhone: null, phone: null, rosterCountries: [], personCountry: c.names[0] ?? c.iso });
       return a ? [[`${a.address}/${a.language}`, a] as const] : [];
     }),
   ).values(),
