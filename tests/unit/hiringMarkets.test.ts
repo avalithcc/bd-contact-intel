@@ -152,9 +152,35 @@ test("a named LATAM place or a LATAM country still files latam with the same cod
   }
 });
 
-test("a bare co/pa/ar with no place or country is ambiguous: counts for neither side (other)", () => {
-  for (const location of ["Erie, PA", "Boulder, CO", "Bentonville, AR", "Capital Department, AR", "Antioquia, CO"]) {
+// Owner decision 2026-10-27 for a bare code when no country and no named place decided: ar -> Argentina,
+// co -> Colombia, pa -> Pennsylvania.
+test("a bare ar/co/pa with no place or country follows the owner's per-code reading", () => {
+  for (const location of ["Capital Department, AR", "BEA, AR", "San Nicolas, AR", "Antioquia, CO"]) {
+    assert.equal(classifyMarket(location), "latam", location);
+  }
+  for (const location of ["Pittsburgh, PA", "Scranton, PA", "Erie, PA", "Remote, Pittsburgh, PA", "Harrisburg, Pa"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+});
+
+test("accepted miss: Arkansas and Colorado cities with no other signal read latam", () => {
+  for (const location of ["Bentonville, AR", "Fayettville, AR", "Boulder, CO", "Remote, Boulder, CO"]) {
+    assert.equal(classifyMarket(location), "latam", location);
+  }
+});
+
+test("a named US place or an explicit country beats a trailing ar/co/pa, with or without a work-mode word", () => {
+  for (const location of ["Remote, Denver, CO", "Hybrid, Philadelphia, PA", "Denver, Colorado, CO", "Little Rock, AR, us", "Remote, Denver, CO - Hybrid"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+  for (const location of ["Cork, CO, ie", "Cadorago, CO, it"]) {
     assert.equal(classifyMarket(location), "other", location);
+  }
+});
+
+test("a trailing ar/co in country position with no US place is LATAM", () => {
+  for (const location of ["Zarzal, Valle del Cauca, co", "Capital, Mendoza, ar", "Envigado, Envigado, co"]) {
+    assert.equal(classifyMarket(location), "latam", location);
   }
 });
 
@@ -202,10 +228,45 @@ test("a list of places is classified part by part and the best part wins, LATAM 
   assert.equal(classifyMarket("Toronto, ON, ca; Cork, CO, ie"), "other");
 });
 
-test("a list of places inside one part ends in a state, not a country", () => {
-  for (const location of ["Arlington, VA or Clearwater, FL", "Washington, DC & Bethesda, MD", "Corpus Christi, TX and St. Francisville, LA", "Dallas, TX, Austin, TX", "Miami, FL / Corpus Christi, TX"]) {
+test("a trailing state code is not a country: work-mode prefixes and comma-joined City, ST lists stay us", () => {
+  for (const location of [
+    "Remote, Atlanta, GA", "Remote, Boston, MA", "Remote, Chicago, IL", "Remote, Nashville, TN", "Remote, San Francisco, CA", "Remote, Raleigh, NC", "Remote, Phoenix, AZ",
+    "Dallas, TX, Atlanta, GA", "Austin, TX, Raleigh, NC", "Nashville, TN, Memphis, TN", "Washington, DC, Arlington, VA", "Alexandria, VA, Bethesda, MD",
+    "Kansas City, KS, Kansas City, MO", "Atlanta, GA, Boston, MA, Chicago, IL", "Remote, California, CA",
+    "Arlington, VA or Clearwater, FL", "Washington, DC & Bethesda, MD", "Corpus Christi, TX and St. Francisville, LA", "Dallas, TX, Austin, TX", "Miami, FL / Corpus Christi, TX",
+  ]) {
     assert.equal(classifyMarket(location), "us", location);
   }
+});
+
+test("the trailing foreign country still wins, also behind a work-mode suffix", () => {
+  for (const location of [
+    "Toronto, ON, ca", "Chennai, TN, in", "Madrid, MD, es", "Barcelona, CT, es", "Amsterdam, NH, nl", "Cork, CO, ie",
+    "Toronto, ON, CA - Remote", "Toronto, ON, CA (Remote)", "Chennai, TN, in - Hybrid",
+  ]) {
+    assert.equal(classifyMarket(location), "other", location);
+  }
+});
+
+test("ordinary words that look like an XX- prefix are not a country", () => {
+  for (const location of ["On-site - Austin, TX", "On-Site, Austin, TX", "In-Office - Austin, TX", "No-relocation Austin, TX", "Co-located, Denver"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+  assert.equal(classifyMarket("In-Office"), "other");
+});
+
+test("a LATAM country name used as a city yields to the US state after it", () => {
+  for (const location of ["Panama City, FL", "Panama City, FL, us", "Panama City Beach, FL, us", "Panama City, Florida", "Mexico, MO", "Peru, IL", "Peru, Indiana"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+  for (const location of ["Panama City, Panama", "Panama", "Mexico City", "Lima, Peru"]) {
+    assert.equal(classifyMarket(location), "latam", location);
+  }
+});
+
+test("Remote, CA and Remote CA agree: Remote is not a city, so neither is California", () => {
+  assert.equal(classifyMarket("Remote, CA"), "other");
+  assert.equal(classifyMarket("Remote CA"), "other");
 });
 
 test("U.S. written with dots is the United States (16 rows were other)", () => {

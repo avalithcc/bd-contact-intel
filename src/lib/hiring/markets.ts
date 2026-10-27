@@ -75,25 +75,30 @@ export const LATAM_COUNTRY_NAMES: readonly string[] = [
 //   1. COUNTRY: a country name ("united states", "costa rica"), a "us"/"usa"
 //      token, an unambiguous LATAM country code, or the country code ATS feeds
 //      put in a fixed position: the trailing segment of "City, Region, XX"
-//      ("Chennai, TN, in", "Toronto, ON, ca", "Denver, CO, us") or the prefix of
-//      "XX-Region-City" ("US-CO-Denver", "CA-Ontario-Toronto"). Inside tier 1,
-//      LATAM beats US (the old order, kept for genuinely mixed postings), and a
-//      country that is neither files other even if a state-like token follows.
+//      ("Chennai, TN, in", "Toronto, ON, ca") or the prefix of "XX-Region-City"
+//      ("US-CO-Denver", "CA-Ontario-Toronto"). Inside tier 1, LATAM beats US (the
+//      old order, kept for genuinely mixed postings), and a country that is
+//      neither files other even if a state-like token precedes it. A LATAM country
+//      NAME used as a city ("Panama City, FL", "Mexico, MO") yields to a US state
+//      right after it.
 //   2. NAMED PLACE: a city or a US state name. "Denver, CO" is Colorado because
 //      Denver is a US city; "Bogota, CO" is Colombia because Bogota is a LATAM city.
+//      A trailing "ar"/"co"/"pa" in country position ("Valle del Cauca, co") means
+//      LATAM only when no US place matched.
 //   3. BARE CODE: a US state code files us. The codes "ar", "co", "pa" (Argentina,
-//      Colombia, Panama; also Arkansas, Colorado, Pennsylvania) and "ca" outside
-//      "City, CA" are genuinely ambiguous and count for neither side. other is
-//      the safe failure: fromPostings holds an `other` audience instead of mailing
-//      the wrong language.
+//      Colombia, Panama; also Arkansas, Colorado, Pennsylvania) are ambiguous and
+//      take the owner's per-code reading, BARE_AMBIGUOUS_CODE_MARKET. "ca" outside
+//      "City, CA" (a leading word, a list item) counts for neither side.
 // A location of several places ("Denver, CO; Toronto, ON, ca") is classified part
-// by part (split on ";") and the best part wins, LATAM first.
+// by part (split on ";") and the best part wins, LATAM first. Work-mode words around
+// a place ("Remote, Denver, CO", "Toronto, ON, ca - Hybrid") are not part of it.
 //
 // Left alone on purpose: "peru"/"Perugia" and "brasil"/"Brasilia" (both live in
 // LATAM_COUNTRY_NAMES, which also feeds isKnownCountryName and so the contact
 // form), "lima" in "Lima, OH".
-const LATAM_COUNTRY_RULES: MarketRules = {
-  phrases: [...LATAM_COUNTRY_NAMES],
+const LATAM_COUNTRY_NAME_RULES: MarketRules = { phrases: [...LATAM_COUNTRY_NAMES], tokens: [] };
+const LATAM_COUNTRY_CODE_RULES: MarketRules = {
+  phrases: [],
   tokens: [
     "arg",
     "uy",
@@ -125,9 +130,11 @@ const LATAM_COUNTRY_RULES: MarketRules = {
   ],
 };
 
-// LATAM codes that are also US state postal codes. They count as a country only
-// in a country position (see countryCode); anywhere else they are ambiguous.
-const AMBIGUOUS_LATAM_CODES: readonly string[] = ["ar", "co", "pa"];
+// LATAM codes that are also US state postal codes. What one means when NOTHING else decided (no
+// country, no named place) is ONE owner decision per code, made here (2026-10-27): the data
+// says "AR" is Argentina and "CO" Colombia far more often than Arkansas/Colorado, and every "PA"
+// seen was Pennsylvania. Accepted misses: "Bentonville, AR", "Fayettville, AR", "Boulder, CO".
+const BARE_AMBIGUOUS_CODE_MARKET: Readonly<Record<string, MarketKey>> = { ar: "latam", co: "latam", pa: "us" };
 
 const LATAM_PLACE_RULES: MarketRules = {
   phrases: [
@@ -278,17 +285,14 @@ const US_PLACE_RULES: MarketRules = {
 // "usa" is a token for the same reason ("Lausanne", "Busan"); "us" likewise.
 const US_COUNTRY_RULES: MarketRules = { phrases: ["united states"], tokens: ["us", "usa"] };
 
-// US state codes that are NOT a country's ISO code: in a country position
-// ("Dallas, TX, Austin, TX") they are still a state, never a country.
-const US_STATE_ONLY_CODES: readonly string[] = [
-  "ak", "ct", "fl", "hi", "ia", "ks", "mi", "nh", "nj", "nm", "nv", "ny", "nd", "oh", "ok", "or", "ri", "tx", "ut", "vt", "wa", "wv", "wi", "wy", "dc",
+// US state postal codes that are not "ar"/"co"/"pa" (see BARE_AMBIGUOUS_CODE_MARKET) and not
+// "ca" (Canada or California: decided by position, see californiaAfterCity). Several are also
+// an ISO country code (Albania, Israel, Laos, Morocco, Moldova, Tunisia...); countryCode()
+// only reads such a code as a country in the strict "City, PROVINCE, XX" shape.
+const US_STATE_CODES: readonly string[] = [
+  "ak", "al", "az", "ct", "dc", "fl", "ga", "hi", "ia", "il", "ks", "ky", "la", "ma", "md", "me", "mi", "mn", "mo", "ms", "mt", "nc", "nd", "ne", "nh", "nj", "nm", "nv", "ny", "oh", "ok", "or", "ri", "sc", "sd", "tn", "tx", "ut", "va", "vt", "wa", "wi", "wv", "wy",
 ];
-// State codes that are also a country's ISO code (Albania, Canada, Israel, Laos,
-// Morocco, Moldova, Tunisia...). "ca" is handled by position, see californiaAfterCity.
-const US_ISO_COLLIDING_CODES: readonly string[] = [
-  "al", "az", "ga", "il", "ky", "la", "me", "md", "ma", "mn", "ms", "mo", "mt", "ne", "nc", "sc", "sd", "tn", "va",
-];
-const US_STATE_CODES: readonly string[] = [...US_STATE_ONLY_CODES, ...US_ISO_COLLIDING_CODES];
+const isUsStateLike = (code: string): boolean => code === "ca" || Object.hasOwn(BARE_AMBIGUOUS_CODE_MARKET, code) || US_STATE_CODES.includes(code);
 
 // Florida, as a finer cut on top of the "us" market bucket: the team sells
 // into the state from Miami, and Miami-metro alone matched too few postings
@@ -323,34 +327,64 @@ export const FLORIDA_PHRASES = [
 export const FLORIDA_TOKENS = ["fl", "miami"];
 
 const MARKET_RANK: Record<MarketKey, number> = { other: 0, us: 1, latam: 2 };
-// ATS feeds write the country in a fixed position: a 2-letter prefix ("US-CO-Denver") or a
-// trailing segment after city and region ("Denver, CO, us"). "co-op" style words match the
-// prefix form too, but only a LATAM or US code changes the answer and none of those occur.
-const COUNTRY_PREFIX = /^([a-z]{2})-[a-z]/;
-// A list of places ("Arlington, VA or Clearwater, FL") ends in a state, not a country.
-const PLACE_LIST_JOINER = /\s(?:and|or)\s|[&/]/;
+// Work-mode words are not a place: "Remote, Denver, CO" is Denver, "Toronto, ON, ca - Hybrid" is Toronto.
+const WORK_MODE = "(?:remote|hybrid|on-?site|in-?office)";
+const LEADING_WORK_MODE = new RegExp(`^${WORK_MODE}\\b\\s*(?:[-–—,:]\\s*)?`);
+const TRAILING_WORK_MODE = new RegExp(`\\s*(?:[-–—]\\s*|\\(\\s*)?${WORK_MODE}\\s*\\)?\\s*$`);
+const stripWorkMode = (part: string): string => part.replace(LEADING_WORK_MODE, "").replace(TRAILING_WORK_MODE, "").trim();
 
-/** The country code a feed put in the prefix or trailing position, or null (state-only codes are never a country). */
-function countryCode(part: string, segments: string[]): string | null {
-  const last = segments.length >= 3 && !PLACE_LIST_JOINER.test(part) ? segments[segments.length - 1] : "";
-  const code = COUNTRY_PREFIX.exec(part)?.[1] ?? (/^[a-z]{2}$/.test(last) ? last : null);
-  return code && !US_STATE_ONLY_CODES.includes(code) ? code : null;
+// The "XX-Region-City" feed form ("US-CO-Denver"). Needs the second dash with no space around it, so
+// "On-site - Austin", "In-Office", "No-relocation Austin" and "Co-located" are not a prefix.
+const COUNTRY_PREFIX = /^([a-z]{2})-[a-z][^-,]*[^-\s,]-\S/;
+const regionNames = new Intl.DisplayNames(["en"], { type: "region", fallback: "none" });
+const isIsoCountry = (code: string): boolean => regionNames.of(code.toUpperCase()) !== undefined;
+
+/**
+ * The country code a feed put in a fixed position, or null: the prefix of "XX-Region-City", or the trailing
+ * segment of "City, Region, XX". The trailing form is read as a country only in that shape:
+ *  - the code is an ISO country and the segment before it is not a US place ("Denver, Colorado, CO");
+ *  - no earlier segment is a US state code, which would make the string a list of "City, ST" pairs
+ *    ("Dallas, TX, Atlanta, GA");
+ *  - a code that is also a US state ("ca", "il", "md"...) additionally needs a province-like 2-letter code
+ *    before it that is not a US state ("Toronto, ON, ca"); "ar"/"co"/"pa" are exempt, since their region
+ *    is usually a name ("Valle del Cauca, co"), and a non-state code ("in", "es") needs nothing more.
+ */
+function countryCode(prefixed: string, segments: string[]): string | null {
+  const prefix = COUNTRY_PREFIX.exec(prefixed)?.[1];
+  if (prefix) return isIsoCountry(prefix) ? prefix : null;
+  const n = segments.length;
+  const code = segments[n - 1];
+  if (n < 3 || !/^[a-z]{2}$/.test(code) || !isIsoCountry(code)) return null;
+  const region = segments[n - 2];
+  if (matchesRules(region, US_PLACE_RULES)) return null;
+  if (segments.slice(0, n - 2).some((s) => /^[a-z]{2}$/.test(s) && isUsStateLike(s))) return null;
+  const provinceCode = /^[a-z]{2}$/.test(region) && !isUsStateLike(region);
+  return isUsStateLike(code) && !Object.hasOwn(BARE_AMBIGUOUS_CODE_MARKET, code) && !provinceCode ? null : code;
 }
 
 /** "San Francisco, CA" is California; "ca" anywhere else (leading word, list item) is Canada or California: no verdict. */
 const californiaAfterCity = (segments: string[]): boolean => segments.slice(1).some((s) => tokenize(s)[0] === "ca");
 
-function classifyPart(part: string): MarketKey {
+/** A US state or place after the first segment ("Panama City, FL", "Mexico, Missouri"): the first segment is a city, not a country. */
+const usAnchorAfterFirst = (segments: string[]): boolean =>
+  segments.slice(1).some((s) => matchesRules(s, US_PLACE_RULES) || US_STATE_CODES.includes(tokenize(s)[0]));
+
+function classifyPart(raw: string): MarketKey {
+  const part = stripWorkMode(raw);
   const segments = part.split(",").map((s) => s.trim()).filter(Boolean);
-  const code = countryCode(part, segments);
-  const isLatamCode = !!code && (LATAM_COUNTRY_RULES.tokens.includes(code) || AMBIGUOUS_LATAM_CODES.includes(code));
-  if (matchesRules(part, LATAM_COUNTRY_RULES) || isLatamCode) return "latam";
+  const code = countryCode(raw, segments);
+  const nameIsCity = usAnchorAfterFirst(segments);
+  if ((!nameIsCity && matchesRules(part, LATAM_COUNTRY_NAME_RULES)) || matchesRules(part, LATAM_COUNTRY_CODE_RULES)) return "latam";
   if (matchesRules(part, US_COUNTRY_RULES)) return "us";
-  if (code) return "other";
+  const ambiguousCode = !!code && Object.hasOwn(BARE_AMBIGUOUS_CODE_MARKET, code);
+  if (code && !ambiguousCode) return "other";
   if (matchesRules(part, LATAM_PLACE_RULES)) return "latam";
   if (matchesRules(part, US_PLACE_RULES)) return "us";
+  if (ambiguousCode) return "latam";
   const tokens = new Set(tokenize(part));
-  return US_STATE_CODES.some((c) => tokens.has(c)) || californiaAfterCity(segments) ? "us" : "other";
+  if (US_STATE_CODES.some((c) => tokens.has(c)) || californiaAfterCity(segments)) return "us";
+  const bare = Object.keys(BARE_AMBIGUOUS_CODE_MARKET).find((c) => tokens.has(c));
+  return bare ? BARE_AMBIGUOUS_CODE_MARKET[bare] : "other";
 }
 
 /**
