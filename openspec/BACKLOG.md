@@ -2180,7 +2180,10 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   on the shared `public` tables: ACCESS EXCLUSIVE locks that block or deadlock any
   file touching `bd`. They now replay the real migration SQL in a private schema
   (`tests/support/migrationReplay.ts`). Rule: a `tests/db` test never runs DDL on a
-  `public` table.
+  `public` table. (3) `emailRecipientsAndAttachments.test.ts:216` failed ~1 run in
+  15 even alone: persons "a"/"b"/"c" shared one email across tests and the matcher
+  has no ORDER BY; every fixture address is now unique. 12 consecutive full
+  parallel `test:db` runs green afterwards (477/477).
 - **A constants edit in `src/lib/hiring/markets.ts` is a PRODUCTION DATA
   MIGRATION.** `src/lib/hiring/sync.ts:113-130` upserts `market`, `is_miami` AND
   `is_offshore_hub` from `excluded`, so the next daily hiring sync recomputes all
