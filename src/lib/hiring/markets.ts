@@ -329,25 +329,34 @@ export const FLORIDA_TOKENS = ["fl", "miami"];
 const MARKET_RANK: Record<MarketKey, number> = { other: 0, us: 1, latam: 2 };
 // Work-mode words are not a place: "Remote, Denver, CO" is Denver, "Toronto, ON, ca - Hybrid" is Toronto.
 const WORK_MODE = "(?:remote|hybrid|on-?site|in-?office)";
-const LEADING_WORK_MODE = new RegExp(`^${WORK_MODE}\\b\\s*(?:[-–—,:]\\s*)?`);
+const LEADING_WORK_MODE = new RegExp(`^\\(?${WORK_MODE}\\b\\)?\\s*(?:[-–—,:]\\s*)?`);
 const TRAILING_WORK_MODE = new RegExp(`\\s*(?:[-–—]\\s*|\\(\\s*)?${WORK_MODE}\\s*\\)?\\s*$`);
-const stripWorkMode = (part: string): string => part.replace(LEADING_WORK_MODE, "").replace(TRAILING_WORK_MODE, "").trim();
+const stripWorkMode = (part: string): string =>
+  part.replace(LEADING_WORK_MODE, "").replace(TRAILING_WORK_MODE, "").trim().replace(/^\(([^()]*)\)$/, "$1"); // "Hybrid (Toronto, ON, ca)"
 
 // The "XX-Region-City" feed form ("US-CO-Denver"). Needs the second dash with no space around it, so
 // "On-site - Austin", "In-Office", "No-relocation Austin" and "Co-located" are not a prefix.
 const COUNTRY_PREFIX = /^([a-z]{2})-[a-z][^-,]*[^-\s,]-\S/;
+// ICU knows regions that are not an ISO 3166-1 country: groupings, reserved and deprecated codes. "uk" (reserved,
+// the usual feed spelling) and "xk" (Kosovo) are kept on purpose.
+const NOT_AN_ISO_COUNTRY = new Set([
+  "ac", "an", "bu", "cp", "cq", "cs", "dd", "dg", "dy", "ea", "eu", "ez", "fx", "hv", "ic", "nh", "qo", "rh", "su", "ta", "tp", "un", "vd", "xa", "xb", "yd", "yu", "zr", "zz",
+]);
 const regionNames = new Intl.DisplayNames(["en"], { type: "region", fallback: "none" });
-const isIsoCountry = (code: string): boolean => regionNames.of(code.toUpperCase()) !== undefined;
+const isIsoCountry = (code: string): boolean => !NOT_AN_ISO_COUNTRY.has(code) && regionNames.of(code.toUpperCase()) !== undefined;
+const isStateCodeSegment = (s: string): boolean => /^[a-z]{2}$/.test(s) && isUsStateLike(s);
 
 /**
  * The country code a feed put in a fixed position, or null: the prefix of "XX-Region-City", or the trailing
  * segment of "City, Region, XX". The trailing form is read as a country only in that shape:
- *  - the code is an ISO country and the segment before it is not a US place ("Denver, Colorado, CO");
- *  - no earlier segment is a US state code, which would make the string a list of "City, ST" pairs
- *    ("Dallas, TX, Atlanta, GA");
- *  - a code that is also a US state ("ca", "il", "md"...) additionally needs a province-like 2-letter code
- *    before it that is not a US state ("Toronto, ON, ca"); "ar"/"co"/"pa" are exempt, since their region
- *    is usually a name ("Valle del Cauca, co"), and a non-state code ("in", "es") needs nothing more.
+ *  - the code is an ISO country and nothing before it is a US place or a county ("Denver, Colorado, CO");
+ *  - no segment before the region is a US state code, which would make the string a list of "City, ST"
+ *    pairs ("Dallas, TX, Atlanta, GA");
+ *  - a code that is also a US state ("ca", "il", "ma"...) additionally needs the string not to be joined by
+ *    and/or/&// ("Washington, DC & Bethesda, MD"). "Toronto, Ontario, CA", "Toronto, ON, ca", "Tirana, AL, al",
+ *    "Vientiane, VT, la" and "Casablanca, CAS, ma" are countries.
+ * A region that names a county without saying so ("Springfield, Sangamon, IL") reads as a province: that is
+ * the owner's "ambiguous is neither" rule, measured on production before it shipped.
  */
 function countryCode(prefixed: string, segments: string[]): string | null {
   const prefix = COUNTRY_PREFIX.exec(prefixed)?.[1];
@@ -355,15 +364,22 @@ function countryCode(prefixed: string, segments: string[]): string | null {
   const n = segments.length;
   const code = segments[n - 1];
   if (n < 3 || !/^[a-z]{2}$/.test(code) || !isIsoCountry(code)) return null;
-  const region = segments[n - 2];
-  if (matchesRules(region, US_PLACE_RULES)) return null;
-  if (segments.slice(0, n - 2).some((s) => /^[a-z]{2}$/.test(s) && isUsStateLike(s))) return null;
-  const provinceCode = /^[a-z]{2}$/.test(region) && !isUsStateLike(region);
-  return isUsStateLike(code) && !Object.hasOwn(BARE_AMBIGUOUS_CODE_MARKET, code) && !provinceCode ? null : code;
+  const before = segments.slice(0, n - 1).join(", ");
+  if (matchesRules(before, US_PLACE_RULES) || /\bcounty\b/.test(before)) return null;
+  if (segments.slice(0, n - 2).some(isStateCodeSegment)) return null;
+  if (!isUsStateLike(code)) return code;
+  return PLACE_LIST_JOINER.test(before) ? null : code;
 }
 
-/** "San Francisco, CA" is California; "ca" anywhere else (leading word, list item) is Canada or California: no verdict. */
-const californiaAfterCity = (segments: string[]): boolean => segments.slice(1).some((s) => tokenize(s)[0] === "ca");
+// A list of places ("Arlington, VA or Clearwater, FL") ends in a state, not a country.
+const PLACE_LIST_JOINER = /\s(?:and|or)\s|[&/]/;
+
+/**
+ * "San Francisco, CA" is California; so is "Sacramento, Sacramento County, CA" (countryCode declined it: a county
+ * is before the code). "ca" anywhere else (leading word, list item) is Canada or California: no verdict.
+ */
+const californiaAfterCity = (segments: string[]): boolean =>
+  tokenize(segments[1] ?? "")[0] === "ca" || (segments.length >= 3 && tokenize(segments[segments.length - 1])[0] === "ca");
 
 /** A US state or place after the first segment ("Panama City, FL", "Mexico, Missouri"): the first segment is a city, not a country. */
 const usAnchorAfterFirst = (segments: string[]): boolean =>
@@ -372,7 +388,7 @@ const usAnchorAfterFirst = (segments: string[]): boolean =>
 function classifyPart(raw: string): MarketKey {
   const part = stripWorkMode(raw);
   const segments = part.split(",").map((s) => s.trim()).filter(Boolean);
-  const code = countryCode(raw, segments);
+  const code = countryCode(raw.replace(LEADING_WORK_MODE, ""), segments); // "In-Office-Denver" is not a prefix
   const nameIsCity = usAnchorAfterFirst(segments);
   if ((!nameIsCity && matchesRules(part, LATAM_COUNTRY_NAME_RULES)) || matchesRules(part, LATAM_COUNTRY_CODE_RULES)) return "latam";
   if (matchesRules(part, US_COUNTRY_RULES)) return "us";
@@ -380,7 +396,7 @@ function classifyPart(raw: string): MarketKey {
   if (code && !ambiguousCode) return "other";
   if (matchesRules(part, LATAM_PLACE_RULES)) return "latam";
   if (matchesRules(part, US_PLACE_RULES)) return "us";
-  if (ambiguousCode) return "latam";
+  if (ambiguousCode) return BARE_AMBIGUOUS_CODE_MARKET[code!];
   const tokens = new Set(tokenize(part));
   if (US_STATE_CODES.some((c) => tokens.has(c)) || californiaAfterCity(segments)) return "us";
   const bare = Object.keys(BARE_AMBIGUOUS_CODE_MARKET).find((c) => tokens.has(c));

@@ -2248,10 +2248,10 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   `"City, Region, XX"` or the prefix of `"XX-Region-City"`; then a named place; then a
   bare code) and classifies `;`-separated places one by one. Measured against 16,939
   production rows, read-only (`scripts/measure/market-country-signal.ts`; old
-  classifier frozen in `scripts/measure/legacyMarkets.ts`): 298 rows change market
+  classifier frozen in `scripts/measure/legacyMarkets.ts`): 300 rows change market
   (`latam>us` 204 = 202 via `co`/`pa`/`ar` (the 182 of 10-21 plus rows synced since,
   including the lone `, PA` cities) + 2 New Mexico, 39 openIT / 28 freshIT;
-  `us>other` 69, 18 openIT / 3 freshIT: Canada, India, Spain, Israel, the Netherlands;
+  `us>other` 71, 18 openIT / 3 freshIT: Canada, India, Spain, Israel, the Netherlands;
   `latam>other` 9, 0 openIT: `"Cork, CO, ie"`, `"Cadorago, CO, it"`; `other>us` 16).
   `CA` by position: 22 Canada rows leave
   `us` (`"Toronto, ON, ca"`, `"CA-Ontario-Toronto"`), 58 California rows leave `latam`;
@@ -2276,17 +2276,23 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   signal) read latam. A named US place or an explicit country still beats the code
   (`"Remote, Denver, CO"`, `"Little Rock, AR, us"`, `"Cork, CO, ie"`).
   **Hardening after fresh review (same day):** a trailing 2-letter code is a country only
-  in the `"City, Region, XX"` shape (not a US place before it, no earlier US state code,
-  and a code that is also a state needs a non-US province code before it), so
-  `"Remote, Atlanta, GA"` and `"Dallas, TX, Atlanta, GA"` stay us; work-mode words
-  (`Remote`, `Hybrid`, `On-site`, `In-Office`) around a place are ignored; the `XX-`
+  in the `"City, Region, XX"` shape (no US place or county before it, no earlier US state
+  code, not joined by and/or/&//; the code must be a real ISO 3166-1 country), so
+  `"Remote, Atlanta, GA"` and `"Dallas, TX, Atlanta, GA"` stay us while
+  `"Toronto, Ontario, CA"`, `"Tel Aviv, Tel Aviv, IL"` and `"Casablanca, CAS, ma"` are
+  other; work-mode words (`Remote`, `Hybrid`, `On-site`, `In-Office`, also wrapped in
+  parentheses) around a place are ignored; the `XX-`
   prefix needs the full `XX-Region-City` form with a real ISO code (`"On-site - Austin,
-  TX"` and `"Co-located, Denver"` are not prefixes); a LATAM country name used as a city
+  TX"`, `"In-Office-Denver"` and `"Co-located, Denver"` are not prefixes); a LATAM
+  country name used as a city
   yields to a US state after it (`"Panama City, FL"`, `"Mexico, MO"`, `"Peru, IL"` are
-  us). `"U.S."` written with dots is now the United States (16 rows `other>us`, 2
-  openIT; not in the owner's list, trivially droppable). Two rows that the first draft
-  moved to `other` stay `us` as on main because the strict shape cannot read them:
-  `"Kulim, Kedah, al"` and an Israeli `"..., il"` (kibbutz) row.
+  us); a lone `"City, County, PA"` is us by the owner's `pa` rule. `"U.S."` written with
+  dots is now the United States (16 rows `other>us`, 2
+  openIT; not in the owner's list, trivially droppable). **Accepted miss:** a US county
+  written without the word County before a state code that is also a country
+  (`"Springfield, Sangamon, IL"`, `"San Jose, Santa Clara, CA"`) reads as a province and
+  files `other` (0 such rows in production on 2026-10-27). `"Kulim, Kedah, al"` and an
+  Israeli kibbutz `"..., il"` row (Malaysia, Israel) are now correctly `other`.
   **Still open:** `"Toronto, CA"` (1 row, no province, so the position rule reads it as
   California), `"Lima, OH"` (Lima token), `peru` -> token (`"Perugia, IT"` stays
   `latam`; entangled with `LATAM_COUNTRY_NAMES`, and tokenizing `brasil` the same way

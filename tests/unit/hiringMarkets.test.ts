@@ -302,6 +302,62 @@ test("isMiamiArea is untouched by the country-signal rewrite", () => {
   assert.equal(isMiamiArea("Denver, CO, USA"), false);
 });
 
+test("a Pennsylvania county before PA follows the owner's pa rule (us); Panama, PA stays latam", () => {
+  for (const location of ["Allentown, Lehigh, PA", "Pittsburgh, Allegheny County, PA", "King of Prussia, Montgomery, PA", "Hybrid - Allentown, Lehigh, PA"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+  for (const location of ["Panama, PA, pa", "Panama City, PA, pa"]) {
+    assert.equal(classifyMarket(location), "latam", location);
+  }
+});
+
+test("a full-name Canadian province before CA is Canada; a California county or state name is California", () => {
+  for (const location of ["Toronto, Ontario, CA", "Montreal, Quebec, CA", "Vancouver, British Columbia, CA", "Toronto, Ontario, ca - Remote"]) {
+    assert.equal(classifyMarket(location), "other", location);
+  }
+  for (const location of ["Sacramento, Sacramento County, CA", "Menlo Park, California, CA", "San Francisco, CA", "Los Angeles, Los Angeles County, CA"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+});
+
+test("CA is California right after the city, not as a leading word or a list item", () => {
+  assert.equal(classifyMarket("USA - San Francisco, CA"), "us");
+  assert.equal(classifyMarket("CA Remote (BC & ON only)"), "other");
+  assert.equal(classifyMarket("Remote (CA, BC)"), "other");
+});
+
+test("a state-like ISO code after a non-US region is that country, not a US state ('ambiguous is neither')", () => {
+  for (const location of ["Casablanca, CAS, ma", "Rabat, RAB, ma", "Tel Aviv, Tel Aviv, IL", "Tirana, AL, al", "Chisinau, MD, md", "Vientiane, VT, la", "Tunis, Tunis, tn", "Tunis, TN, tn", "Kulim, Kedah, al"]) {
+    assert.equal(classifyMarket(location), "other", location);
+  }
+});
+
+// Accepted miss of the same rule: a US county written without the word "County" cannot be told from a province.
+test("accepted miss: a US county with no 'County' word before a state/country code reads as a province", () => {
+  assert.equal(classifyMarket("Springfield, Sangamon, IL"), "other");
+});
+
+test("a US place or a list anywhere before the trailing code keeps it a state", () => {
+  for (const location of ["Kansas City, KS, Kansas City, MO", "Springfield, Illinois, IL", "Chicago, Cook, IL", "Dallas, TX, Atlanta, GA"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+});
+
+test("a work-mode word glued to the place is not a country prefix, and a wrapped place is unwrapped", () => {
+  assert.equal(classifyMarket("In-Office-Denver"), "us");
+  assert.equal(classifyMarket("On-site-Austin, TX"), "us");
+  assert.equal(classifyMarket("Hybrid (Toronto, ON, ca)"), "other");
+  assert.equal(classifyMarket("Remote (Austin, TX)"), "us");
+  assert.equal(classifyMarket("Hybrid (Denver, CO)"), "us");
+});
+
+test("an ICU region that is not an ISO country (EU, UN, ZZ...) is not a trailing country", () => {
+  for (const location of ["Raleigh NC, Wake, EU", "Raleigh NC, Wake, ZZ", "Raleigh NC, Wake, UN"]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+  assert.equal(classifyMarket("Raleigh NC, Wake, IE"), "other");
+});
+
 test("blank and null locations classify as other", () => {
   assert.equal(classifyMarket(null), "other");
   assert.equal(classifyMarket(""), "other");
