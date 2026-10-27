@@ -8,7 +8,7 @@
 
 async function main() {
   const m = await import("../../../src/lib/sequences/complianceAudience");
-  const audience = (over: Record<string, unknown>) => m.resolveComplianceAudience({ mobilePhone: null, phone: null, ...over });
+  const audience = (over: Record<string, unknown>) => m.resolveComplianceAudience({ mobilePhone: null, phone: null, rosterCountries: [], ...over });
   console.log(
     JSON.stringify({
       recognized: m.RECOGNIZED_COUNTRIES.length,

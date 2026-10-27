@@ -97,7 +97,7 @@ test("known limit, pinned: a real 7-digit Tokelau number clears no length floor,
   // PHONE_MIN_LENGTH is 8 on purpose (it keeps `+5491`-style garbage out); the derived set of calling codes it clips
   // is SHORT_VALID_WITNESSES in the picker unit test (Tokelau is one of 14). Owner decision, not a silent behaviour.
   const { resolveComplianceAudience } = await import("@/lib/sequences/complianceAudience");
-  assert.notEqual(resolveComplianceAudience({ mobilePhone: SPECS.tokelau.mobilePhone ?? null, phone: null }), null, "JS mails it");
+  assert.notEqual(resolveComplianceAudience({ mobilePhone: SPECS.tokelau.mobilePhone ?? null, phone: null, rosterCountries: [] }), null, "JS mails it");
   assert.equal((await page(false)).has("tokelau"), false);
   assert.equal((await page(true)).get("tokelau"), null, "it only surfaces, addable and with no badge, when blocked rows are shown");
 });

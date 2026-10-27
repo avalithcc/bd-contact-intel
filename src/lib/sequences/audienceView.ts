@@ -1,41 +1,43 @@
 /**
  * What the Sequence member card shows about the draft's audience: the answer of `explainComplianceAudience` (the one chain,
- * so the card and the draft cannot disagree) plus two facts that make the reason actionable. Pure, no I/O.
+ * so the card and the draft cannot disagree) plus the facts that make the reason actionable. Pure, no I/O.
  */
-import { explainComplianceAudience, resolveCountry, type ComplianceAudienceExplained, type ComplianceAudienceInputs } from "./complianceAudience";
+import { explainComplianceAudience, resolveCountry, rosterBreakdown, type ComplianceAudienceExplained, type ComplianceAudienceInputs } from "./complianceAudience";
+import { countryNameEs } from "./countryDisplay";
 import { phoneCountryIso } from "./phoneMarket";
 
-/** Colleagues of the same company that have a country of their own, grouped by the text filed (as the read returns them). */
-export interface ColleagueCountry { readonly country: string; readonly n: number }
-
-export interface MemberAudienceRaw extends ComplianceAudienceInputs {
-  /** Other live emailable contacts at the same company with no country of their own: the ones the company country decides. */
-  readonly companyDecides: number;
-  readonly colleagueCountries: readonly ColleagueCountry[];
-}
-
-export interface CompanyImpact {
-  /** How many OTHER contacts this company's country decides. */
-  readonly decides: number;
-  /** Colleagues whose own country resolves to a different ISO than the company's. */
-  readonly contradicting: number;
-  /** The filed text of the most common contradicting country. */
-  readonly topCountry: string;
-}
+/**
+ * One country held by some recognized colleagues of the contact. `name` is its Spanish name, resolved HERE (the server) and not
+ * in the card: the card renders on the client too, where `Intl.DisplayNames` may come from a different ICU build than the server's.
+ */
+export interface ColleagueIso { readonly iso: string; readonly n: number; readonly name: string }
 
 export interface MemberAudience extends ComplianceAudienceExplained {
-  /** ISO of the country behind the reason (null for the postings bucket, which names none, and for a HOLD). */
+  /** ISO of the country behind the reason (null for the postings bucket, which names none, and for a HOLD with no country). */
   readonly iso: string | null;
+  /** The Spanish name of `iso`, resolved on the server (see ColleagueIso); null when `iso` is. */
+  readonly isoName: string | null;
+  /**
+   * The company country as filed, only when the card has to say it was NOT used: the roster outvoted it, or the colleagues split
+   * and contradicted it. Null when the company country decided or was never filed.
+   */
+  readonly companyIgnored: string | null;
   /** A phone is on file but is not what decided: its number and the country its dial code places. */
   readonly unusedPhone: { readonly number: string; readonly iso: string } | null;
-  /** Only when the company country decided and a colleague contradicts it. */
-  readonly companyImpact: CompanyImpact | null;
+  /** Recognized colleagues by country, biggest first: the breakdown the card quotes when the roster is split. */
+  readonly colleagueCountries: readonly ColleagueIso[];
+  /** How many colleagues have a recognized country (the denominator of every roster sentence). */
+  readonly colleaguesKnown: number;
 }
 
-export function buildMemberAudience(raw: MemberAudienceRaw): MemberAudience {
+export function buildMemberAudience(raw: ComplianceAudienceInputs): MemberAudience {
   const explained = explainComplianceAudience(raw);
   const { reason, evidence } = explained;
-  const iso = reason === "person_country" || reason === "company_country" ? resolveCountry(evidence) : reason === "phone" ? phoneCountryIso(evidence, null) : null;
+  const iso =
+    reason === "person_country" || reason === "company_country" ? resolveCountry(evidence)
+    : reason === "roster_consensus" ? evidence // already an ISO
+    : reason === "phone" ? phoneCountryIso(evidence, null)
+    : null;
 
   let unusedPhone: MemberAudience["unusedPhone"] = null;
   if (reason === "company_country" || reason === "posting_markets") {
@@ -44,14 +46,8 @@ export function buildMemberAudience(raw: MemberAudienceRaw): MemberAudience {
     if (number && phoneIso) unusedPhone = { number, iso: phoneIso };
   }
 
-  let companyImpact: CompanyImpact | null = null;
-  if (reason === "company_country" && iso) {
-    const against = raw.colleagueCountries.filter((c) => { const r = resolveCountry(c.country); return r !== null && r !== iso; });
-    const contradicting = against.reduce((sum, c) => sum + c.n, 0);
-    if (contradicting > 0) {
-      const top = against.reduce((a, b) => (b.n > a.n ? b : a));
-      companyImpact = { decides: raw.companyDecides, contradicting, topCountry: top.country };
-    }
-  }
-  return { ...explained, iso, unusedPhone, companyImpact };
+  const colleagueCountries = rosterBreakdown(raw.rosterCountries).map((c) => ({ ...c, name: countryNameEs(c.iso) }));
+  const filed = raw.companyCountry?.trim() || null;
+  const companyIgnored = filed && ((reason === "roster_consensus" && resolveCountry(filed) !== iso) || explained.colleaguesDisagree) ? filed : null;
+  return { ...explained, iso, isoName: iso ? countryNameEs(iso) : null, companyIgnored, unusedPhone, colleagueCountries, colleaguesKnown: colleagueCountries.reduce((sum, c) => sum + c.n, 0) };
 }

@@ -61,6 +61,42 @@ export const companyCountrySql = firstFilledCountry(
 export const postingMarketsSql = sql`coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyAs("jp")}), '[]'::json)`;
 
 /**
+ * THE roster of the audience's second link, shared by every by-id reader (draft, release, approval, roster add, seed, unsubscribe
+ * page, detail): the countries filed on the OTHER live contacts of the person's company, as a JSON array of
+ * `{ country, n }`, one entry per filed text (the pure resolver resolves, groups and counts them: complianceAudience.ts). "The
+ * same company" is the canonical company: the person's key, or the key it is an alias of, plus every alias of that key, the same
+ * pooling `companyCountrySql` reads from. Live = not merged; email is NOT required, a country filed on a contact is evidence
+ * about where the company's people sit whether or not that contact is mailable. One grouped read, never a row per colleague.
+ *
+ * `= any(array(...))` and not `key = x or key in (subquery)` (the form `sameCompanyAs` uses): the OR hides the index, so the planner
+ * Seq Scans `person` once per contact (measured on production, 100 contacts of the largest companies: 1,028 ms with the OR,
+ * 18-25 ms with the array, same rows). Do not "simplify" it back.
+ *
+ * The person is not excluded by `q.id <> p.id`, on purpose: the resolver reads the roster only when the person has no country of
+ * their own, and a person without a country is not in a list of filed countries. That also keeps this the same set the picker's
+ * set-based `pk_roster` produces (pickerQuery.ts), so the two cannot disagree by one row.
+ */
+const canonicalCompanyKeySql = sql`coalesce((select ca.company_key from company_alias ca where ca.alias_key = p.company_key), p.company_key)`;
+export const rosterCountriesSql = sql`coalesce((
+  select json_agg(json_build_object('country', g.c, 'n', g.n))
+  from (
+    select btrim(q.country) as c, count(*)::int as n
+    from person q
+    where q.merged_into_id is null and btrim(coalesce(q.country, '')) <> '' and p.company_key is not null
+      and q.company_key = any(array(select ${canonicalCompanyKeySql} union select ca.alias_key from company_alias ca where ca.company_key = ${canonicalCompanyKeySql}))
+    group by 1
+  ) g
+), '[]'::json)`;
+
+/**
+ * Every fact the audience resolver reads, in the column names `audienceInputsFromRow` expects, for a `from person p` read. A reader
+ * selects THIS and maps with `audienceInputsFromRow`; spelling the columns by hand is how one reader forgets the roster
+ * (tests/unit/sequencesAudienceCallSites.test.ts fails on that).
+ */
+export const audienceFactsSql = sql`p.country as person_country, p.mobile_phone, p.phone, ${companyCountrySql} as company_country,
+  ${postingMarketsSql} as posting_markets, ${rosterCountriesSql} as roster_countries`;
+
+/**
  * The company NAME a Sequence read shows, same rule and same join as the Contacts list (companyDisplayName.ts): free
  * text wins, `company.display_name` fills a null. Joins `company` on `person.company_key` DIRECTLY and not through
  * `company_alias`, deliberately: /contacts shows the same name for the same person, and the search below

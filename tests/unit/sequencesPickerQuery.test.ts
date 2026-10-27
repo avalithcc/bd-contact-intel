@@ -137,7 +137,7 @@ const SHORT_VALID_WITNESSES: Readonly<Record<string, { country: string; witness:
   "98": { country: "IR", witness: "+989000" },
 };
 const BELOW_THE_FLOOR = new Set(Object.values(SHORT_VALID_WITNESSES).map((w) => w.country));
-const jsSaysFooter = (phone: string) => resolveComplianceAudience({ mobilePhone: phone, phone: null }) !== null;
+const jsSaysFooter = (phone: string) => resolveComplianceAudience({ mobilePhone: phone, phone: null, rosterCountries: [] }) !== null;
 
 test("the SQL phone test never blocks a number the JS resolver allows, across every country's example number", () => {
   let checked = 0;

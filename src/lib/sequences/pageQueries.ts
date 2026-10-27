@@ -23,6 +23,7 @@ import { pickerCountsFromRows, type CountsRow } from "./pickerCounts";
 import { buildPickerReads, countryFacts, distinctCountriesSql, type CountryFacts } from "./pickerQuery";
 import { countryLabelsEs } from "./countryDisplay";
 import { resolveComplianceAudience } from "./complianceAudience";
+import { audienceInputsFromRow } from "./audienceInputs";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
 import { companyNameColumnsSql, canonicalCompanyJoinSql } from "./rosterQuery";
 
@@ -113,13 +114,13 @@ async function pickerCountryFacts(): Promise<CountryFacts> {
  */
 export async function listPickerPage(query: PickerQuery, meId: string, unnamed: string): Promise<PickerPage> {
   const reads = buildPickerReads(query, meId, await pickerCountryFacts());
-  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null; suppressed: boolean; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }>(
+  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null; suppressed: boolean; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[]; roster_countries: unknown }>(
     await db.execute(reads.page),
   );
   const counts = reads.counts ? pickerCountsFromRows(rowsOf<CountsRow>(await db.execute(reads.counts))) : null;
   const named = withResolvedCompanyName(rows).slice(0, PICKER_PAGE_SIZE);
   const contacts = named.map((r) => {
-    const mapped = resolveComplianceAudience({ mobilePhone: r.mobile_phone, phone: r.phone, personCountry: r.person_country, companyCountry: r.company_country, postingMarkets: r.posting_markets }) !== null;
+    const mapped = resolveComplianceAudience(audienceInputsFromRow(r)) !== null;
     // A suppressed address becomes a one-address rule, so the SAME isSuppressed() that guards the add decides the reason.
     const rules: SuppressionRule[] = r.suppressed && r.email ? [{ ruleKind: "address", value: normalizeSuppressionValue("address", r.email) }] : [];
     return toPickerContact({ ...r, market_mapped: mapped }, rules, unnamed);

@@ -6,8 +6,8 @@ import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { emailSuppression, person, sequenceMember, sequenceUnsubscribeToken } from "@/db/schema";
 import { cancelPendingForAddress } from "@/lib/scheduledEmail/queries";
-import { openPostingSql } from "@/lib/hiring/openPosting";
-import { companyCountrySql, sameCompanyAs } from "@/lib/sequences/rosterQuery";
+import { audienceFactsSql } from "@/lib/sequences/rosterQuery";
+import { audienceInputsFromRow } from "@/lib/sequences/audienceInputs";
 import { OPT_OUT_DISCARD_REASON, planOptOutDiscards } from "@/lib/sequences/optOut";
 import { normalizeSuppressionValue } from "@/lib/sequences/suppression";
 import type { UnsubscribePort } from "@/lib/sequences/unsubscribeHandlers";
@@ -118,17 +118,15 @@ export async function suppressByToken(tokenHash: string): Promise<{ email: strin
  */
 export async function unsubscribeAudienceForToken(tokenHash: string): Promise<UnsubscribePageAudience | undefined> {
   const rows = (await db.execute(sql`
-    select sm.draft_language, p.country as person_country, p.mobile_phone, p.phone,
-           ${companyCountrySql} as company_country,
-           coalesce((select json_agg(distinct jp.market) from job_posting jp where jp.is_it = true and ${openPostingSql("jp")} and ${sameCompanyAs("jp")}), '[]'::json) as posting_markets
+    select sm.draft_language, ${audienceFactsSql}
     from sequence_unsubscribe_token t
     join sequence_member sm on sm.id = t.sequence_member_id
     join person p on p.id = sm.person_id
     where t.token_hash = ${tokenHash}
-    limit 1`)) as unknown as { draft_language: string | null; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[] }[];
+    limit 1`)) as unknown as ({ draft_language: string | null } & Record<string, unknown>)[];
   const row = rows[0];
   if (!row) return undefined;
-  return unsubscribePageAudience({ mobilePhone: row.mobile_phone, phone: row.phone, personCountry: row.person_country, companyCountry: row.company_country, postingMarkets: row.posting_markets }, row.draft_language);
+  return unsubscribePageAudience(audienceInputsFromRow(row), row.draft_language);
 }
 
 /** The port the unsubscribe route (PR 13) is given. */

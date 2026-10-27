@@ -50,7 +50,7 @@ export function countryFacts(countries: readonly string[]): CountryFacts {
   for (const raw of countries) {
     const country = raw.trim().toLowerCase();
     if (!country) continue;
-    if (!resolveComplianceAudience({ mobilePhone: null, phone: null, personCountry: country })) unmapped.add(country);
+    if (!resolveComplianceAudience({ mobilePhone: null, phone: null, personCountry: country, rosterCountries: [] })) unmapped.add(country);
     if (classifyMarket(country) === "us") us.add(country);
   }
   return { unmapped: [...unmapped], us: [...us] };
@@ -136,7 +136,26 @@ const joins = sql`
   left join company_alias ca on ca.alias_key = p.company_key
   left join company cca on cca.company_key = ca.company_key and cca.company_key <> p.company_key
   left join pk_jf d on d.company_key = p.company_key
-  left join pk_jf a on a.company_key = ca.company_key and a.company_key <> p.company_key`;
+  left join pk_jf a on a.company_key = ca.company_key and a.company_key <> p.company_key
+  left join pk_roster rs on rs.roster_key = coalesce(ca.company_key, p.company_key)`;
+
+/**
+ * The audience's roster link, set-based: for every canonical company, the countries filed on its live contacts as the same
+ * `{ country, n }` JSON the by-id reads produce (`rosterCountriesSql`, rosterQuery.ts: canonical company = the key or the key it is
+ * an alias of, merged contacts and blank countries left out), plus how many contacts filed one (`roster_n`). One grouped pass
+ * over `person`, joined once, never a subquery per row.
+ */
+export const rosterFacts = sql`pk_roster as (
+  select g.roster_key, json_agg(json_build_object('country', g.c, 'n', g.n)) as roster, sum(g.n)::int as roster_n
+  from (
+    select coalesce(ra.company_key, q.company_key) as roster_key, btrim(q.country) as c, count(*)::int as n
+    from person q
+    left join company_alias ra on ra.alias_key = q.company_key
+    where q.merged_into_id is null and q.company_key is not null and btrim(coalesce(q.country, '')) <> ''
+    group by 1, 2
+  ) g
+  group by g.roster_key
+)`;
 
 const jobFacts = sql`pk_jf as (
   select jp.company_key,
@@ -147,6 +166,9 @@ const jobFacts = sql`pk_jf as (
   where jp.is_it = true and ${openPostingSql("jp")}
   group by jp.company_key
 )`;
+
+/** Both CTE lists the picker's statements start with. */
+const pickerCtes = sql`${jobFacts}, ${rosterFacts}`;
 
 const either = (col: string) => sql.raw(`(coalesce(d.${col}, false) or coalesce(a.${col}, false))`);
 const hireCount = sql`(coalesce(d.hire, 0) + coalesce(a.hire, 0))`;
@@ -193,9 +215,12 @@ const phoneIsLocated = () => {
 };
 
 function blockedSql(f: CountryFacts): SQL {
-  // A country decides its market alone; only without one do the postings (exactly one of us / latam is a market), and only
-  // when those do not either does the phone's dial code (the audience's last link).
-  const unmapped = sql`case when ${effectiveCountry} is not null then lower(${effectiveCountry}) = any(${textArray(f.unmapped)}) else (${either("posts_us")} = ${either("posts_latam")} and not ${phoneIsLocated()}) end`;
+  // The person's own country decides alone. Without one the roster may (a strict majority of at least two colleagues with a
+  // country): SQL cannot say "recognized", so it only knows the roster COULD decide (two or more colleagues filed a country)
+  // and then never blocks, leaving the answer to the JS resolver (a wrong "show" is badged, a wrong "block" is invisible).
+  // Otherwise the company country, then the postings (exactly one of us / latam is a market), then the phone's dial code.
+  const own = sql`nullif(btrim(p.country), '')`;
+  const unmapped = sql`case when ${own} is not null then lower(${own}) = any(${textArray(f.unmapped)}) when coalesce(rs.roster_n, 0) >= 2 then false when ${companyCountry} is not null then lower(${companyCountry}) = any(${textArray(f.unmapped)}) else (${either("posts_us")} = ${either("posts_latam")} and not ${phoneIsLocated()}) end`;
   return sql`coalesce((
     p.email_status in ('none', 'bounced')
     or (p.email_source = 'pattern_inferred' and p.email_status <> 'verified')
@@ -238,7 +263,7 @@ function countryPredicates(q: PickerQuery): SQL[] {
  * THE POOL: `from person p ... where <every predicate>`, the one text both the page and the chip counts are built
  * from. Eligibility, the toggles, the search and the industry filter are all spelled in here and nowhere else, so a
  * predicate changed or added here reaches the list and the chip counts together; neither statement has a WHERE of its own
- * (a unit test fails if one grows one). Both must be preceded by `with ${jobFacts}` because the joins read `pk_jf`.
+ * (a unit test fails if one grows one). Both must be preceded by `with ${pickerCtes}` because the joins read `pk_jf` and `pk_roster`.
  */
 export function buildPickerPoolSql(q: PickerQuery, meId: string, facts: CountryFacts): SQL {
   const predicates = [
@@ -264,12 +289,13 @@ export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: Countr
   // Hidden blocked rows need no sort key; a constant would be read as an ORDER BY position.
   const blockedFirst = q.showBlocked ? sql`${blockedSql(facts)}, ` : sql``;
   return sql`
-    with ${jobFacts}
+    with ${pickerCtes}
     select p.id::text as person_id, p.first_name, p.last_name, p.email, p.email_status, p.email_source, p.job_title, p.status,
            ${companyNameColumnsSql}, p.company_key, p.merged_into_id::text as merged_into_id, ${clientStatus} as client_status,
            ${hireCount}::int as open_it, (${postingFlorida} or ${homeInFlorida(facts)}) as is_florida,
            ${suppressedSql} as suppressed, p.country as person_country, p.mobile_phone, p.phone, ${companyCountry} as company_country,
-           array_remove(array[case when ${either("posts_us")} then 'us' end, case when ${either("posts_latam")} then 'latam' end], null) as posting_markets
+           array_remove(array[case when ${either("posts_us")} then 'us' end, case when ${either("posts_latam")} then 'latam' end], null) as posting_markets,
+           coalesce(rs.roster, '[]'::json) as roster_countries
     ${buildPickerPoolSql(q, meId, facts)}
     order by ${blockedFirst}${displayedCompanySql}, p.last_name, p.first_name, p.id
     offset ${q.offset} limit ${PICKER_PAGE_SIZE + 1}`;
@@ -292,7 +318,7 @@ const allOf = (preds: SQL[]): SQL => (preds.length ? preds[0] : sql`true`);
 export function buildPickerCountsQuery(q: PickerQuery, meId: string, facts: CountryFacts): SQL {
   const pool = buildPickerPoolSql({ ...q, industries: [], noIndustry: false, countries: [], noCountry: false }, meId, facts);
   return sql`
-    with ${jobFacts},
+    with ${pickerCtes},
     pk_cnt as (
       select ${companyIndustry} as ci_ind, ${effectiveCountry} as ci_pais, ${allOf(industryPredicates(q))} as ci_ind_ok, ${allOf(countryPredicates(q))} as ci_pais_ok,
              (${postingFlorida} or ${homeInFlorida(facts)}) as ci_florida, ${hireCount} > 0 as ci_hire

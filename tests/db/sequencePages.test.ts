@@ -509,7 +509,7 @@ test("SQL/JS AGREEMENT: the picker's blocked flag never hides a contact the audi
     const p = await mkPerson(`agr-${i}`, ck, { country: spec.country, mobilePhone: spec.mobile });
     made.push({ id: p.id, spec, label: JSON.stringify(spec) });
   }
-  const js = (spec: Spec) => resolveComplianceAudience({ mobilePhone: spec.mobile ?? null, phone: null, personCountry: spec.country ?? null, companyCountry: spec.companyCountry ?? null, postingMarkets: spec.posting ? ["us"] : [] }) !== null;
+  const js = (spec: Spec) => resolveComplianceAudience({ mobilePhone: spec.mobile ?? null, phone: null, personCountry: spec.country ?? null, companyCountry: spec.companyCountry ?? null, postingMarkets: spec.posting ? ["us"] : [], rosterCountries: [] }) !== null;
   const visible = new Map((await pickerIds({ search: `agr- ${run}` })).map((c) => [c.personId, c.block]));
   const everything = new Map((await pickerIds({ search: `agr- ${run}`, showBlocked: true })).map((c) => [c.personId, c.block]));
   let shownButHeld = 0;

@@ -41,12 +41,15 @@ test("openPostingSql is open-only: no freshness window", () => {
 });
 
 test("posting_markets (recipient geography) never carries the freshness window", () => {
+  // The expression is spelled once (`postingMarketsSql`, reached through `audienceFactsSql`); the readers must not carry a copy.
+  const shared = readFileSync("src/lib/sequences/rosterQuery.ts", "utf8").match(/json_agg\(distinct jp\.market\)[\s\S]*?'\[\]'::json\)/);
+  assert.ok(shared, "rosterQuery: posting_markets expression");
+  assert.match(shared[0], /openPostingSql\(/);
+  assert.doesNotMatch(shared[0], /openFreshPostingSql/);
   for (const f of ["seedQueries", "releaseQueries", "draftQueries"]) {
     const text = readFileSync(`src/lib/sequences/${f}.ts`, "utf8");
-    const m = text.match(/json_agg\(distinct jp\.market\)[\s\S]*?as posting_markets/);
-    assert.ok(m, `${f}: posting_markets expression`);
-    assert.match(m[0], /openPostingSql\(/, f);
-    assert.doesNotMatch(m[0], /openFreshPostingSql/, f);
+    assert.doesNotMatch(text, /json_agg\(distinct jp\.market\)/, `${f}: a hand-spelled posting_markets expression`);
+    assert.match(text, /audienceFactsSql/, f);
   }
 });
 

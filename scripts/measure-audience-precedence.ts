@@ -138,6 +138,8 @@ async function main() {
         personCountry: clean(r.personCountry),
         companyCountry: clean(r.companyCountry),
         postingMarkets: r.postingMarkets ?? [],
+        // This measurement predates the roster link and stays a before/after of the PHONE reorder alone.
+        rosterCountries: [],
       };
 
       const now = resolveComplianceAudience(input);
@@ -192,6 +194,8 @@ async function main() {
         personCountry: clean(r.personCountry),
         companyCountry: clean(r.companyCountry),
         postingMarkets: r.postingMarkets ?? [],
+        // This measurement predates the roster link and stays a before/after of the PHONE reorder alone.
+        rosterCountries: [],
       };
       console.log(`  ${r.personName ?? "(no name)"} | person=${input.personCountry} company=${input.companyCountry} phone=${input.mobilePhone ?? input.phone ?? "(none)"} postings=${JSON.stringify(r.postingMarkets)}`);
       console.log(`    now=${label(resolveComplianceAudience(input))} proposed=${label(proposed(input))}`);
