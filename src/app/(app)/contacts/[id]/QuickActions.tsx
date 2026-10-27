@@ -28,7 +28,7 @@ import { generatePersonOutreachMessageAction } from "../messageActions";
 import { GenerateMessageDialog } from "./GenerateMessageDialog";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
 import type { Locale } from "@/lib/i18n/locales";
-import { DISCARD_REASON_CODES, type DiscardReasonCode } from "@/lib/contacts/discard";
+import { DISCARD_REASON_CODES, DISCARD_REASON_LABEL_KEY } from "@/lib/contacts/discard";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/ToastProvider";
 import { AttachmentsField } from "@/components/email/AttachmentsField";
@@ -87,15 +87,6 @@ export interface QuickActionsProps {
 }
 
 type QuickAction = "call" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
-
-const DISCARD_REASON_LABEL_KEY: Record<DiscardReasonCode, keyof ContactRecordLabels> = {
-  wrong_profile: "discardReasonWrongProfile",
-  not_interested: "discardReasonNotInterested",
-  other_vendor: "discardReasonOtherVendor",
-  left_company: "discardReasonLeftCompany",
-  bad_data: "discardReasonBadData",
-  other: "discardReasonOther",
-};
 
 export interface ActionError {
   message: string;

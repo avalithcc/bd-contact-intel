@@ -16,6 +16,7 @@
  */
 import type { TimelineActivityType } from "@/lib/activity/queries";
 import { bounceEntryText } from "@/lib/contacts/bounceView";
+import { discardReasonText } from "@/lib/contacts/discard";
 import type { ContactRecordLabels } from "@/lib/contacts/labels";
 import { readBounceMetadata } from "@/lib/gmail/bouncePlan";
 import { taskActivityBody, type TaskActivityBodyLabels, type TaskActivityMetadata } from "@/lib/tasks/taskActivityBody";
@@ -92,7 +93,8 @@ export function readSentEmailExtras(metadata: Record<string, unknown> | null | u
 }
 
 function discardBody(metadata: Record<string, unknown>, l: ContactRecordLabels): string {
-  const reason = typeof metadata.reason === "string" ? metadata.reason : null;
+  // The stored value is a fixed code (discard.ts); only its label is shown. An unrecognized code is dropped, not printed.
+  const reason = discardReasonText(metadata.reason, l);
   const note = typeof metadata.note === "string" ? metadata.note : null;
   return [reason, note].filter(Boolean).join(" · ") || l.timelineDiscardedDefault;
 }

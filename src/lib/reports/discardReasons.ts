@@ -8,20 +8,12 @@
  * ever writes one of the 6 codes) is dropped rather than silently inflating
  * a "total" that then wouldn't match any single row.
  */
-import { DISCARD_REASON_CODES, type DiscardReasonCode, isDiscardReasonCode } from "@/lib/contacts/discard";
+import { DISCARD_REASON_CODES, DISCARD_REASON_LABEL_KEY, type DiscardReasonCode, isDiscardReasonCode } from "@/lib/contacts/discard";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
-/** Reuses the exact labels the "Descartar contacto" dialog itself shows (dict.contactRecord) — never redefined here. */
+/** Reuses the exact labels the "Descartar contacto" dialog itself shows (dict.contactRecord) through the one shared map in discard.ts. */
 export function discardReasonLabel(reason: DiscardReasonCode, dict: Dictionary): string {
-  const key = {
-    wrong_profile: "discardReasonWrongProfile",
-    not_interested: "discardReasonNotInterested",
-    other_vendor: "discardReasonOtherVendor",
-    left_company: "discardReasonLeftCompany",
-    bad_data: "discardReasonBadData",
-    other: "discardReasonOther",
-  } as const satisfies Record<DiscardReasonCode, keyof Dictionary["contactRecord"]>;
-  return dict.contactRecord[key[reason]] as string;
+  return dict.contactRecord[DISCARD_REASON_LABEL_KEY[reason]];
 }
 
 export interface DiscardReasonCount {
