@@ -266,6 +266,7 @@ export const en = {
     companies: "Companies",
     tasks: "Tasks",
     followUps: "Follow-ups",
+    followUpsBadgeAria: "{n} pending follow-ups: {v} overdue and {h} from today",
     meetings: "Meetings",
     sequences: "Sequences",
     scheduled: "Scheduled",

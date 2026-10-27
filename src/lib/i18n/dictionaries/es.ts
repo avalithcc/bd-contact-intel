@@ -240,6 +240,7 @@ export const es: typeof en = {
     companies: "Empresas",
     tasks: "Tareas",
     followUps: "Seguimientos",
+    followUpsBadgeAria: "{n} seguimientos pendientes: {v} vencidos y {h} de hoy",
     meetings: "Reuniones",
     sequences: "Secuencias",
     scheduled: "Programados",

@@ -11,6 +11,7 @@ import {
 } from "@/lib/contacts/listMemory";
 import { isNavItemActive, shouldSetPending } from "@/lib/nav/pendingNav";
 import type { NavLabels } from "@/lib/i18n/navLabels";
+import { fillTemplate } from "@/lib/i18n/template";
 import {
   ContactsIcon,
   CompaniesIcon,
@@ -132,6 +133,7 @@ export function Sidebar({
   labels,
   taskCount,
   followUpCount,
+  followUpOverdueCount,
   sequenceCount,
   scheduledCount,
   meetingCount,
@@ -143,6 +145,8 @@ export function Sidebar({
   labels: NavLabels;
   taskCount?: number;
   followUpCount?: number;
+  /** Of `followUpCount`, how many are Vencidos; only used for the pill's accessible name. */
+  followUpOverdueCount?: number;
   sequenceCount?: number;
   scheduledCount?: number;
   /** Own meetings waiting for an outcome ("Por confirmar"). */
@@ -226,7 +230,20 @@ export function Sidebar({
               <item.icon className="icon" />
               {labels[item.labelKey]}
               {!!pillCountByLabelKey[item.labelKey] && (
-                <span className="pill-count">{pillCountByLabelKey[item.labelKey]}</span>
+                <span
+                  className="pill-count"
+                  aria-label={
+                    item.labelKey === "followUps" && followUpOverdueCount
+                      ? fillTemplate(labels.followUpsBadgeAria, {
+                          n: String(followUpCount),
+                          v: String(followUpOverdueCount),
+                          h: String((followUpCount ?? 0) - followUpOverdueCount),
+                        })
+                      : undefined
+                  }
+                >
+                  {pillCountByLabelKey[item.labelKey]}
+                </span>
               )}
             </Link>
           ))}
