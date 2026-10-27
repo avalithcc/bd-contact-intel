@@ -97,6 +97,10 @@ async function main() {
     return;
   }
 
+  // Fail before the (slow) backup, not at the audit insert after the writes: the actor must be a real BD.
+  const known = (await db.execute(sql`select 1 from bd where id::text = ${actor}`)) as unknown as unknown[];
+  if (!known.length) throw new Error(`--actor=${actor} is not a bd id`);
+
   const backupPath = await snapshotBackup("posting-market-backfill", ["job_posting"]);
   console.log(`backup written and verified: ${backupPath}`);
 
@@ -111,8 +115,8 @@ async function main() {
     const metadata = buildMarketBackfillAuditMetadata(rows.length, changes);
     const written = await writeChanges(tx, changes);
     if (written !== changes.length) throw new Error(`planned ${changes.length} updates but wrote ${written}: rolling back`);
-    await tx.insert(auditLog).values({ actorBdId: actor!, action: MARKET_BACKFILL_ACTION, metadata });
-    console.log(`updated ${written} job_posting row(s) and wrote 1 audit_log row (${MARKET_BACKFILL_ACTION}).`);
+    const [audit] = await tx.insert(auditLog).values({ actorBdId: actor!, action: MARKET_BACKFILL_ACTION, metadata }).returning({ id: auditLog.id });
+    console.log(`updated ${written} job_posting row(s) and wrote 1 audit_log row (${MARKET_BACKFILL_ACTION}), id ${audit.id}: the revert path reads its metadata.`);
   });
 }
 
