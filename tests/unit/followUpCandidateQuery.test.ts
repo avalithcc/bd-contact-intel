@@ -16,6 +16,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
+import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import { buildFollowUpInsertQuery, buildFollowUpVerificationQuery } from "@/lib/followUp/candidateQuery";
 
 const dialect = new PgDialect();
@@ -134,5 +135,5 @@ test("fuq_activity excludes exactly the shared no-progress types from the last-t
   assert.ok(match, "the clock filters by type");
   const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
   assert.deepEqual(bound, [...NO_PROGRESS_ACTIVITY_TYPES]);
-  assert.deepEqual(bound, ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced"]);
+  assert.deepEqual(bound, ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced", ...FOLLOW_UP_ACTIVITY_TYPES]);
 });

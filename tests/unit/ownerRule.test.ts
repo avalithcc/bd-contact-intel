@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { NON_TOUCH_ACTIVITY_TYPES, resolveEffectiveActivityAt } from "@/lib/contacts/effectiveActivityTime";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
+import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import {
   OWNER_BACKFILL_SOURCE,
   hasManualOwner,
@@ -102,7 +103,7 @@ test("the backfill's own source never reads as a manual edit", () => {
 // list, so these tests pin the list and its disagreement with the last-activity bar.
 
 test("dialling a number is not working the relationship: call_attempt is on the shared no-progress list (ownership and the follow-up clock both read it)", () => {
-  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced"]);
+  assert.deepEqual([...NO_PROGRESS_ACTIVITY_TYPES], ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced", ...FOLLOW_UP_ACTIVITY_TYPES]);
 });
 
 test("the ownership bar is stricter than the last-activity bar: a dialled attempt shows in one and not the other", () => {

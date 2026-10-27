@@ -38,6 +38,7 @@
  */
 import { sql, type SQL } from "drizzle-orm";
 import { activity } from "@/db/schema";
+import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import { MEETING_ACTIVITY_TYPES } from "@/lib/meetings/status";
 import {
   activityRowToStatusEvent,
@@ -70,6 +71,9 @@ export const NON_TOUCH_ACTIVITY_TYPES = [
   // Scheduling, rescheduling, cancelling or a no-show records what happened to a meeting, not a conversation with the
   // Contact (meeting-outcomes). Only "Se hizo" (`meeting_logged`) is a touch.
   ...MEETING_ACTIVITY_TYPES,
+  // A drop or re-entry in Seguimientos (follow-up-expiry) is bookkeeping about the queue, not a conversation: it must not
+  // read as "Ultima actividad" nor restart the follow-up cadence.
+  ...FOLLOW_UP_ACTIVITY_TYPES,
 ] as const;
 
 function isNonTouchActivityType(type: string): boolean {
