@@ -329,8 +329,8 @@ export const FLORIDA_TOKENS = ["fl", "miami"];
 const MARKET_RANK: Record<MarketKey, number> = { other: 0, us: 1, latam: 2 };
 // Work-mode words are not a place: "Remote, Denver, CO" is Denver, "Toronto, ON, ca - Hybrid" is Toronto.
 const WORK_MODE = "(?:remote|hybrid|on-?site|in-?office)";
-const LEADING_WORK_MODE = new RegExp(`^\\(?${WORK_MODE}\\b\\)?\\s*(?:[-–—,:]\\s*)?`);
-const TRAILING_WORK_MODE = new RegExp(`\\s*(?:[-–—]\\s*|\\(\\s*)?${WORK_MODE}\\s*\\)?\\s*$`);
+const LEADING_WORK_MODE = new RegExp(`^\\(?${WORK_MODE}\\b\\)?\\s*(?:[-–—,:]\\s*)?`, "i");
+const TRAILING_WORK_MODE = new RegExp(`\\s*(?:[-–—]\\s*|\\(\\s*)?${WORK_MODE}\\s*\\)?\\s*$`, "i");
 const stripWorkMode = (part: string): string =>
   part.replace(LEADING_WORK_MODE, "").replace(TRAILING_WORK_MODE, "").trim().replace(/^\(([^()]*)\)$/, "$1"); // "Hybrid (Toronto, ON, ca)"
 
@@ -352,13 +352,19 @@ const isStateCodeSegment = (s: string): boolean => /^[a-z]{2}$/.test(s) && isUsS
  *  - the code is an ISO country and nothing before it is a US place or a county ("Denver, Colorado, CO");
  *  - no segment before the region is a US state code, which would make the string a list of "City, ST"
  *    pairs ("Dallas, TX, Atlanta, GA");
- *  - a code that is also a US state ("ca", "il", "ma"...) additionally needs the string not to be joined by
- *    and/or/&// ("Washington, DC & Bethesda, MD"). "Toronto, Ontario, CA", "Toronto, ON, ca", "Tirana, AL, al",
- *    "Vientiane, VT, la" and "Casablanca, CAS, ma" are countries.
- * A region that names a county without saying so ("Springfield, Sangamon, IL") reads as a province: that is
- * the owner's "ambiguous is neither" rule, measured on production before it shipped.
+ *  - a code that is also a US state ("ca", "il", "ma"...) is a country only when the string is not joined by
+ *    and/or/&// ("Washington, DC & Bethesda, MD") AND one of these holds:
+ *      a. the region is a 2-letter code that is not a US state ("Toronto, ON, CA", "Montreal, QC, ca");
+ *      b. the code is "ca" and the region is a Canadian province name ("Toronto, Ontario, CA");
+ *      c. the code is written in LOWERCASE. ATS feeds that append a country (Lever: "Kulim, Kedah, al",
+ *         "Casablanca, CAS, ma", "Tunis, Tunis, tn") write it lowercase; a US feed writes the state in capitals
+ *         ("Nashville, Davidson, TN", "Irvine, Orange, CA"). Measured on production 2026-10-27: 20 distinct
+ *         strings end in a lowercase state-like code and all are foreign; the 3 in capitals are all US lists.
+ *    Anything else is a US state ("Springfield, Sangamon, IL"). The cost is the capitalised foreign case
+ *    ("Tel Aviv, Tel Aviv, IL" files us), pinned as an accepted miss in the tests.
+ * `lowercaseTrailing` is the casing of the ORIGINAL last segment: classifyMarket lowercases before this runs.
  */
-function countryCode(prefixed: string, segments: string[]): string | null {
+function countryCode(prefixed: string, segments: string[], lowercaseTrailing: boolean): string | null {
   const prefix = COUNTRY_PREFIX.exec(prefixed)?.[1];
   if (prefix) return isIsoCountry(prefix) ? prefix : null;
   const n = segments.length;
@@ -368,11 +374,19 @@ function countryCode(prefixed: string, segments: string[]): string | null {
   if (matchesRules(before, US_PLACE_RULES) || /\bcounty\b/.test(before)) return null;
   if (segments.slice(0, n - 2).some(isStateCodeSegment)) return null;
   if (!isUsStateLike(code)) return code;
-  return PLACE_LIST_JOINER.test(before) ? null : code;
+  const region = segments[n - 2];
+  if (code === "ca" && CANADIAN_PROVINCES.has(region)) return code;
+  if (PLACE_LIST_JOINER.test(before)) return null;
+  const provinceCode = /^[a-z]{2}$/.test(region) && !isUsStateLike(region);
+  return provinceCode || lowercaseTrailing ? code : null;
 }
 
 // A list of places ("Arlington, VA or Clearwater, FL") ends in a state, not a country.
 const PLACE_LIST_JOINER = /\s(?:and|or)\s|[&/]/;
+const CANADIAN_PROVINCES = new Set([
+  "ontario", "quebec", "british columbia", "alberta", "manitoba", "saskatchewan", "nova scotia", "new brunswick",
+  "newfoundland", "newfoundland and labrador", "prince edward island", "yukon", "northwest territories", "nunavut",
+]);
 
 /**
  * "San Francisco, CA" is California; so is "Sacramento, Sacramento County, CA" (countryCode declined it: a county
@@ -385,10 +399,12 @@ const californiaAfterCity = (segments: string[]): boolean =>
 const usAnchorAfterFirst = (segments: string[]): boolean =>
   segments.slice(1).some((s) => matchesRules(s, US_PLACE_RULES) || US_STATE_CODES.includes(tokenize(s)[0]));
 
-function classifyPart(raw: string): MarketKey {
+function classifyPart(raw: string, original: string): MarketKey {
   const part = stripWorkMode(raw);
   const segments = part.split(",").map((s) => s.trim()).filter(Boolean);
-  const code = countryCode(raw.replace(LEADING_WORK_MODE, ""), segments); // "In-Office-Denver" is not a prefix
+  const originalLast = stripWorkMode(original).split(",").map((s) => s.trim()).filter(Boolean).pop() ?? "";
+  const lowercaseTrailing = originalLast === originalLast.toLowerCase() && normalizeText(originalLast) === segments[segments.length - 1];
+  const code = countryCode(raw.replace(LEADING_WORK_MODE, ""), segments, lowercaseTrailing); // "In-Office-Denver" is not a prefix
   const nameIsCity = usAnchorAfterFirst(segments);
   if ((!nameIsCity && matchesRules(part, LATAM_COUNTRY_NAME_RULES)) || matchesRules(part, LATAM_COUNTRY_CODE_RULES)) return "latam";
   if (matchesRules(part, US_COUNTRY_RULES)) return "us";
@@ -416,8 +432,9 @@ export function classifyMarket(location: string | null | undefined): MarketKey {
     .replace(/\bnew mexico\b/g, "nm")
     .replace(/\bu\.s\.(a\.?)?/g, (_, a) => (a ? "usa " : "us "));
   let best: MarketKey = "other";
-  for (const part of normalized.split(";")) {
-    const market = classifyPart(part.trim());
+  const originals = location.split(";");
+  for (const [i, part] of normalized.split(";").entries()) {
+    const market = classifyPart(part.trim(), originals[i] ?? "");
     if (MARKET_RANK[market] > MARKET_RANK[best]) best = market;
   }
   return best;

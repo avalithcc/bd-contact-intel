@@ -2288,11 +2288,18 @@ zone, `TZ=UTC`, `TZ=America/Argentina/Buenos_Aires`, `TZ=Asia/Tokyo`).
   yields to a US state after it (`"Panama City, FL"`, `"Mexico, MO"`, `"Peru, IL"` are
   us); a lone `"City, County, PA"` is us by the owner's `pa` rule. `"U.S."` written with
   dots is now the United States (16 rows `other>us`, 2
-  openIT; not in the owner's list, trivially droppable). **Accepted miss:** a US county
-  written without the word County before a state code that is also a country
-  (`"Springfield, Sangamon, IL"`, `"San Jose, Santa Clara, CA"`) reads as a province and
-  files `other` (0 such rows in production on 2026-10-27). `"Kulim, Kedah, al"` and an
-  Israeli kibbutz `"..., il"` row (Malaysia, Israel) are now correctly `other`.
+  openIT; not in the owner's list, trivially droppable). **A state code that is also a
+  country** (`ca il md tn ma al la ga va mn ...`) after a region name is decided by
+  CASING: the ATS country position is lowercase (`"Kulim, Kedah, al"`, `"Casablanca,
+  CAS, ma"`, `"Tunis, Tunis, tn"`), a US feed writes the state in capitals
+  (`"Nashville, Davidson, TN"`, `"San Jose, Santa Clara, CA"`, `"Springfield, Sangamon,
+  IL"` are us). Production 2026-10-27: 20 distinct strings end in a lowercase state-like
+  code (all foreign) and 3 in capitals (all US lists). A 2-letter non-US province code
+  before it (`"Toronto, ON, CA"`) or a Canadian province name before `CA` (`"Toronto,
+  Ontario, CA"`) is a country whatever the casing. **Accepted misses:** a capitalised
+  foreign code (`"Tel Aviv, Tel Aviv, IL"` files us) and `"Boulder, Boulder, CO"`
+  (lone-`co` rule, latam). `"Kulim, Kedah, al"` and an Israeli kibbutz `"..., il"` row
+  are `other`.
   **Still open:** `"Toronto, CA"` (1 row, no province, so the position rule reads it as
   California), `"Lima, OH"` (Lima token), `peru` -> token (`"Perugia, IT"` stays
   `latam`; entangled with `LATAM_COUNTRY_NAMES`, and tokenizing `brasil` the same way

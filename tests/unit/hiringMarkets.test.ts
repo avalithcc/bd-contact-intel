@@ -164,7 +164,7 @@ test("a bare ar/co/pa with no place or country follows the owner's per-code read
 });
 
 test("accepted miss: Arkansas and Colorado cities with no other signal read latam", () => {
-  for (const location of ["Bentonville, AR", "Fayettville, AR", "Boulder, CO", "Remote, Boulder, CO"]) {
+  for (const location of ["Bentonville, AR", "Fayettville, AR", "Boulder, CO", "Remote, Boulder, CO", "Boulder, Boulder, CO"]) {
     assert.equal(classifyMarket(location), "latam", location);
   }
 });
@@ -326,15 +326,27 @@ test("CA is California right after the city, not as a leading word or a list ite
   assert.equal(classifyMarket("Remote (CA, BC)"), "other");
 });
 
-test("a state-like ISO code after a non-US region is that country, not a US state ('ambiguous is neither')", () => {
-  for (const location of ["Casablanca, CAS, ma", "Rabat, RAB, ma", "Tel Aviv, Tel Aviv, IL", "Tirana, AL, al", "Chisinau, MD, md", "Vientiane, VT, la", "Tunis, Tunis, tn", "Tunis, TN, tn", "Kulim, Kedah, al"]) {
+// The ATS country position is written in LOWERCASE ("Kulim, Kedah, al"); a US feed writes the state in capitals.
+// Production 2026-10-27: 20 distinct strings end in a lowercase state-like code, all foreign; the 3 in capitals are all US.
+test("a LOWERCASE state-like ISO code after a non-US region is that country", () => {
+  for (const location of ["Casablanca, CAS, ma", "Rabat, RAB, ma", "Tirana, AL, al", "Chisinau, MD, md", "Vientiane, VT, la", "Tunis, Tunis, tn", "Tunis, TN, tn", "Kulim, Kedah, al", "Kibbutz Hanita, Kibbutz Hanita - קיבוץ חניתה , il"]) {
     assert.equal(classifyMarket(location), "other", location);
   }
 });
 
-// Accepted miss of the same rule: a US county written without the word "County" cannot be told from a province.
-test("accepted miss: a US county with no 'County' word before a state/country code reads as a province", () => {
-  assert.equal(classifyMarket("Springfield, Sangamon, IL"), "other");
+test("a capitalised state code after a county or region name is a US state ('City, County, ST' without the word County)", () => {
+  for (const location of [
+    "Nashville, Davidson, TN", "Baltimore, Baltimore City, MD", "Richmond, Henrico, VA", "Minneapolis, Hennepin, MN", "Charlotte, Mecklenburg, NC",
+    "Cambridge, Middlesex, MA", "Raleigh, Wake, NC", "Alexandria, Fairfax, VA", "Irvine, Orange, CA", "San Jose, Santa Clara, CA",
+    "Mountain View, Santa Clara, CA", "Palo Alto, Santa Clara, CA", "San Mateo, San Mateo, CA", "Springfield, Sangamon, IL",
+  ]) {
+    assert.equal(classifyMarket(location), "us", location);
+  }
+});
+
+// Accepted miss of the casing rule: a capitalised foreign code cannot be told from a US state.
+test("accepted miss: a capitalised foreign state-like code files us", () => {
+  assert.equal(classifyMarket("Tel Aviv, Tel Aviv, IL"), "us");
 });
 
 test("a US place or a list anywhere before the trailing code keeps it a state", () => {
