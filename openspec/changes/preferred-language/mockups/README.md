@@ -134,4 +134,23 @@ Audience card (`audience`):
 
 Bulk set from the contacts list, import of the property, and a filter or column for it. Out of scope for this slice.
 
-Approved:
+## Decisions taken by the owner (2026-10-27)
+
+1. **Property.** New nullable contact property `person.preferred_language` (`es` | `en`; NULL = "Automático"), migration `0063_person_preferred_language`
+   (rollback file next to it). Edited through the contact record's property editor, so `person_property_history` records the value change with the actor;
+   any BD may edit it.
+2. **Precedence, for the draft language only.** One-off choice on the member (`sequence_member.draft_language`) > preferred language > the audience chain.
+   The preference never changes the legal address, never unblocks a HOLD (panel C3), and the opt-out sentence keeps following the draft language.
+   One function decides it (`resolveDraftLanguage`, `src/lib/sequences/languageChoice.ts`); the draft input, the unsubscribe page and the card/dialog all call it.
+3. **Who-and-when line (open decision 3).** The record reuses its existing "Última actualización por … · {date}" line fed by the property history. No new
+   "Cargado por" wording on the record (the card and the dialog do say "cargado por", from the same history row).
+4. **Dialog checkbox (open decision 1).** "Guardar como idioma preferido de {name}": checked by default when the contact has none, unchecked when saving would
+   replace a stored value (with the "lo reemplaza" help line), hidden when the selection equals the stored value. Saved as preferred, the value goes on the
+   contact and the member keeps no one-off; not saved, the one-off behaves as before.
+5. **Audience card.** When the preference decides: badge "idioma preferido", the reason "… Sin esa preferencia sería {resolved}." with the address reason on its
+   own line, and the menu item "Cambiar el idioma preferido en la ficha". A one-off choice keeps the existing wording.
+6. **No generation by itself.** Changing the preference writes no draft and regenerates nothing; drafts stay one contact at a time.
+7. **Country correction (open decision 2).** Changing or clearing the contact's own country does NOT clear the preference.
+8. **Not shown (open decision 5)** and **who can edit (open decision 6)**: as proposed (no "hoy sería …" on the record; any BD edits, actor in the history).
+
+Approved: 2026-10-27 by Cristian (owner)
