@@ -203,9 +203,16 @@ export async function getFollowUpQueuePage(
   // not on every visit, because the selection scans every person.
   const attemptKey = `${bdId}:${queueDate}`;
   if (pageBuildAttempted.has(attemptKey)) return rows;
+  try {
+    await ensureTodayFollowUpQueue(bdId, now, executor);
+  } catch (err) {
+    // Same as the shell badge: a failed build must not take the page down. Not memoized, so the next visit retries; logged
+    // (BD id, error class and message, no PII) so it lands in the Vercel logs.
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error(`[follow-ups] today's queue build failed for bd ${bdId}: ${detail}`);
+    return rows;
+  }
   pageBuildAttempted.add(attemptKey);
-
-  await ensureTodayFollowUpQueue(bdId, now, executor);
   return readQueueRows(bdId, queueDate, now, executor);
 }
 

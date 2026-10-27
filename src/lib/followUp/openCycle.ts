@@ -15,9 +15,10 @@
  * every activity that is not NO_PROGRESS: a Hunter lookup, a status change or other system row moves that clock, but must not
  * reset a Vencido's deadline. `person_bd_connection.last_message_at` (a LinkedIn message) stays a closing touch in both.
  *
- * `workedBeforeIso` relaxes the "closed" test for the PAGE read only: work done at or after that instant (the start of today) does
- * not close the row, so an item the BD worked today stays visible as done for the rest of the day, like a worked day-0 item. The
- * badge, the cap and the job leave it unset (strict).
+ * `workedBeforeIso` relaxes the "closed" test for the PAGE read only, and only for the BD's own WORK (WORKED_ACTIVITY_TYPES): work done
+ * at or after that instant (the start of today) does not close the row, so an item the BD worked today stays visible as done for the rest of the day, like a worked day-0 item. A
+ * reply or a LinkedIn message stays a strict closer even today (the contact answered; the item leaves the page, the badge and the
+ * drop together). The badge, the cap and the job leave it unset (strict).
  *
  * The queue row is referenced by `rowRef` (default UNALIASED `follow_up_queue_item`) and every other table through its schema
  * object, like candidateQuery.ts. Callers add the date window and the state filter that fit them.
@@ -45,10 +46,24 @@ function typeList(types: readonly string[]) {
 
 export function openCycleRowSql({ rowRef = "follow_up_queue_item", workedBeforeIso }: { rowRef?: string; workedBeforeIso?: string } = {}) {
   const row = sql.raw(rowRef);
-  const workedBefore = workedBeforeIso
-    ? sql`and ${workedTodayAtSql()} < ${workedBeforeIso}::timestamptz`
+  // The entry clock (`fuq_last_touch`) ignores a soft-deleted note, so a note that was ALREADY deleted when the row was written
+  // looks newer than the row's `last_touch_at` forever. It must not close the row it predates: the row would be born closed, the
+  // contact (still due by the entry clock) would be queued again every day, and "a cycle owns one row" would break. Work that
+  // happens, and is then deleted, after the row exists still closes it (deleting a note never un-counts work).
+  const notBornClosed = sql`and (activity.deleted_at is null or activity.created_at >= ${row}.created_at)`;
+  // Relaxed (page read): the BD's own work today stays visible as done, so it is split from the strict closers. A reply or a
+  // LinkedIn message is the CONTACT answering: it ends the item for the page, the badge, the cap and the drop alike.
+  const strictTypes = workedBeforeIso ? ["reply_received"] : CYCLE_CLOSING_ACTIVITY_TYPES;
+  const relaxedWork = workedBeforeIso
+    ? sql`and not exists (
+      select 1 from ${activity}
+      where activity.person_id = ${row}.person_id
+        and activity.type in (${typeList([...WORKED_ACTIVITY_TYPES])})
+        and ${workDoneAtSql()} > ${row}.last_touch_at
+        and ${workedTodayAtSql()} < ${workedBeforeIso}::timestamptz
+        ${notBornClosed}
+    )`
     : sql``;
-  const connectionBefore = workedBeforeIso ? sql`and person_bd_connection.last_message_at < ${workedBeforeIso}::timestamptz` : sql``;
   return sql`(
     exists (
       select 1 from ${person}
@@ -61,15 +76,15 @@ export function openCycleRowSql({ rowRef = "follow_up_queue_item", workedBeforeI
     and not exists (
       select 1 from ${activity}
       where activity.person_id = ${row}.person_id
-        and activity.type in (${typeList(CYCLE_CLOSING_ACTIVITY_TYPES)})
+        and activity.type in (${typeList(strictTypes)})
         and ${workDoneAtSql()} > ${row}.last_touch_at
-        ${workedBefore}
+        ${notBornClosed}
     )
+    ${relaxedWork}
     and not exists (
       select 1 from ${personBdConnection}
       where person_bd_connection.person_id = ${row}.person_id
         and person_bd_connection.last_message_at > ${row}.last_touch_at
-        ${connectionBefore}
     )
     and not exists (
       select 1 from ${activity}

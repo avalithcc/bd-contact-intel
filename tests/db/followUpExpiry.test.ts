@@ -372,7 +372,7 @@ test("a note that was added and then soft-deleted still closes the cycle: deleti
   await inRolledBackTransaction(async (tx) => {
     const bdId = await seedBd(tx);
     const id = await seedPerson(tx, bdId, "deleted", "contacted", 7);
-    await seedCarried(tx, bdId, id, 1, 7);
+    await seedCarried(tx, bdId, id, 2, 7);
     assert.equal((await read(tx, bdId, await today())).length, 1);
     await addActivity(tx, id, "note", hoursAgo(30), { deletedAt: hoursAgo(1) });
     assert.equal((await read(tx, bdId, await today())).length, 0);
@@ -521,5 +521,66 @@ test("a drop cannot change the person row at all, even when the cached status di
     assert.deepEqual(await dropFollowUp({ itemId: item.id, bdId, reason: "not_now", detail: null, today: await today() }, tx as never), { dropped: true });
     const [after] = await tx.select().from(person).where(eq(person.id, id));
     assert.deepEqual(after, before);
+  });
+});
+
+test("a note already deleted when the row is written does not close it: no born-closed row, no daily re-queue", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "loop", "contacted", 7);
+    // Mis-filed note, deleted before the contact enters the queue. The entry clock ignores it (owner decision), so the contact is due.
+    await addActivity(tx, p, "note", hoursAgo(30), { deletedAt: hoursAgo(29) });
+    await materialize(tx, bdId, d0);
+    assert.equal((await rowsFor(tx, bdId)).length, 1);
+    const d1 = await plusDays(d0, 1);
+    assert.deepEqual((await read(tx, bdId, d1)).map((r) => r.personId), [p], "the row opened a cycle and is carried");
+    await materialize(tx, bdId, d1);
+    await materialize(tx, bdId, await plusDays(d0, 2));
+    assert.equal((await rowsFor(tx, bdId)).length, 1, "a cycle owns exactly one row: the contact is not queued again day after day");
+  });
+});
+
+test("work done and then deleted AFTER the row exists still closes the cycle, and the contact starts a new one later (entry clock ignores the note)", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "closed", "contacted", 7);
+    const first = await seedCarried(tx, bdId, p, 2, 7);
+    await addActivity(tx, p, "note", hoursAgo(30), { deletedAt: hoursAgo(1) });
+    assert.equal((await read(tx, bdId, d0)).length, 0);
+    await materialize(tx, bdId, d0);
+    const rows = (await rowsFor(tx, bdId)).filter((r) => r.personId === p);
+    assert.equal(rows.length, 2, "one closed cycle, and exactly one new row for the new one");
+    assert.ok(rows.some((r) => r.id === first.id));
+    await materialize(tx, bdId, await plusDays(d0, 1));
+    assert.equal((await rowsFor(tx, bdId)).filter((r) => r.personId === p).length, 2, "and it does not repeat");
+  });
+});
+
+test("a reply received today closes the cycle for the page, the badge and the drop alike (only BD work stays visible as done)", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { dropFollowUp } = await import("@/lib/followUp/dropQueries");
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "replied-today", "contacted", 10);
+    const item = await seedCarried(tx, bdId, p, 4, 10);
+    assert.equal((await read(tx, bdId, d0)).length, 1);
+    await addActivity(tx, p, "reply_received", NOW, { metadata: { occurredAt: NOW.toISOString() } });
+    assert.equal((await read(tx, bdId, d0)).length, 0, "the page drops it, like the badge");
+    assert.deepEqual(await badge(tx, bdId, d0), { total: 0, overdue: 0 });
+    assert.deepEqual(await dropFollowUp({ itemId: item.id, bdId, reason: "not_now", detail: null, today: d0 }, tx as never), { dropped: false });
+  });
+});
+
+test("a LinkedIn message received today also closes it for the page", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { personBdConnection } = await import("@/db/schema");
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const p = await seedPerson(tx, bdId, "linkedin-today", "contacted", 10);
+    await seedCarried(tx, bdId, p, 4, 10);
+    await tx.insert(personBdConnection).values({ personId: p, bdId, lastMessageAt: NOW });
+    assert.equal((await read(tx, bdId, d0)).length, 0);
   });
 });

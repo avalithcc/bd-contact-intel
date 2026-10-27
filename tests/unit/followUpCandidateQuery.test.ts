@@ -21,6 +21,7 @@ import { buildFollowUpInsertQuery, buildFollowUpReentryQuery, buildFollowUpVerif
 import { FOLLOW_UP_DROP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import { FOLLOW_UP_ENTRY_DAYS } from "@/lib/followUp/cycle";
 import { CYCLE_CLOSING_ACTIVITY_TYPES, carriedOpenItemSql } from "@/lib/followUp/openCycle";
+import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 
 const dialect = new PgDialect();
 
@@ -194,6 +195,21 @@ test("only the owner's worked set closes a cycle: the bound types are WORKED_ACT
   assert.deepEqual(bound, [...CYCLE_CLOSING_ACTIVITY_TYPES]);
   assert.deepEqual([...CYCLE_CLOSING_ACTIVITY_TYPES].sort(), ["call", "discarded", "email_sent", "meeting_logged", "note", "reply_received"]);
   for (const system of ["hunter_lookup", "status_change", "status_backfill", "lusha_reveal", "call_attempt"]) assert.ok(!bound.includes(system), system);
+});
+
+test("the entry clock keeps the display rule (a deleted note is ignored); the closing clock is workDone but never closes a row it predates", () => {
+  const cte = renderVerification();
+  assert.match(cte.slice(cte.indexOf("fuq_activity as ("), cte.indexOf("fuq_connection as (")), /"deleted_at" is not null then null/);
+  const { sql: open } = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27"));
+  assert.match(open, /and \(activity\.deleted_at is null or activity\.created_at >= follow_up_queue_item\.created_at\)/);
+});
+
+test("when the page relaxes today's work, a reply stays in the strict clause and only the worked set is relaxed", () => {
+  const { sql: text, params } = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27", "2026-10-27T03:00:00.000Z"));
+  const clauses = [...text.matchAll(/activity\.type in \(([^)]*)\)/g)].map((m) => m[1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]));
+  assert.deepEqual(clauses[0], ["reply_received"], "strict closer");
+  assert.deepEqual(clauses[1], [...WORKED_ACTIVITY_TYPES], "relaxed: the BD's own work");
+  assert.equal(text.match(/< \$\d+::timestamptz/g)?.length, 1, "only one clause is relaxed, and not the LinkedIn clock");
 });
 
 test("the open-cycle work time is workDoneAtSql (a soft-deleted note still counts), and only the page read relaxes today's work", () => {
