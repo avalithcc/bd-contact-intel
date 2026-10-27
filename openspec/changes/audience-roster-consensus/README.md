@@ -46,4 +46,4 @@ The table at the bottom lists the resolution order and what the card says at eac
 - Phone-case copy "Por eso se miró el teléfono" is only shown when the roster was split and the phone then answered.
 - Internal CRM copy is voseo (owner rule); the prospect-facing draft is unaffected.
 
-## Approved:
+## Approved: 2026-10-27 by the owner, with corregir items limited in the roster state and companyImpact removed
