@@ -20,7 +20,7 @@ import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import { buildFollowUpInsertQuery, buildFollowUpReentryQuery, buildFollowUpVerificationQuery } from "@/lib/followUp/candidateQuery";
 import { FOLLOW_UP_DROP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
 import { FOLLOW_UP_ENTRY_DAYS } from "@/lib/followUp/cycle";
-import { carriedOpenItemSql } from "@/lib/followUp/openCycle";
+import { CYCLE_CLOSING_ACTIVITY_TYPES, carriedOpenItemSql } from "@/lib/followUp/openCycle";
 
 const dialect = new PgDialect();
 
@@ -154,7 +154,11 @@ test("a dropped contact and a contact with an open cycle are kept out of the new
   const due = text.slice(text.indexOf("fuq_due as ("));
   assert.match(due, /activity\.created_at > fuq_last_touch/);
   assert.ok(FOLLOW_UP_DROP_ACTIVITY_TYPES.every((t) => params.includes(t)));
-  assert.match(due, /fuq_cycle\.cycle_started_on is not null\s+and fuq_cycle\.last_touch_at >= fuq_last_touch/);
+  // The exclusion is the shared open-cycle predicate applied to the aliased row, not a private last_touch comparison.
+  assert.match(due, /from "follow_up_queue_item" fuq_cycle\s+where fuq_cycle\.bd_id = fuq_owner_bd_id[\s\S]*fuq_cycle\.person_id = fuq_person_id/);
+  assert.match(due, /fuq_cycle\.queue_date > current_date - \$\d+::int/);
+  assert.match(due, /activity\.person_id = fuq_cycle\.person_id/);
+  assert.match(due, /activity\.created_at >= fuq_cycle\.created_at/);
 });
 
 test("the insert opens a cycle on its own queue date and gives the cap to days 1-2 carried items only", () => {
@@ -181,13 +185,32 @@ test("the re-entry statement fires only while the latest follow-up activity is a
   assert.match(text, /\) in \(\$\d+, \$\d+\)\s*$/);
 });
 
+test("only the owner's worked set closes a cycle: the bound types are WORKED_ACTIVITY_TYPES plus reply_received, never the no-progress or system ones", () => {
+  const { sql: text, params } = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27"));
+  const closing = text.slice(text.indexOf('from "activity"'));
+  const match = closing.match(/activity\.type in \(([^)]*)\)/);
+  assert.ok(match);
+  const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
+  assert.deepEqual(bound, [...CYCLE_CLOSING_ACTIVITY_TYPES]);
+  assert.deepEqual([...CYCLE_CLOSING_ACTIVITY_TYPES].sort(), ["call", "discarded", "email_sent", "meeting_logged", "note", "reply_received"]);
+  for (const system of ["hunter_lookup", "status_change", "status_backfill", "lusha_reveal", "call_attempt"]) assert.ok(!bound.includes(system), system);
+});
+
+test("the open-cycle work time is workDoneAtSql (a soft-deleted note still counts), and only the page read relaxes today's work", () => {
+  const strict = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27")).sql;
+  assert.doesNotMatch(strict.slice(strict.indexOf("follow_up_queue_item.last_touch_at") - 400), /"activity"\."deleted_at" is not null then null/);
+  assert.doesNotMatch(strict, /< \$\d+::timestamptz/, "no 'worked before' bound unless asked");
+  const relaxed = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27", "2026-10-27T03:00:00.000Z")).sql;
+  assert.match(relaxed, /< \$\d+::timestamptz/);
+});
+
 test("the open-cycle predicate reads every table through its schema object and ends a cycle on a touch or a drop", () => {
   const { sql: text, params } = dialect.sqlToQuery(carriedOpenItemSql("00000000-0000-0000-0000-000000000001", "2026-10-27"));
   for (const table of ["person", "activity", "person_bd_connection"]) assert.match(text, new RegExp(`from "${table}"`));
   assert.doesNotMatch(text, /from "(person|activity|person_bd_connection)" [a-z_]+\s/);
   assert.match(text, /person_bd_connection\.last_message_at > follow_up_queue_item\.last_touch_at/);
   assert.match(text, /activity\.created_at >= follow_up_queue_item\.created_at/);
-  for (const t of [...NO_PROGRESS_ACTIVITY_TYPES, ...FOLLOW_UP_DROP_ACTIVITY_TYPES]) assert.ok(params.includes(t), t);
+  for (const t of [...CYCLE_CLOSING_ACTIVITY_TYPES, ...FOLLOW_UP_DROP_ACTIVITY_TYPES]) assert.ok(params.includes(t), t);
 });
 
 test("the open-cycle predicate renders identically on repeated calls", () => {

@@ -46,7 +46,7 @@ import { sql } from "drizzle-orm";
 import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
 import { activity, bd, companyAbsorptionProposal, duplicateCandidate, emailAccount, followUpQueueItem, meeting, person, scheduledEmail, sequence, sequenceMember, task } from "@/db/schema";
 import { safeTimestamptzText } from "@/lib/contacts/effectiveActivityTime";
-import { carriedOpenItemSql, carriedOverdueCountSql } from "@/lib/followUp/openCycle";
+import { carriedSummarySql } from "@/lib/followUp/openCycle";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 import { CLOSED_STATES } from "@/lib/sequences/memberState";
 
@@ -145,10 +145,10 @@ export function buildAppShellBadgeCountsQuery({
         )
         -- follow-up-expiry: plus every unworked item carried from an earlier day (days 1-2 and the Vencidos), the same
         -- predicate the page reads with (openCycle.ts).
-        + (select count(*)::int from ${followUpQueueItem} where ${carriedOpenItemSql(bdId, queueDate)})
+        + fu_carried.fuc_total
       ) as follow_up_count,
       -- The Vencidos alone, for the badge's accessible name ("13 seguimientos pendientes: 3 vencidos y 10 de hoy").
-      ${carriedOverdueCountSql(bdId, queueDate)}::int as follow_up_overdue_count,
+      fu_carried.fuc_overdue as follow_up_overdue_count,
       (
         -- Team-wide on purpose: unlike task_count/follow_up_count (per-BD),
         -- an absorption proposal is proposed by one BD and resolved by any
@@ -247,5 +247,7 @@ export function buildAppShellBadgeCountsQuery({
       )`
           : sql`null`
       } as gmail_fleet_accounts
+    -- ONE pass over the carried items for both numbers (total and Vencidos), via FILTER.
+    from ${carriedSummarySql(bdId, queueDate)} fu_carried
   `;
 }

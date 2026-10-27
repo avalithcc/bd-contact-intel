@@ -122,7 +122,7 @@ export async function readQueueRows(
         // days 1-2 carried items. `carriedOpenItemSql` is the one definition shared with the badge and the expiry job.
         or(
           and(eq(followUpQueueItem.bdId, bdId), eq(followUpQueueItem.queueDate, queueDate)),
-          carriedOpenItemSql(bdId, queueDate),
+          carriedOpenItemSql(bdId, queueDate, argentinaInstantDayWindow(now).fromUtc.toISOString()),
         ),
         // Defense in depth: a person queued this morning could be merged
         // away later the same day (a duplicate cleanup can run any time) —
@@ -164,9 +164,9 @@ export async function readQueueRows(
  * more than 10 rows for the day; the lock guarantees only one computation
  * ever runs.
  */
-export async function ensureTodayFollowUpQueue(bdId: string, now: Date): Promise<void> {
+export async function ensureTodayFollowUpQueue(bdId: string, now: Date, executor: Pick<typeof db, "transaction"> = db): Promise<void> {
   const queueDate = argentinaCalendarDate(now);
-  await db.transaction((tx) => materializeQueueInTx(tx, bdId, queueDate));
+  await executor.transaction((tx) => materializeQueueInTx(tx, bdId, queueDate));
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -189,14 +189,28 @@ export async function materializeQueueInTx(tx: Tx, bdId: string, queueDate: stri
  * `ensureTodayFollowUpQueue` (a few extra round trips, but this runs once
  * per BD per day, not once per page view) and re-reads.
  */
-export async function getFollowUpQueuePage(bdId: string, now: Date): Promise<FollowUpQueueRow[]> {
+export async function getFollowUpQueuePage(
+  bdId: string,
+  now: Date,
+  executor: Pick<typeof db, "select" | "transaction"> = db,
+): Promise<FollowUpQueueRow[]> {
   const queueDate = argentinaCalendarDate(now);
-  const rows = await readQueueRows(bdId, queueDate, now);
-  if (rows.length > 0) return rows;
+  const rows = await readQueueRows(bdId, queueDate, now, executor);
+  // "Has today's queue been built?" asks for a row WRITTEN today. The read now also returns items carried over from earlier days
+  // (follow-up-expiry), so any non-empty read says nothing about today; a BD with only Vencidos must still get today's entries.
+  if (rows.some((r) => r.queueDate === queueDate)) return rows;
+  // A BD with nothing new due keeps `rows` free of today's date all day: build once per instance and day (like the shell badge),
+  // not on every visit, because the selection scans every person.
+  const attemptKey = `${bdId}:${queueDate}`;
+  if (pageBuildAttempted.has(attemptKey)) return rows;
+  pageBuildAttempted.add(attemptKey);
 
-  await ensureTodayFollowUpQueue(bdId, now);
-  return readQueueRows(bdId, queueDate, now);
+  await ensureTodayFollowUpQueue(bdId, now, executor);
+  return readQueueRows(bdId, queueDate, now, executor);
 }
+
+/** (bd, ART day) pairs this server instance already tried to build from the page. */
+const pageBuildAttempted = new Set<string>();
 
 /**
  * "Posponer a mañana" / "Omitir hoy" (mockup README decision 5): both leave

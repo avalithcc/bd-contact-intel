@@ -55,7 +55,7 @@ import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
 import { notActiveClientCompanySql } from "@/lib/followUp/activeClientExclusion";
 import { FOLLOW_UP_ACTIVITY_TYPES, FOLLOW_UP_DROP_ACTIVITY_TYPES, FOLLOW_UP_REENTERED_TYPE } from "@/lib/followUp/activityTypes";
 import { FOLLOW_UP_ENTRY_DAYS } from "@/lib/followUp/cycle";
-import { carriedNormalCountSql } from "@/lib/followUp/openCycle";
+import { EXPIRY_LOOKBACK_DAYS, carriedNormalCountSql, openCycleRowSql } from "@/lib/followUp/openCycle";
 import { FOLLOW_UP_DAILY_CAP } from "@/lib/followUp/queueSelection";
 
 /**
@@ -157,7 +157,9 @@ export function fuqCandidatesCte({ includeCycles = true }: CandidateOptions = {}
             )})
             and activity.created_at > fuq_last_touch
         )
-        -- A contact whose cycle is still open (no touch since its row was written) is carried, never re-added as new.
+        -- A contact whose cycle is still open (the SAME predicate the page reads with, openCycle.ts) is carried, never re-added
+        -- as new, whatever moved fuq_last_touch meanwhile (a Hunter lookup does). Rows older than the expiry job's lookback
+        -- no longer block, so a job that stopped cannot strand a contact out of the queue for good.
         ${
           includeCycles
             ? sql`and not exists (
@@ -165,7 +167,8 @@ export function fuqCandidatesCte({ includeCycles = true }: CandidateOptions = {}
           where fuq_cycle.bd_id = fuq_owner_bd_id
             and fuq_cycle.person_id = fuq_person_id
             and fuq_cycle.cycle_started_on is not null
-            and fuq_cycle.last_touch_at >= fuq_last_touch
+            and fuq_cycle.queue_date > current_date - ${EXPIRY_LOOKBACK_DAYS}::int
+            and ${openCycleRowSql({ rowRef: "fuq_cycle" })}
         )`
             : sql``
         }

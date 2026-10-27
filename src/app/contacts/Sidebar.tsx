@@ -230,19 +230,22 @@ export function Sidebar({
               <item.icon className="icon" />
               {labels[item.labelKey]}
               {!!pillCountByLabelKey[item.labelKey] && (
-                <span
-                  className="pill-count"
-                  aria-label={
-                    item.labelKey === "followUps" && followUpOverdueCount
-                      ? fillTemplate(labels.followUpsBadgeAria, {
+                <span className="pill-count">
+                  {item.labelKey === "followUps" && followUpOverdueCount ? (
+                    // A span has no accessible name of its own, so the full sentence is visually-hidden text and the digit is hidden.
+                    <>
+                      <span aria-hidden="true">{pillCountByLabelKey[item.labelKey]}</span>
+                      <span className="sr-only">
+                        {fillTemplate(labels.followUpsBadgeAria, {
                           n: String(followUpCount),
                           v: String(followUpOverdueCount),
                           h: String((followUpCount ?? 0) - followUpOverdueCount),
-                        })
-                      : undefined
-                  }
-                >
-                  {pillCountByLabelKey[item.labelKey]}
+                        })}
+                      </span>
+                    </>
+                  ) : (
+                    pillCountByLabelKey[item.labelKey]
+                  )}
                 </span>
               )}
             </Link>
