@@ -12,10 +12,17 @@
  * resolution, file naming, argument building, and the verification
  * decision. `snapshotBackup` itself spawns real processes and touches the
  * filesystem; it is NOT unit-tested, same rationale as queries.ts.
+ *
+ * After a verified dump it applies the retention policy in
+ * backupRetention.ts, which deletes dumps past a window and keeps the most
+ * recent few whatever their age. `backups/` also holds source CSVs and
+ * spreadsheets, so that module decides eligibility from the filename this
+ * one writes and can never see them.
  */
 import { spawn } from "node:child_process";
 import { mkdirSync, rmSync, statSync } from "node:fs";
 import { dirname } from "node:path";
+import { pruneOldBackups } from "./backupRetention";
 
 /**
  * Every table the collapse/fold-leads migration reads from or writes to
@@ -264,6 +271,19 @@ export async function snapshotBackup(
     // Never leave a partial or empty dump that looks like a valid backup.
     rmSync(outputPath, { force: true });
     throw err;
+  }
+
+  // Retention runs only once the dump above is verified, and OUTSIDE that catch on purpose: in there a
+  // throw deletes `outputPath`, so a cleanup failure would destroy the backup it was tidying up around.
+  // A failure here is logged and swallowed — the caller is about to do something irreversible and the
+  // backup it needs already exists.
+  try {
+    const pruned = pruneOldBackups(dirname(outputPath));
+    if (pruned.length > 0) {
+      console.log(`backup retention: deleted ${pruned.length} dump(s) past the window: ${pruned.join(", ")}`);
+    }
+  } catch (err) {
+    console.error(`backup retention skipped: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return outputPath;
