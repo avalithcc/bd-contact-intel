@@ -1102,6 +1102,30 @@ open, and the only parts of this item that are: (1) company-key alias
 duplicates — the two Roberto Gorchs sit under `andina` vs `andina tech`, both
 real `company` rows with no alias between them, and a prefix heuristic finds 59
 same-name groups of this kind; (2) the 230 nameless contacts.
+
+**Update 2026-10-27/28: (1) is closed.** `scripts/measure/company-alias-duplicates.ts`
+measured 3,393 candidate pairs over 14,655 companies and bucketed them. Merged
+with the owner deciding pair by pair: lot 1 (50 groups), lot 2 (56 groups, then
+the last 10 on 2026-10-28 after he reviewed the 20 the heuristic had refused to
+call) and BBVA. 24 pairs were marked `separadas` — a `Tech`/`Digital`/`Group`
+arm is a separate entity (YPF/YPF Tecnología, Telefónica/Telefónica Tech), and
+`Amazon` vs a `reinvent.awsevents.com` URL in the name field is a data defect,
+not a duplicate. The #403 re-scan then opened 60 person pairs, all resolved, and
+the 8 that the 2026-10-28 merges created were resolved the same day after
+running the re-scan by hand instead of waiting for the 03:30 ART cron. Queue:
+**0 open**.
+
+**Lot 3 — the 252 STRONG-GEO pairs — will NOT be merged. Owner decision
+2026-10-28, closing it.** These are names that become identical once the country
+word is dropped: Hitss Argentina / Hitss Perú. The country is the only thing
+distinguishing those rows, and it is what decides the contact's market and the
+postal address in the email footer — collapse them and you destroy the field
+that picks which signature a mail carries, which is the same class of bug as the
+357 contacts whose language was decided by a contradicted country. They are also
+harmless as they stand: the re-scan keys on `name::company_key`, so one person
+under two regional keys stays invisible, which is correct when they really are
+two different offices. Do not re-propose them: a future measurement WILL surface
+these 252 again, and this is the answer.
 Previously recorded as 353 open pairs with a recommendation to dismiss 9
 pairs whose two sides had different **verified** emails, on the premise that
 two differing verified emails mean two different people. **That premise was
