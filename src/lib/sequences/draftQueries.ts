@@ -18,6 +18,7 @@ import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { REGENERABLE_STATES } from "./detailFlow";
 import { blocksEditedOverwrite, composeDraft, footerRemovedOnSave, runDraftBatch, type BatchResult, type EditConfirmations, type SkippedEdit } from "./draftCompose";
 import { buildSequenceDraftInput, draftSignals, resolveDraftCompliance, senderIdentity } from "@/lib/sequences/draftInput";
+import { signatureWillFollow } from "@/lib/signature/compose";
 import { parseLanguageChoice, resolveDraftLanguage, type DraftLanguageOverrides } from "./languageChoice";
 import { clearDraftHold } from "./draftHold";
 import { languageMismatch, pinToStep1 } from "./languageMismatch";
@@ -63,7 +64,7 @@ async function loadFacts(bdId: string, memberId: string, sequenceId?: string) {
   const [r] = rowsOf<Row>(
     await db.execute(sql`
       select sm.state, sm.hold_reason, sm.draft_language, p.preferred_language, sm.sequence_id::text, p.id::text as person_id, p.email, p.first_name, p.last_name,
-             p.job_title, p.role_group, p.industry, p.company_key, b.name as sender_name,
+             p.job_title, p.role_group, p.industry, p.company_key, p.company, b.name as sender_name, b.signature_html,
              ${audienceFactsSql},
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${STEP}) as has_draft,
              exists (select 1 from sequence_draft d where d.sequence_member_id = sm.id and d.step = ${REMINDER_STEP}) as has_reminder_draft,
@@ -100,6 +101,7 @@ async function loadPromptArgs(bdId: string, r: Row) {
       roleGroup: (r.role_group ?? null) as RoleGroupKey | null,
       industry: r.industry as string | null,
       companyKey,
+      company: r.company as string | null,
     },
     connection: connection ?? null,
     signalBodies: signals.map((s) => (s.data as { body?: string } | null)?.body?.trim()).filter((b): b is string => Boolean(b)),
@@ -133,7 +135,7 @@ async function draftMember(bdId: string, sequenceId: string, memberId: string, m
     return "skipped";
   }
 
-  const input = audience && compliance && buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", compliance.language) }, audience, reminder ? "reminder" : "first", overrides);
+  const input = audience && compliance && buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", compliance.language) }, audience, reminder ? "reminder" : "first", overrides, signatureWillFollow(r.signature_html as string | null));
   if (!audience || !compliance || !input) {
     // No audience (no location signal, or an embargoed jurisdiction): hold, do not draft. The reason is a code; the UI words it.
     await db.update(sequenceMember).set({ holdReason: UNMAPPED_MARKET_HOLD, holdAt: new Date() }).where(and(eq(sequenceMember.id, memberId), sql`${sequenceMember.holdReason} is distinct from ${UNMAPPED_MARKET_HOLD}`));
@@ -189,7 +191,7 @@ export async function memberDraftSignals(bdId: string, memberId: string, step: 1
   if (!facts.audience) return [];
   const overrides = step === REMINDER_STEP ? pinToStep1(facts.overrides, facts.step1Language) : facts.overrides;
   const language = resolveDraftCompliance(facts.audience, overrides)!.language;
-  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first", overrides);
+  const input = buildSequenceDraftInput({ ...(await loadPromptArgs(bdId, facts.r)), ...senderIdentity((facts.r.sender_name as string) ?? "", language) }, facts.audience, step === REMINDER_STEP ? "reminder" : "first", overrides, signatureWillFollow(facts.r.signature_html as string | null));
   return input ? draftSignals(input) : [];
 }
 

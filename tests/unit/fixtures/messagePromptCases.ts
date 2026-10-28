@@ -1,7 +1,8 @@
 /**
  * Inputs for the characterization test of buildOutreachMessagePrompt (tests/unit/messagePromptCharacterization.test.ts).
- * Each case is a shape an existing live caller produces: Spanish, no `purpose`. The goldens next to it were generated
- * from the code BEFORE the `purpose` parameter existed; they must never be regenerated to make a change pass.
+ * Each case is a shape a live caller produces: Spanish, no `purpose`. The goldens next to it were captured from the code
+ * and re-captured on 2026-10-28 for the intentional prompt change (sign-off removal, subject rule, company-name
+ * absence); they must never be regenerated to make an unintended change pass.
  */
 import type { BuildOutreachMessagePromptInput } from "@/lib/outreach/messagePrompt";
 
@@ -12,6 +13,7 @@ const CONTACT = {
   roleGroup: "eng_leadership" as const,
   isLeadership: true,
   connectedOn: "2024-01-01",
+  companyName: "Affirm",
 };
 
 const COMPANY = {
@@ -58,4 +60,6 @@ export const CASES: Record<string, BuildOutreachMessagePromptInput> = {
     notes: ["Posted about platform migrations."],
   },
   "linkedin-es-cold": { ...BASE, channel: "linkedin" },
+  // A signature block follows the body (every active BD has one): no sign-off rule and a sign-off-free exemplar.
+  "email-es-signature": { ...BASE, company: COMPANY, signatureFollows: true },
 };

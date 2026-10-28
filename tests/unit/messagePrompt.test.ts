@@ -15,6 +15,7 @@ const BASE: BuildOutreachMessagePromptInput = {
     roleGroup: "eng_leadership",
     isLeadership: true,
     connectedOn: "2024-01-01",
+    companyName: "Affirm",
   },
   company: null,
   history: [],

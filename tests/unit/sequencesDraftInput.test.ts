@@ -14,7 +14,7 @@ const EN: ComplianceAudience = { address: "miami", language: "en" };
 const ES: ComplianceAudience = { address: "mdp", language: "es" };
 
 const base: SequenceDraftInputArgs = {
-  person: { firstName: "Ana", lastName: "Lee", jobTitle: "VP Engineering", roleGroup: null, industry: null, companyKey: "acme" },
+  person: { firstName: "Ana", lastName: "Lee", jobTitle: "VP Engineering", roleGroup: null, industry: null, companyKey: "acme", company: "Acme Inc" },
   connection: null,
   signalBodies: [],
   company: null,

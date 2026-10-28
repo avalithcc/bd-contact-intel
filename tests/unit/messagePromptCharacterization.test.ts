@@ -1,9 +1,10 @@
 /**
- * Characterization test: pins, byte for byte, what buildOutreachMessagePrompt renders TODAY for the Spanish inputs the
- * existing live callers send (no `purpose`). The prompt is shared by five callers that generate the app's outreach
+ * Characterization test: pins, byte for byte, what buildOutreachMessagePrompt renders for the Spanish inputs the
+ * live callers send (no `purpose`). The prompt is shared by five callers that generate the app's outreach
  * messages in production, and a regression there has no other test watching it. Goldens in
- * tests/unit/fixtures/messagePromptGolden/ were captured from the unmodified code. Never regenerate them to make a
- * change pass: if this fails, the existing path moved.
+ * tests/unit/fixtures/messagePromptGolden/ were re-captured on 2026-10-28 for an intentional, owner-approved prompt
+ * change (email sign-off removal when a signature follows, the new subject rule, company-name absence instead of
+ * "unknown"). Do not regenerate them to make an unintended change pass: if this fails, the existing path moved.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -19,7 +20,7 @@ const golden = (name: string) =>
   };
 
 for (const name of Object.keys(CASES)) {
-  test(`existing Spanish caller "${name}" renders the exact pre-change system and user prompt`, () => {
+  test(`existing Spanish caller "${name}" renders the pinned system and user prompt`, () => {
     const rendered = buildOutreachMessagePrompt(CASES[name]);
     const expected = golden(name);
     assert.equal(rendered.system, expected.system);

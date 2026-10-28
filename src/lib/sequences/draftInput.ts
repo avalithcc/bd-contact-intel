@@ -48,12 +48,13 @@ export function buildSequenceDraftInput(
   audience: ComplianceAudience | null,
   purpose: OutreachPurpose = "first",
   overrides: DraftLanguageOverrides = {},
+  signatureFollows = false,
 ): BuildOutreachMessagePromptInput | null {
   const compliance = resolveDraftCompliance(audience, overrides);
   if (!compliance) return null;
   const { language } = compliance;
-  // Spread first so a stray `language`/`channel` on the args can never win.
-  return { ...buildPersonMessageInput({ ...args, language, channel: "email" }), purpose };
+  // Spread first so a stray `language`/`channel` on the args can never win; `signatureFollows` is set after the spread for the same reason.
+  return { ...buildPersonMessageInput({ ...args, language, channel: "email" }), purpose, signatureFollows };
 }
 
 /** The "Señales usadas" chips, derived from the SAME input the generator gets and never from model output. */

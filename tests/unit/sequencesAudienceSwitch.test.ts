@@ -21,7 +21,7 @@ const MIAMI = "Avalith Corporation, 470 Ansin Blvd Ste G, Hallandale, FL 33009, 
 const URL_OK = buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken());
 const NOW = new Date("2026-10-15T14:00:00Z");
 const ARGS: SequenceDraftInputArgs = {
-  person: { firstName: "Ana", lastName: "Lee", jobTitle: "VP Engineering", roleGroup: null, industry: null, companyKey: "acme" },
+  person: { firstName: "Ana", lastName: "Lee", jobTitle: "VP Engineering", roleGroup: null, industry: null, companyKey: "acme", company: "Acme Inc" },
   connection: null, signalBodies: [], company: null, senderName: "Cristian Civita", senderTitle: "COO at Avalith",
 };
 

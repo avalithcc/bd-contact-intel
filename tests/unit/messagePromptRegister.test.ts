@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { buildOutreachMessagePrompt, type BuildOutreachMessagePromptInput } from "@/lib/outreach/messagePrompt";
 
 const BASE: BuildOutreachMessagePromptInput = {
-  contact: { firstName: "Ana", lastName: "Gomez", position: "VP Engineering", roleGroup: "eng_leadership", isLeadership: true, connectedOn: "2024-01-01" },
+  contact: { firstName: "Ana", lastName: "Gomez", position: "VP Engineering", roleGroup: "eng_leadership", isLeadership: true, connectedOn: "2024-01-01", companyName: "Affirm" },
   company: null,
   history: [],
   notes: [],

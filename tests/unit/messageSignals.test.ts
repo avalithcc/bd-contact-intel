@@ -37,6 +37,7 @@ const BASE: BuildOutreachMessagePromptInput = {
     roleGroup: null,
     isLeadership: false,
     connectedOn: null,
+    companyName: null,
   },
   company: null,
   history: [],

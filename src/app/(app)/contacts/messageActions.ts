@@ -17,6 +17,7 @@ import { db } from "@/db";
 import { person, personBdConnection, signal } from "@/db/schema";
 import { getCurrentBd } from "@/lib/queries";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
+import { signatureWillFollow } from "@/lib/signature/compose";
 import { buildPersonMessageInput } from "@/lib/outreach/personMessageInput";
 import { runGenerateOutreachMessage, type GenerateOutreachMessageResult } from "@/lib/outreach/generateMessage";
 import type { RoleGroupKey } from "@/lib/roleGroups";
@@ -84,7 +85,7 @@ export async function generatePersonOutreachMessageAction(
   const senderName = me.name?.trim() || "Cristian Civita";
   const senderTitle = senderName === "Cristian Civita" ? "COO de Avalith" : undefined;
 
-  const input = buildPersonMessageInput({
+  const built = buildPersonMessageInput({
     person: {
       firstName: row.firstName,
       lastName: row.lastName,
@@ -92,6 +93,7 @@ export async function generatePersonOutreachMessageAction(
       roleGroup: (row.roleGroup ?? null) as RoleGroupKey | null,
       industry: row.industry,
       companyKey: row.companyKey,
+      company: row.company,
     },
     connection: connectionRow ?? null,
     signalBodies,
@@ -101,6 +103,8 @@ export async function generatePersonOutreachMessageAction(
     language: messageLanguage,
     channel,
   });
+  // The signature is appended after generation on the one-off send path too (composeEmailBody), email only.
+  const input = { ...built, signatureFollows: channel === "email" && signatureWillFollow(me.signatureHtml) };
 
   // historyCount is always 0 here (not signalBodies.length): the existing
   // hint copy ("Tiene en cuenta N mensajes anteriores") describes prior

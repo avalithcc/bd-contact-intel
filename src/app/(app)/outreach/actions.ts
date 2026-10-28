@@ -68,6 +68,7 @@ export async function generateOutreachMessage(
         roleGroup: (row.roleGroup ?? null) as RoleGroupKey | null,
         isLeadership: isLeadershipRoleGroup(row.roleGroup),
         connectedOn: row.connectedOn,
+        companyName: row.company,
       },
       company,
       history,

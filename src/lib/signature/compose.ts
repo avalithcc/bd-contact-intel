@@ -31,3 +31,16 @@ export function composeEmailBody(text: string, signatureHtml: string | null | un
   const bodyHtml = escapeHtml(text).replace(/\r\n|\r|\n/g, "<br>");
   return { bodyHtml: `<div>${bodyHtml}</div><br><div>${signature}</div>` };
 }
+
+/**
+ * Whether a signature block will actually be appended to a body — the SAME emptiness test `composeEmailBody` above and
+ * `composeReleaseBody` apply, so a caller cannot reach a different verdict than the send path does.
+ *
+ * It lives here, next to the two functions that append, because the generator needs it to decide whether the body may
+ * carry its own sign-off: a body that signs off AND gets a signature appended is double-signed, which is what every
+ * Sequence email did until 2026-10-28. Keeping it beside them means a change to what counts as "no signature" cannot
+ * update one side only.
+ */
+export function signatureWillFollow(signatureHtml: string | null | undefined): boolean {
+  return sanitizeSignatureHtml(signatureHtml ?? "") !== "";
+}

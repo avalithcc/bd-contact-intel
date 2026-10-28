@@ -13,7 +13,7 @@ import { buildSequenceDraftInput, resolveDraftCompliance, type SequenceDraftInpu
 import { choiceToStore, LANGUAGE_CHOICES, parseLanguageChoice } from "@/lib/sequences/languageChoice";
 
 const base: SequenceDraftInputArgs = {
-  person: { firstName: "Ana", lastName: "Lee", jobTitle: "VP Engineering", roleGroup: null, industry: null, companyKey: "acme" },
+  person: { firstName: "Ana", lastName: "Lee", jobTitle: "VP Engineering", roleGroup: null, industry: null, companyKey: "acme", company: "Acme Inc" },
   connection: null,
   signalBodies: [],
   company: null,

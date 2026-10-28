@@ -18,7 +18,7 @@ const BASE_PERSON = {
   jobTitle: "VP Engineering",
   roleGroup: "eng_leadership" as const,
   industry: "fintech",
-  companyKey: "acme",
+  companyKey: "acme", company: "Acme Inc",
 };
 
 test("maps person fields into the contact block", () => {

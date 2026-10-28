@@ -33,6 +33,8 @@ export interface PersonMessageContact {
   roleGroup: RoleGroupKey | null;
   industry: string | null;
   companyKey: string | null;
+  // The employer name on the person row, forwarded so the prompt knows who it is writing to even when the postings lookup finds nothing.
+  company: string | null;
 }
 
 /** The calling BD's own connection facts for this person — never another
@@ -85,6 +87,7 @@ export function buildPersonMessageInput(args: BuildPersonMessageInputArgs): Buil
       roleGroup: person.roleGroup,
       isLeadership: isLeadershipRoleGroup(person.roleGroup),
       connectedOn: connection?.connectedOn ?? null,
+      companyName: person.company,
     },
     company,
     // Never another BD's message content (R6) — this builder has no path
