@@ -291,8 +291,22 @@ export function buildOutreachMessagePrompt(
   input: BuildOutreachMessagePromptInput,
 ): OutreachMessagePrompt {
   const { contact, company, history, notes = [], senderName, senderTitle, language, channel, purpose = "first" } = input;
-  const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "the contact";
+  const fullName = [contact.firstName, contact.lastName].filter(Boolean).join(" ");
   const firstName = contact.firstName || fullName;
+  /**
+   * A name we do not have is expressed by ABSENCE, not by a stand-in. The previous fallback was the literal
+   * "the contact", rendered as `- First name: the contact` — a placeholder the model has no way to recognise as one,
+   * so a draft could open "Hola the contact,". A sentinel like "unknown" has the same defect one word further on
+   * ("Hola unknown,"), which is why the two lines are dropped instead: the model cannot echo a field that is not
+   * there, and rule 10 already tells it to write around what is missing.
+   *
+   * Production holds 232 live contacts with no first or last name (measured 2026-10-28: all have an email, none has a
+   * LinkedIn profile). None had reached a Sequence, which is the only reason this never went out. Keep the named
+   * branch byte-identical: tests/unit/messagePromptCharacterization.test.ts pins the rendered prompt exactly.
+   */
+  const nameLines = fullName
+    ? `- First name: ${firstName}\n- Full name: ${fullName}`
+    : "- Name: not on file. Open without a name in the greeting rather than inventing one or writing a placeholder.";
   const roleLabel = contact.roleGroup ? ROLE_GROUP_LABELS[contact.roleGroup] : "unknown";
   const signOff = senderTitle ? `${senderName}, ${senderTitle}` : senderName;
   const historyText = summarizeHistory(history);
@@ -359,8 +373,7 @@ ${referenceStyle}
 Write the ${isEmail ? "email" : "LinkedIn DM"} now, using only the facts below.
 
 Contact:
-- First name: ${firstName}
-- Full name: ${fullName}
+${nameLines}
 - Position: ${contact.position ?? "unknown"}
 - Seniority/role group: ${roleLabel}
 - Is a likely decision-maker for engineering capacity: ${contact.isLeadership ? "yes" : "no"}

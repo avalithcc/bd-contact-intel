@@ -26,3 +26,26 @@ for (const name of Object.keys(CASES)) {
     assert.equal(rendered.prompt, expected.prompt);
   });
 }
+
+/**
+ * A contact with no name at all. Production holds 232 of them (measured 2026-10-28, all with an email), and the old
+ * code rendered `- First name: the contact` — a placeholder presented AS the name, which the model cannot tell apart
+ * from a real one, so a draft could open "Hola the contact,". The two name lines are now dropped entirely instead of
+ * being filled with a stand-in, because any sentinel ("unknown" included) has the same defect one word further on.
+ * None of those contacts had reached a Sequence, so nothing went out; this keeps it that way.
+ */
+test("a contact with no name gets no name line, and no placeholder the model could echo", () => {
+  const { prompt } = buildOutreachMessagePrompt({ ...CASES["email-es-cold"], contact: { ...CASES["email-es-cold"].contact, firstName: null, lastName: null } });
+  assert.ok(!prompt.includes("the contact"), "the old placeholder must not survive anywhere in the prompt");
+  assert.ok(!prompt.includes("- First name:"), "a name we do not have must be absent, not filled in");
+  assert.ok(!prompt.includes("- Full name:"));
+  assert.match(prompt, /- Name: not on file\. Open without a name in the greeting/);
+  // The rest of the prompt is unchanged: the section it sits in still reads as a contact block.
+  assert.match(prompt, /Contact:\n- Name: not on file[^\n]*\n- Position:/);
+});
+
+test("a contact with only a last name still gets both name lines, as before", () => {
+  const { prompt } = buildOutreachMessagePrompt({ ...CASES["email-es-cold"], contact: { ...CASES["email-es-cold"].contact, firstName: null, lastName: "Piccolo" } });
+  assert.match(prompt, /- First name: Piccolo\n- Full name: Piccolo\n/);
+  assert.ok(!prompt.includes("not on file"));
+});
