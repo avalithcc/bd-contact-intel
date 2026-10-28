@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
 import * as schema from "../../src/db/schema";
 import {
   buildRefCounts,
   COMPANY_KEY_TABLES,
+  COMPANY_MERGE_BACKUP_TABLES,
   refCount,
   squashCompanyKey,
 } from "../../src/lib/companyMerge/keys";
+import { BACKUP_TABLES } from "../../src/lib/migration/backup";
 import {
   findBlockers,
   groupCandidates,
@@ -204,6 +207,47 @@ test("every table with a company_key column in the schema is in the merge regist
     .map((c) => c.name)
     .sort();
   assert.deepEqual(withKey, [...COMPANY_KEY_TABLES].sort());
+});
+
+test("the merge backup set is the keyed registry plus the proposals table, and nothing else", () => {
+  assert.deepEqual(
+    [...COMPANY_MERGE_BACKUP_TABLES],
+    [...COMPANY_KEY_TABLES, "company_absorption_proposal"],
+  );
+});
+
+/**
+ * The regression this pins is NOT the content of the set above — that is one spread — but the WIRING: the merge
+ * is irreversible, and for weeks the script took no dump at all while its header told the operator to take one.
+ * The script imports the real db, so it cannot be run here; it is checked at source level, like
+ * companyContactCountsWiring.test.ts. It fails if the backup call is dropped, moved out of the --execute branch,
+ * left on the default BACKUP_TABLES, or stops asserting which tables the dump must contain.
+ */
+test("merge-companies.ts --execute backs up with the merge's own table set before it writes", () => {
+  // Line comments are stripped first: a matcher that accepts a COMMENTED-OUT call would pass while the
+  // script takes no backup at all. There is no `//` inside a string literal in this branch.
+  const source = readFileSync("scripts/merge-companies.ts", "utf8").replace(/\/\/.*$/gm, "");
+  const branchStart = source.search(/if \(o\.execute[^)]*\) \{/);
+  const executeBranch = source.slice(branchStart, source.indexOf("await dryRunMerge"));
+  assert.ok(branchStart > 0 && executeBranch.includes("o.execute"), "the --execute branch moved: this test can no longer see it");
+  const backupAt = executeBranch.indexOf("snapshotBackup(");
+  const mergeAt = executeBranch.indexOf("executeMerge(");
+  assert.ok(backupAt > 0, "--execute no longer calls snapshotBackup");
+  assert.ok(mergeAt > 0 && backupAt < mergeAt, "the backup must be taken before executeMerge, not after");
+  assert.match(executeBranch, /snapshotBackup\([\s\S]*?COMPANY_MERGE_BACKUP_TABLES/);
+  assert.match(executeBranch, /requiredTables:\s*COMPANY_KEY_TABLES/);
+  // A swallowed failure is worse than no backup: the merge would run believing it has one.
+  assert.ok(!/snapshotBackup\([\s\S]*?\)\s*\.catch/.test(executeBranch), "the backup failure must propagate, not be caught");
+});
+
+// Why COMPANY_MERGE_BACKUP_TABLES exists at all. Written as "the default is still not enough" so that the day
+// someone widens BACKUP_TABLES to cover every keyed table, this fails and says the constant can go.
+test("the default BACKUP_TABLES does not cover every table a company merge writes", () => {
+  const uncovered = COMPANY_KEY_TABLES.filter((t) => !(BACKUP_TABLES as readonly string[]).includes(t));
+  assert.ok(
+    uncovered.length > 0,
+    "BACKUP_TABLES now covers every company_key table — COMPANY_MERGE_BACKUP_TABLES can go",
+  );
 });
 
 test("groupCandidates: groups by squash, biggest group first, suggests the record with most contacts and never mutates", () => {

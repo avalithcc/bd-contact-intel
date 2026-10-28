@@ -30,7 +30,15 @@
  * NOT REVERSIBLE. Once keys are repointed there is no per-row undo and none is provided. The one audit_log row
  * (action 'merge_companies') carries what a manual reconstruction needs: per table, the ids moved from each dead
  * key (`movedIds`), the dead company rows (minus notes), the dead target_company rows, the discarded values, the
- * aliases written. Take a backup (src/lib/migration/backup.ts#snapshotBackup) before --execute.
+ * aliases written. --execute takes that backup ITSELF — snapshotBackup with COMPANY_MERGE_BACKUP_TABLES, printed
+ * before anything is written — and the run dies if the dump fails, if its `pg_restore --list` verification fails,
+ * or if the dump turns out to carry no data for one of the keyed tables. The default BACKUP_TABLES is NOT used:
+ * it omits company_alias, company_probe and company_property_history, which this merge writes.
+ *
+ * Two limits of that dump. It is taken BEFORE the merge transaction takes its row locks, so it is the state
+ * before the run, not an exact pre-image of what the transaction saw. And it covers THIS script only: the
+ * absorption action in src/app/(app)/admin/absorptions/actions.ts calls the same executeMerge from a web
+ * request and takes no backup at all.
  *
  * PROPOSALS (migration 0040): a BD may propose "company X was absorbed by Y" (company_absorption_proposal). The dry run
  * REPORTS which open proposals the groups fulfil and which they contradict; --execute marks the fulfilled ones 'applied'
@@ -51,7 +59,10 @@
  */
 import { readFileSync } from "node:fs";
 import { dryRunMerge, executeMerge, readCandidateRecords } from "../src/lib/companyMerge/db";
+import { COMPANY_KEY_TABLES, COMPANY_MERGE_BACKUP_TABLES } from "../src/lib/companyMerge/keys";
 import { groupCandidates, parseGroupJson, parseGroupLines } from "../src/lib/companyMerge/plan";
+import { snapshotBackup } from "../src/lib/migration/backup";
+import { isUuid } from "../src/lib/uuid";
 
 function parseArgs(argv: readonly string[]) {
   const o = { execute: false, report: false, actor: null as string | null, match: null as string | null, lines: [] as string[], json: null as string | null };
@@ -69,6 +80,9 @@ function parseArgs(argv: readonly string[]) {
   }
   if (o.json && o.lines.length) throw new Error("--json cannot be combined with --group or --file: pick one input.");
   if (o.execute && !o.actor) throw new Error("--execute requires --actor=<bd id> for the audit log.");
+  // Checked here, not inside executeMerge: a bad uuid refuses the merge AFTER the backup has already
+  // dumped every company-keyed table to disk for nothing.
+  if (o.actor && !isUuid(o.actor)) throw new Error(`--actor is not a uuid: ${o.actor}`);
   return o;
 }
 
@@ -86,6 +100,13 @@ async function main() {
   }
   const groups = o.json ? parseGroupJson(readFileSync(o.json, "utf8")) : parseGroupLines(o.lines);
   if (o.execute) {
+    // Before the irreversible part, never after: snapshotBackup throws on a failed dump, a failed
+    // pg_restore --list or a dump missing one of `requiredTables`, and nothing below runs then. The
+    // required set is the keyed tables only, because company_absorption_proposal predates migration 0040.
+    const backup = await snapshotBackup("merge-companies", COMPANY_MERGE_BACKUP_TABLES, {
+      requiredTables: COMPANY_KEY_TABLES,
+    });
+    console.log(`backup: ${backup}\n`);
     const r = await executeMerge(groups, o.actor!);
     console.log(`Merged ${r.plans.length} group(s). Rows repointed per table:`, r.moved, `\nProposals marked applied: ${r.proposals.matched.length} | contradicted, not marked: ${r.proposals.divergent.length}\naudit_log id: ${r.auditLogId}`);
     return;

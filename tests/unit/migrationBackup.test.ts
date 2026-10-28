@@ -6,6 +6,7 @@
  * NOT unit-tested here — see the file's header comment.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   BACKUP_TABLES,
@@ -16,6 +17,7 @@ import {
   libpqEnvFromDatabaseUrl,
   pgRestorePathFor,
   resolvePgDumpCandidates,
+  tableDataNames,
 } from "@/lib/migration/backup";
 
 // The homebrew libpq keg tracks the newest client, while a `pg_dump` on
@@ -116,6 +118,79 @@ test("evaluateBackupVerification accepts a clean exit, non-trivial size, and non
     restoreListExitCode: 0,
     restoreListStdout: "1234; 0 0 TABLE public contact bd_user\n5678; 0 0 TABLE public lead bd_user\n",
     fileSizeBytes: 50_000,
+  });
+  assert.deepEqual(result, { ok: true });
+});
+
+// A real listing: pg_restore's `;` header block, then one TABLE DATA entry per dumped table (even an empty
+// one), plus DDL-only entries. CRLF on one line because `split("\n")` leaves the `\r` behind.
+const LISTING = [
+  ";",
+  "; Archive created at 2026-10-28 09:03:08 -03",
+  ";     dbname: postgres",
+  ";",
+  "4257; 0 17500 TABLE DATA public company postgres",
+  "4258; 0 18351 TABLE DATA public company_alias postgres\r",
+  "217; 1259 18351 TABLE public company_probe postgres",
+  "",
+].join("\n");
+
+test("tableDataNames reads the table from the TABLE DATA position, past header lines and CRLF", () => {
+  assert.deepEqual(tableDataNames(LISTING), ["company", "company_alias"]);
+});
+
+// The check exists because pg_dump SKIPS a `-t` that matches nothing while another matches: the dump then
+// misses a table and still exits 0, well over the size floor, with plenty of entries.
+test("evaluateBackupVerification rejects a dump that carries no data for a required table", () => {
+  const result = evaluateBackupVerification({
+    restoreListExitCode: 0,
+    restoreListStdout: LISTING,
+    fileSizeBytes: 5_000_000,
+    requiredTables: ["company", "company_alias", "company_probe"],
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason ?? "", /company_probe/);
+});
+
+// "company" is a prefix of "company_alias" and also appears on its own DDL line: a substring search over the
+// raw listing would pass this wrongly, while no row of `company` was dumped.
+test("evaluateBackupVerification does not accept a required table on a prefix or on its DDL line", () => {
+  const noDataForCompany = [
+    "4258; 0 18351 TABLE DATA public company_alias postgres",
+    "216; 1259 17500 TABLE public company postgres",
+    "",
+  ].join("\n");
+  const result = evaluateBackupVerification({
+    restoreListExitCode: 0,
+    restoreListStdout: noDataForCompany,
+    fileSizeBytes: 5_000_000,
+    requiredTables: ["company"],
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.reason ?? "", /company/);
+});
+
+/**
+ * snapshotBackup spawns pg_dump, so it cannot be run here (see the file header) — and the gap that leaves is
+ * real: deleting the one line that forwards `requiredTables` would silently disable the short-dump guard with
+ * every unit test still green. Checked at source level, like companyContactCountsWiring.test.ts.
+ */
+test("snapshotBackup forwards requiredTables to the verification it then enforces", () => {
+  const source = readFileSync("src/lib/migration/backup.ts", "utf8").replace(/\/\/.*$/gm, "");
+  const body = source.slice(source.indexOf("export async function snapshotBackup"));
+  assert.match(body, /requiredTables:\s*options\.requiredTables/, "snapshotBackup no longer forwards requiredTables");
+  const evaluateAt = body.indexOf("evaluateBackupVerification({");
+  const forwardAt = body.indexOf("requiredTables: options.requiredTables");
+  assert.ok(evaluateAt > 0 && forwardAt > evaluateAt, "requiredTables must be forwarded inside the verification call");
+  assert.match(body, /if \(!verification\.ok\)[\s\S]*?throw new Error/, "a failed verification must still throw");
+});
+
+test("evaluateBackupVerification accepts a dump that carries data for every required table", () => {
+  const result = evaluateBackupVerification({
+    restoreListExitCode: 0,
+    restoreListStdout: LISTING,
+    fileSizeBytes: 5_000_000,
+    requiredTables: ["company", "company_alias"],
   });
   assert.deepEqual(result, { ok: true });
 });

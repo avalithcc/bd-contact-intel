@@ -22,6 +22,22 @@ export const COMPANY_KEY_TABLES = [
   "task",
 ] as const;
 
+/**
+ * Tables the pre-merge dump of scripts/merge-companies.ts --execute must carry: every table the merge
+ * repoints, patches or deletes from, plus the one other table it writes — the proposals it marks
+ * 'applied'. The merge has no per-row undo, so this dump is the only way back.
+ *
+ * It is NOT the default BACKUP_TABLES of src/lib/migration/backup.ts: that set was written for the
+ * HubSpot import and omits company_alias, company_probe and company_property_history, which a company
+ * merge writes. Derived from COMPANY_KEY_TABLES so a new keyed table cannot fall out of the dump.
+ *
+ * `audit_log` is deliberately absent. The merge's own audit row is inserted AFTER the dump is taken, so
+ * no dump can contain it; including the table would only copy unrelated history, and it is large.
+ * `company_absorption_proposal` only exists from migration 0040, which is why the script requires the
+ * COMPANY_KEY_TABLES subset to be present in the dump and not this whole list.
+ */
+export const COMPANY_MERGE_BACKUP_TABLES = [...COMPANY_KEY_TABLES, "company_absorption_proposal"] as const;
+
 /** Key of the reference-count map: the producer (buildRefCounts) and every reader go through these two. */
 export const refKey = (table: string, companyKey: string): string => `${table}|${companyKey}`;
 

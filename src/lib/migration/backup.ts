@@ -132,11 +132,34 @@ export interface BackupVerification {
   reason?: string;
 }
 
-/** Pure decision: given pg_restore --list's result and the file size, is the backup good? */
+/**
+ * Table names `pg_restore --list` reports a TABLE DATA entry for. One entry per dumped table, even an empty
+ * one, in the form `4258; 0 18351 TABLE DATA public activity postgres`. Parsed by position, not by substring:
+ * looking for "company" in the raw output also matches the `company_alias` line.
+ */
+export function tableDataNames(restoreListStdout: string): string[] {
+  const names: string[] = [];
+  for (const line of restoreListStdout.split("\n")) {
+    const match = /^\s*\d+;\s+\d+\s+\d+\s+TABLE DATA\s+\S+\s+(\S+)/.exec(line);
+    if (match) names.push(match[1]!);
+  }
+  return names;
+}
+
+/**
+ * Pure decision: given pg_restore --list's result and the file size, is the backup good?
+ *
+ * `requiredTables` is opt-in and exists because the other three checks cannot see a SHORT dump: pg_dump
+ * skips a `-t` pattern that matches nothing as long as another pattern matches, so a renamed, misspelled or
+ * not-yet-migrated table leaves the dump missing that table while the exit code is 0, the file is far over
+ * the size floor and the entry count is non-zero. A caller about to do something irreversible passes the
+ * tables it must be able to restore.
+ */
 export function evaluateBackupVerification(input: {
   restoreListExitCode: number;
   restoreListStdout: string;
   fileSizeBytes: number;
+  requiredTables?: readonly string[];
 }): BackupVerification {
   if (input.restoreListExitCode !== 0) {
     return { ok: false, reason: `pg_restore --list exited with code ${input.restoreListExitCode}` };
@@ -150,6 +173,13 @@ export function evaluateBackupVerification(input: {
   const entryCount = input.restoreListStdout.split("\n").filter((line) => line.trim().length > 0).length;
   if (entryCount === 0) {
     return { ok: false, reason: "pg_restore --list reported no entries" };
+  }
+  if (input.requiredTables?.length) {
+    const present = new Set(tableDataNames(input.restoreListStdout));
+    const missing = input.requiredTables.filter((table) => !present.has(table));
+    if (missing.length > 0) {
+      return { ok: false, reason: `the dump carries no data for ${missing.join(", ")}` };
+    }
   }
   return { ok: true };
 }
@@ -193,7 +223,11 @@ async function runWithFallback(
  * not as a command-line argument, so it never appears in `args`/process
  * listings either.
  */
-export async function snapshotBackup(runId: string, tables: readonly string[] = BACKUP_TABLES): Promise<string> {
+export async function snapshotBackup(
+  runId: string,
+  tables: readonly string[] = BACKUP_TABLES,
+  options: { requiredTables?: readonly string[] } = {},
+): Promise<string> {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is not set — cannot back up before --execute.");
@@ -221,6 +255,7 @@ export async function snapshotBackup(runId: string, tables: readonly string[] = 
       restoreListExitCode: restoreResult.code,
       restoreListStdout: restoreResult.stdout,
       fileSizeBytes,
+      requiredTables: options.requiredTables,
     });
     if (!verification.ok) {
       throw new Error(`Backup verification failed for ${outputPath}: ${verification.reason}`);
