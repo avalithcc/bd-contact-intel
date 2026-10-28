@@ -128,6 +128,10 @@ export function contactActionErrorMessage(l: ContactRecordLabels, reason: Contac
       return l.errorCallOutcomeRequired;
     case "call_occurred_at_in_future":
       return l.errorCallOccurredAtInFuture;
+    case "whatsapp_outcome_required":
+      return l.errorWhatsappOutcomeRequired;
+    case "whatsapp_occurred_at_in_future":
+      return l.errorWhatsappOccurredAtInFuture;
     case "signal_text_required":
       return l.errorSignalTextRequired;
     case "email_subject_required":
@@ -271,6 +275,7 @@ const ACTIVITY_SOURCE_LABEL_KEY: Partial<Record<string, keyof Dictionary["contac
   email_sent: "statusReasonSourceEmail",
   meeting_logged: "statusReasonSourceMeeting",
   call: "statusReasonSourceCall",
+  whatsapp: "statusReasonSourceWhatsapp",
   status_change: "statusReasonSourceStatusChange",
   status_backfill: "statusReasonSourceStatusChange",
   discarded: "statusReasonSourceDiscard",

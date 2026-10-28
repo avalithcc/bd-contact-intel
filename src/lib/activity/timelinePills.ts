@@ -1,8 +1,9 @@
 /**
  * Timeline filter pills (mockup-port fix; contact-record.html:97-106's 8
  * pills). The product's filter grouping — NOT the raw `activity.type` DB
- * enum — is what the BD sees: `TIMELINE_ACTIVITY_TYPES` (queries.ts) has 8
- * values, 4 of which (`hunter_lookup`, `status_change`, `discarded`,
+ * enum — is what the BD sees: `TIMELINE_ACTIVITY_TYPES` (queries.ts) has grown
+ * to 25 values (it said 8 when this was written; do not trust the number,
+ * count it), 4 of which (`hunter_lookup`, `status_change`, `discarded`,
  * `status_backfill`) are internal/migration evidence, never a team member's
  * real-time action. Those 4 collapse behind ONE "Sistema" pill so the
  * migration artifact (`status_backfill` alone: 3,517 rows in prod) never
@@ -50,8 +51,9 @@ export type TimelinePillKey = (typeof TIMELINE_PILL_KEYS)[number];
  */
 export const TIMELINE_PILL_GROUPS: Record<TimelinePillKey, readonly string[]> = {
   note: ["note"],
-  // An attempt is shown with calls, but dashed and without a conversation.
-  call: ["call", "call_attempt"],
+  // An attempt is shown with calls, but dashed and without a conversation. WhatsApp is grouped here too
+  // (whatsapp-como-actividad): both are hand-logged phone-number channels and a new pill was not part of the approved design.
+  call: ["call", "call_attempt", "whatsapp", "whatsapp_no_channel"],
   // `reply_received` (email-sync brief) is a synced Gmail reply — grouped
   // here with `email_sent` (not its own pill key) since both are "Correos"
   // to a BD reading the timeline.

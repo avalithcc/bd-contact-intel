@@ -14,6 +14,7 @@ import {
   discardContactAction,
   logCallAction,
   logContactMeetingAction,
+  logWhatsAppAction,
   sendContactEmailAction,
 } from "../actions";
 import { scheduleContactEmailAction } from "../scheduleActions";
@@ -23,6 +24,7 @@ import type { ContactSendContext } from "@/lib/sendSchedule/labels";
 import type { Slot } from "@/lib/sendSchedule/time";
 import { MANUAL_CALL_DIRECTION } from "@/lib/contacts/call";
 import { CallForm } from "@/components/CallForm";
+import { WhatsAppForm } from "@/components/WhatsAppForm";
 import { buildTaskAssigneeOptions } from "@/lib/tasks/assignee";
 import { generatePersonOutreachMessageAction } from "../messageActions";
 import { GenerateMessageDialog } from "./GenerateMessageDialog";
@@ -36,6 +38,7 @@ import { RecipientBlock, type ComposePrimary } from "@/components/email/ComposeF
 import { useComposeDraft, type ComposeDraft } from "@/components/email/useComposeDraft";
 import {
   CallIcon,
+  WhatsAppIcon,
   ClipboardIcon,
   ClockIcon,
   DiscardIcon,
@@ -66,7 +69,7 @@ export interface QuickActionsProps {
   // Board drag/keyboard-menu handoff (task 10.5, 14.1), plus the follow-up
   // queue's deep-link quick actions: pre-opens this composer on mount, e.g.
   // arriving from `/contacts/[id]?openAction=meeting`.
-  initialAction?: "email" | "meeting" | "discard" | "call" | "task" | null;
+  initialAction?: "email" | "meeting" | "discard" | "call" | "whatsapp" | "task" | null;
   // "Tarea" quick action's assignee `<select>` (task-essentials backlog item
   // 2) — the same `bd` list `PropertyList`'s owner `<select>` already uses.
   assigneeOptions: TaskAssigneeOption[];
@@ -86,7 +89,7 @@ export interface QuickActionsProps {
   send: ContactSendContext;
 }
 
-type QuickAction = "call" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
+type QuickAction = "call" | "whatsapp" | "email" | "task" | "meeting" | "discard" | "signal" | "generate" | null;
 
 export interface ActionError {
   message: string;
@@ -245,6 +248,12 @@ export function QuickActions({
           </span>
           {l.quickActionCall}
         </button>
+        <button type="button" className="qa" onClick={() => toggle("whatsapp")}>
+          <span className="qa-icon">
+            <WhatsAppIcon className="icon" />
+          </span>
+          {l.quickActionWhatsapp}
+        </button>
         <button type="button" className="qa" onClick={() => toggle("email")}>
           <span className="qa-icon">
             <MailIcon className="icon" />
@@ -325,6 +334,32 @@ export function QuickActions({
             if (result.ok) {
               closeQuickAction();
               showToast(l.toastCallLogged);
+              router.refresh();
+            } else {
+              const message = contactActionErrorMessage(l, result.reason);
+              setError({ message });
+              showToast(message, "error");
+            }
+          }}
+        />
+      )}
+
+      {openAction === "whatsapp" && (
+        <WhatsAppForm
+          labels={l}
+          busy={busy}
+          error={error && <ErrorNotice labels={l} error={error} />}
+          onCancel={closeQuickAction}
+          onSubmit={async ({ outcome, date, time, notes }) => {
+            setBusy(true);
+            setError(null);
+            const result = await settleAction(() => logWhatsAppAction(personId, outcome, date, time, notes));
+            setBusy(false);
+            // The write may have landed: show the timeline as it is now, so "revisar" points at the truth.
+            if (!result.ok && result.reason === "unconfirmed") router.refresh();
+            if (result.ok) {
+              closeQuickAction();
+              showToast(l.toastWhatsappLogged);
               router.refresh();
             } else {
               const message = contactActionErrorMessage(l, result.reason);

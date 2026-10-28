@@ -17,6 +17,7 @@ const serverStrings: Dictionary["contactRecordServer"] = {
   statusReasonSourceEmail: "se envió un correo",
   statusReasonSourceMeeting: "se registró una reunión",
   statusReasonSourceCall: "se registró una llamada",
+  statusReasonSourceWhatsapp: "se registró un WhatsApp",
   statusReasonSourceStatusChange: "se registró un cambio de estado",
   statusReasonSourceDiscard: "se descartó el contacto",
   statusReasonSourceNote: "se agregó una nota",
@@ -127,4 +128,16 @@ test("connection-sourced reason with a missing bdName falls back to the empty-va
     result,
     "Respondió porque se recibió una respuesta de LinkedIn en la conversación de — el 12 oct. Registrar una reunión para pasar a Reunión.",
   );
+});
+
+test("activity-sourced 'contacted' from a whatsapp row says a WhatsApp was logged, not a status change", () => {
+  const evidence: StatusReasonEvidence = {
+    status: "contacted",
+    because: { source: "activity", activityId: "w1" },
+    at: new Date("2026-10-12T18:04:00Z"),
+    bdName: null,
+    activityType: "whatsapp",
+  };
+  const result = describeStatusReason(serverStrings, leadStatuses, emptyValue, nextStepHint, evidence, "12 oct");
+  assert.equal(result, "Contactado porque se registró un WhatsApp el 12 oct.");
 });

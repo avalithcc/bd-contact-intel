@@ -21,6 +21,7 @@ import { logUnsafeReplyHeader, planThreadReply } from "@/lib/gmail/replyThread";
 import { getThreadReplySource } from "@/lib/gmail/threadMessages";
 import { registerContactMeeting } from "@/lib/meetings/db";
 import { planCall } from "@/lib/contacts/call";
+import { planWhatsApp, whatsappActivityType } from "@/lib/contacts/whatsapp";
 import { recordCallAttempt, resolveCallAttempt, settleCallAttempt } from "@/lib/contacts/callAttemptDb";
 import type { DialledField } from "@/lib/contacts/callAttempt";
 import { planDiscard } from "@/lib/contacts/discard";
@@ -305,6 +306,26 @@ export async function logCallAction(
     const metadata = planCall(outcome, direction, date, time, notes);
     // createActivityAction owns the revalidation (contact, touch lists and company page).
     await createActivityAction({ type: "call", personId, metadata: { ...metadata } });
+    return { ok: true };
+  } catch (err) {
+    return actionFailure(err);
+  }
+}
+
+/** "WhatsApp" quick action (whatsapp-como-actividad) — writes a `whatsapp` activity (`whatsapp_no_channel` for "No tiene WhatsApp"); status recomputes from the outcome in
+ * the same transaction (deriveStatus.ts#whatsappStage, via createActivity). Logs by hand: nothing reads WhatsApp. */
+export async function logWhatsAppAction(
+  personId: string,
+  outcome: string,
+  date: string,
+  time: string,
+  notes: string,
+): Promise<ContactActionResult> {
+  try {
+    await assertContactEditableById(personId);
+    const metadata = planWhatsApp(outcome, date, time, notes);
+    // createActivityAction owns the revalidation (contact, touch lists and company page).
+    await createActivityAction({ type: whatsappActivityType(metadata.outcome), personId, metadata: { ...metadata } });
     return { ok: true };
   } catch (err) {
     return actionFailure(err);

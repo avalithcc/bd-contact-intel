@@ -54,6 +54,7 @@ import {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
   CallIcon,
+  WhatsAppIcon,
   ChevronDownIcon,
   CloseIcon,
   DiscardIcon,
@@ -239,6 +240,8 @@ const FILTER_LABEL_KEY: Record<TimelineActivityType, keyof ContactRecordLabels> 
   meeting_rescheduled: "timelineFilterMeeting",
   call: "timelineFilterCall",
   call_attempt: "timelineFilterCallAttempt",
+  whatsapp: "timelineFilterWhatsapp",
+  whatsapp_no_channel: "timelineFilterWhatsapp",
   lusha_reveal: "timelineFilterLushaReveal",
   discarded: "timelineFilterDiscarded",
   status_backfill: "timelineFilterStatusBackfill",
@@ -271,6 +274,8 @@ const TYPE_ICON: Record<TimelineActivityType, (props: { className?: string }) =>
   call: CallIcon,
   // Rendered by the dashed attempt row below, which draws its own icon.
   call_attempt: CallIcon,
+  whatsapp: WhatsAppIcon,
+  whatsapp_no_channel: WhatsAppIcon,
   // A paid enrichment lookup: same icon as the Hunter email lookup it most resembles.
   lusha_reveal: SearchIcon,
   discarded: DiscardIcon,
@@ -294,6 +299,7 @@ const TYPE_ICON_CLASS: Partial<Record<TimelineActivityType, string>> = {
   status_change: "system",
   meeting_logged: "meeting",
   call: "call",
+  whatsapp: "call",
   discarded: "discard",
   status_backfill: "system",
   task_created: "system",
@@ -1445,6 +1451,22 @@ export function Timeline({
                               · {l.timelineAttemptToPrefix} <span className="mono">{meta.number}</span>
                             </>
                           )}
+                        </span>
+                        <span className="when">{formatWhen(at)}</span>
+                      </div>
+                    </div>
+                  );
+                }
+                // "No tiene WhatsApp" leaves the conversation line: dashed and grey like an attempt, because it moves nothing
+                // (whatsapp-como-actividad mockup, section 3). It is its own activity type (whatsapp_no_channel); the other two outcomes are regular `whatsapp` cards.
+                if (timelineEntry.type === "whatsapp_no_channel" && timelineEntry.visible) {
+                  return (
+                    <div key={timelineEntry.id} className="tl-item tl-item-attempt">
+                      <div aria-hidden="true" />
+                      <div className="try">
+                        <CloseIcon className="icon" />
+                        <span>
+                          <strong>{l.timelineFilterWhatsapp}</strong> · {entryBody(timelineEntry, l)}
                         </span>
                         <span className="when">{formatWhen(at)}</span>
                       </div>

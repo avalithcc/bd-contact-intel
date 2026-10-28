@@ -7,12 +7,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MANUAL_CALL_DIRECTION, planCall } from "@/lib/contacts/call";
+import { planWhatsApp, WHATSAPP_OUTCOME_CODES } from "@/lib/contacts/whatsapp";
 import {
   activityRowToStatusEvent,
   activityStageCandidate,
   buildPersonStatusUpdates,
   connectionRowToStatusEvent,
   deriveStatus,
+  whatsappStage,
   type StatusEvent,
 } from "@/lib/status/deriveStatus";
 
@@ -426,4 +428,46 @@ test("a confirmed call (type call, connected) still moves the contact to replied
   });
   assert.equal(deriveStatus([event]).status, "replied");
   assert.equal(event.at.toISOString(), "2026-10-05T10:42:00.000Z");
+});
+
+// --- whatsapp activity (whatsapp-como-actividad) ----------------------------
+
+test("whatsappStage maps sent to contacted, replied to replied, and no_whatsapp to no stage at all", () => {
+  assert.equal(whatsappStage("sent"), "contacted");
+  assert.equal(whatsappStage("replied"), "replied");
+  assert.equal(whatsappStage("no_whatsapp"), null);
+});
+
+test("whatsappStage returns no stage when the outcome is missing or unrecognized", () => {
+  assert.equal(whatsappStage(undefined), null);
+  assert.equal(whatsappStage("connected"), null);
+});
+
+test("a whatsapp row built from stored metadata derives the stage of its outcome through activityRowToStatusEvent", () => {
+  const expected = { sent: "contacted", replied: "replied", no_whatsapp: "new" } as const;
+  for (const outcome of WHATSAPP_OUTCOME_CODES) {
+    const event = activityRowToStatusEvent({
+      id: "w1",
+      type: "whatsapp",
+      createdAt: new Date("2026-10-28T18:00:00.000Z"),
+      metadata: { ...planWhatsApp(outcome, "2026-10-01", "14:30", "") },
+    });
+    assert.equal(deriveStatus([event]).status, expected[outcome], outcome);
+  }
+});
+
+test("a no_whatsapp row does not outrank an earlier sent row: the contact stays contacted", () => {
+  const sent = activityEvent({ id: "w1", type: "whatsapp", at: new Date("2026-10-01"), whatsappOutcome: "sent" });
+  const none = activityEvent({ id: "w2", type: "whatsapp", at: new Date("2026-10-02"), whatsappOutcome: "no_whatsapp" });
+  assert.equal(deriveStatus([sent, none]).status, "contacted");
+});
+
+test("activityRowToStatusEvent uses a whatsapp row's metadata.occurredAt, not createdAt, as the event time", () => {
+  const event = activityRowToStatusEvent({
+    id: "w1",
+    type: "whatsapp",
+    createdAt: new Date("2026-10-28T18:00:00.000Z"),
+    metadata: { outcome: "sent", occurredAt: "2026-10-20T12:00:00.000Z" },
+  });
+  assert.equal(event.at.toISOString(), "2026-10-20T12:00:00.000Z");
 });

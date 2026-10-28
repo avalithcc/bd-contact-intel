@@ -68,6 +68,8 @@ export interface ActivityStatusEvent {
   // direction is a reply).
   callOutcome?: string;
   callDirection?: string;
+  // `whatsapp` rows only — read from metadata.outcome by activityRowToStatusEvent and used by activityStageCandidate's dedicated `whatsapp` case.
+  whatsappOutcome?: string;
 }
 
 /**
@@ -124,6 +126,8 @@ export interface DiscardCandidate {
  */
 export const STATUS_NEUTRAL_ACTIVITY_TYPES = [
   "call_attempt",
+  // "No tiene WhatsApp" (whatsapp-como-actividad): nobody was reached, so it is the call_attempt of the chat channel.
+  "whatsapp_no_channel",
   "lusha_reveal",
   "auto_reply_received",
   "email_bounced",
@@ -153,6 +157,24 @@ export function activityStageCandidate(event: ActivityStatusEvent): StageCandida
     if (!stage) return null;
     return { rank: STAGE_RANK[stage], at: event.at, because: { source: "activity", activityId: event.id } };
   }
+  if (event.type === "whatsapp") {
+    const stage = whatsappStage(event.whatsappOutcome);
+    if (!stage) return null;
+    return { rank: STAGE_RANK[stage], at: event.at, because: { source: "activity", activityId: event.id } };
+  }
+  return null;
+}
+
+/**
+ * Same rule as `callStage`, applied to the channel that was missing (whatsapp-como-actividad):
+ * `sent` (the BD wrote) is contact evidence → `contacted`; `replied` (the contact answered) →
+ * `replied`. `no_whatsapp` — the number has no WhatsApp — contributes no stage, like a
+ * `call_attempt`: it stays on the timeline and moves nothing. There is no direction to read: the
+ * outcome itself says who wrote. Exported so the rule is pinned by its own test.
+ */
+export function whatsappStage(outcome: string | undefined): StatusStage | null {
+  if (outcome === "replied") return "replied";
+  if (outcome === "sent") return "contacted";
   return null;
 }
 
@@ -254,7 +276,7 @@ export interface ActivityRowForStatus {
  * twin `effectiveActivityAtSql()` (src/lib/contacts/effectiveActivityTime.ts)
  * so the two can never drift on which types get this treatment.
  */
-export const OCCURRED_AT_ACTIVITY_TYPES = ["call", "email_sent", "reply_received", "auto_reply_received", "email_bounced"] as const;
+export const OCCURRED_AT_ACTIVITY_TYPES = ["call", "whatsapp", "whatsapp_no_channel", "email_sent", "reply_received", "auto_reply_received", "email_bounced"] as const;
 
 /**
  * Builds one activity row's status event (task 5.2) — the type/metadata
@@ -284,6 +306,9 @@ export function activityRowToStatusEvent(row: ActivityRowForStatus): ActivitySta
   if (row.type === "call") {
     event.callOutcome = readMetadataString(row.metadata, "outcome");
     event.callDirection = readMetadataString(row.metadata, "direction");
+  }
+  if (row.type === "whatsapp") {
+    event.whatsappOutcome = readMetadataString(row.metadata, "outcome");
   }
   return event;
 }

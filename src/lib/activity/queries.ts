@@ -43,6 +43,8 @@ export const TIMELINE_ACTIVITY_TYPES = [
   "meeting_rescheduled",
   "call",
   "call_attempt",
+  "whatsapp",
+  "whatsapp_no_channel",
   "lusha_reveal",
   "discarded",
   "status_backfill",

@@ -45,6 +45,10 @@ export const ACTIVITY_STAGE_ROWS: readonly ActivityStageRow[] = [
   { activity: "Llamada conectada, entrante o saliente", stage: "replied" },
   { activity: "Llamada saliente que no conectó", stage: "contacted" },
   { activity: "Llamada entrante que no conectó", resultText: "No cambia el estado" },
+  // `whatsappStage` (deriveStatus.ts): sent -> contacted, replied -> replied. "No tiene WhatsApp" is its own type and no stage.
+  { activity: "WhatsApp que le escribiste", stage: "contacted" },
+  { activity: "WhatsApp que te contestó", stage: "replied" },
+  { activity: "WhatsApp a un número que no tiene WhatsApp", resultText: "No cambia el estado" },
   { activity: "Conexión de LinkedIn con mensajes que enviaste", stage: "contacted" },
   { activity: "Conexión de LinkedIn con mensajes que recibiste", stage: "replied" },
 ];

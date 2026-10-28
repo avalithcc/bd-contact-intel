@@ -32,6 +32,8 @@ import { FOLLOW_UP_ACTIVITY_TYPES } from "@/lib/followUp/activityTypes";
  */
 export const NO_PROGRESS_ACTIVITY_TYPES = [
   "call_attempt",
+  // "No tiene WhatsApp" reached no one: it must not transfer the contact, close a cycle or reset the clock (whatsapp-como-actividad).
+  "whatsapp_no_channel",
   "lusha_reveal",
   "auto_reply_received",
   "email_bounced",

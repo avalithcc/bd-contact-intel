@@ -114,6 +114,26 @@ const CALL_OUTCOME_LABEL_KEY: Record<string, keyof ContactRecordLabels> = {
  * (Timeline.tsx), since the direction/outcome pair IS the headline fact for
  * a call, same reasoning as the LinkedIn entries' own dedicated headline.
  */
+const WHATSAPP_OUTCOME_LABEL_KEY: Record<string, keyof ContactRecordLabels> = {
+  sent: "timelineWhatsappSent",
+  replied: "timelineWhatsappReplied",
+  no_whatsapp: "timelineWhatsappNoWhatsapp",
+};
+
+/**
+ * The outcome (and the notes, when present) of a WhatsApp entry. The channel name is NOT repeated here: the card head
+ * already reads "WhatsApp · <actor>" (and the dashed no-channel row prints it itself), so the mockup's single line
+ * "WhatsApp · me contestó" is head plus body. An unrecognized outcome code is dropped, not printed.
+ */
+function whatsappBody(metadata: Record<string, unknown>, l: ContactRecordLabels): string {
+  const outcome = typeof metadata.outcome === "string" ? metadata.outcome : null;
+  const outcomeKey = outcome ? WHATSAPP_OUTCOME_LABEL_KEY[outcome] : undefined;
+  const label = outcomeKey ? (l[outcomeKey] as string) : null;
+  const headline = label ? label.charAt(0).toUpperCase() + label.slice(1) : null;
+  const notes = typeof metadata.notes === "string" && metadata.notes ? metadata.notes : null;
+  return [headline, notes].filter(Boolean).join(" · ");
+}
+
 export function callWhatLabel(metadata: Record<string, unknown>, l: ContactRecordLabels): string {
   const direction = metadata.direction === "inbound" ? l.timelineCallInboundPrefix : l.timelineCallOutboundPrefix;
   const outcome = typeof metadata.outcome === "string" ? metadata.outcome : null;
@@ -195,6 +215,9 @@ export function entryBody(entry: TimelineEntryForBody, l: ContactRecordLabels): 
       const toText = typeof metadata.number === "string" && metadata.number ? `${l.timelineAttemptToPrefix} ${metadata.number}` : null;
       return [durationText, notes, toText].filter(Boolean).join(" ") || l.timelineCallDefault;
     }
+    case "whatsapp":
+    case "whatsapp_no_channel":
+      return whatsappBody(metadata, l);
     case "discarded":
       return discardBody(metadata, l);
     case "task_created":

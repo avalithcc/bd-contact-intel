@@ -41,6 +41,7 @@
 import { sql } from "drizzle-orm";
 import { activity, bd, company, followUpQueueItem, meeting, person, sequence, sequenceMember, task } from "@/db/schema";
 import { effectiveActivityAtSql, happenedAtDisplaySql, happenedAtSql, safeTimestamptzText } from "@/lib/contacts/effectiveActivityTime";
+import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 import { notCurrentClientPersonSql } from "@/lib/reports/currentClient";
 import { WON_TRACKING_STARTS_AT_ISO } from "@/lib/reports/wonTracking";
 import { COHORT_STATUSES, cohortHasReplyColumns, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
@@ -89,7 +90,7 @@ function wonAtSql() {
  * by notFoldedAttemptSql(). That fold is a display rule and must not be applied here: a dial that became a conversation
  * is still a dial, and dropping it would break the dials-to-calls ratio the column exists to show.
  */
-const ACTIVITY_BY_BD_TYPES = ["note", "call_attempt", "call", "meeting_logged", "email_sent", "reply_received"] as const;
+const ACTIVITY_BY_BD_TYPES = ["note", "call_attempt", "call", "whatsapp", "whatsapp_no_channel", "meeting_logged", "email_sent", "reply_received"] as const;
 
 /**
  * Midnight UTC of a queue day, as a `timestamptz`. `queue_date` is a `date`,
@@ -104,7 +105,6 @@ export const WORKED_AT_SQL_TEXT = `(case
             when activity.type = 'call' then activity.created_at
             when activity.type in ('email_sent', 'reply_received') then coalesce(${safeTimestamptzText("(activity.metadata->>'occurredAt')")}, activity.created_at)
             else activity.created_at end)`;
-const WORKED_ACTIVITY_TYPE_LIST = ["note", "call", "meeting_logged", "email_sent", "discarded"] as const;
 
 export interface ReportAggregatesParams {
   fromIso: string;
@@ -240,7 +240,7 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
     sql`, `,
   );
   const workedTypes = sql.join(
-    WORKED_ACTIVITY_TYPE_LIST.map((t) => sql`${t}`),
+    [...WORKED_ACTIVITY_TYPES].map((t) => sql`${t}`),
     sql`, `,
   );
   return sql`
@@ -253,6 +253,9 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
         -- No fold filter and no result filter on purpose (see ACTIVITY_BY_BD_TYPES).
         count(*) filter (where activity.type = 'call_attempt')::int as pbc_call_attempts,
         count(*) filter (where activity.type = 'call')::int as pbc_calls,
+        -- "No tiene WhatsApp" is counted apart from the chats, as a dial is apart from a call: it is an attempt, not a conversation.
+        count(*) filter (where activity.type = 'whatsapp')::int as pbc_whatsapps,
+        count(*) filter (where activity.type = 'whatsapp_no_channel')::int as pbc_whatsapp_no_channel,
         count(*) filter (where activity.type = 'meeting_logged')::int as pbc_meetings,
         count(*) filter (where activity.type = 'email_sent')::int as pbc_emails_sent,
         count(*) filter (where activity.type = 'reply_received')::int as pbc_replies_received
@@ -317,6 +320,8 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
       coalesce(rpt_activity_pivot.pbc_notes, 0) as notes,
       coalesce(rpt_activity_pivot.pbc_call_attempts, 0) as call_attempts,
       coalesce(rpt_activity_pivot.pbc_calls, 0) as calls,
+      coalesce(rpt_activity_pivot.pbc_whatsapps, 0) as whatsapps,
+      coalesce(rpt_activity_pivot.pbc_whatsapp_no_channel, 0) as whatsapp_no_channel,
       coalesce(rpt_activity_pivot.pbc_meetings, 0) as meetings,
       coalesce(rpt_activity_pivot.pbc_emails_sent, 0) as emails_sent,
       coalesce(rpt_activity_pivot.pbc_replies_received, 0) as replies_received,
@@ -363,6 +368,8 @@ export interface ReportPerBdRow {
   /** Every `call_attempt` (dial) in the period, including attempts later settled into a `call`. */
   callAttempts: number;
   calls: number;
+  whatsapps: number;
+  whatsappNoChannel: number;
   meetings: number;
   emailsSent: number;
   repliesReceived: number;

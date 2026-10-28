@@ -239,3 +239,32 @@ test("a task_created entry reads '<actor> created task «X»' on the record's ti
   );
   assert.equal(body, "Mariel created task «Call back»");
 });
+function whatsappLabels(): ContactRecordLabels {
+  return {
+    ...labels(),
+    timelineFilterWhatsapp: "WhatsApp",
+    timelineWhatsappSent: "le escribí",
+    timelineWhatsappReplied: "me contestó",
+    timelineWhatsappNoWhatsapp: "no tiene WhatsApp",
+  } as unknown as ContactRecordLabels;
+}
+
+test("a whatsapp entry body is the capitalized outcome label for sent and replied, without repeating the channel name", () => {
+  const l = whatsappLabels();
+  assert.equal(entryBody(entry({ type: "whatsapp", metadata: { outcome: "replied" } }), l), "Me contestó");
+  assert.equal(entryBody(entry({ type: "whatsapp", metadata: { outcome: "sent" } }), l), "Le escribí");
+});
+
+test("a whatsapp_no_channel entry body is 'No tiene WhatsApp', the channel prefix being drawn by the dashed row", () => {
+  assert.equal(entryBody(entry({ type: "whatsapp_no_channel", metadata: { outcome: "no_whatsapp" } }), whatsappLabels()), "No tiene WhatsApp");
+});
+
+test("a whatsapp entry body appends its notes last, and drops an unrecognized outcome code instead of printing it", () => {
+  const l = whatsappLabels();
+  assert.equal(entryBody(entry({ type: "whatsapp", metadata: { outcome: "sent", notes: "mando propuesta" } }), l), "Le escribí · mando propuesta");
+  assert.equal(entryBody(entry({ type: "whatsapp", metadata: { outcome: "levitated" } }), l), "");
+});
+
+test("a whatsapp entry the viewer may not see shows the locked copy", () => {
+  assert.equal(entryBody(entry({ type: "whatsapp", visible: false, metadata: null }), whatsappLabels()), "locked");
+});

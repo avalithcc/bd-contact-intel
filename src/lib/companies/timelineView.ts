@@ -32,6 +32,8 @@ export interface CompanyTimelineViewLabels {
   atMeetingRescheduled: string;
   atCall: string;
   atCallAttempt: string;
+  atWhatsapp: string;
+  atWhatsappNoChannel: string;
   atLushaReveal: string;
   atDiscarded: string;
   atHunterLookup: string;
@@ -107,6 +109,10 @@ function typeLabel(l: CompanyTimelineViewLabels, type: string): string {
       return l.atCall;
     case "call_attempt":
       return l.atCallAttempt;
+    case "whatsapp":
+      return l.atWhatsapp;
+    case "whatsapp_no_channel":
+      return l.atWhatsappNoChannel;
     case "discarded":
       return l.atDiscarded;
     case "hunter_lookup":

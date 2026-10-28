@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { safeWhatsappHref, toTelHref } from "@/lib/phone";
 import { WhatsAppIcon } from "@/components/icons";
+import { WhatsAppLink } from "@/components/WhatsAppBarProvider";
 import { PhoneCallLink, type DoNotCallWarning } from "@/components/PhoneCallLink";
 
 export interface PhoneValueLabels {
@@ -24,7 +25,7 @@ export interface PhoneValueLabels {
  * WhatsApp.
  *
  * With `call`, clicking the `tel:` link also records a call attempt and asks
- * the outcome (CallAttemptProvider). The WhatsApp shortcut is unchanged.
+ * the outcome (CallAttemptProvider). The WhatsApp shortcut also opens the outcome bar (WhatsAppBarProvider), but writes nothing on click.
  *
  * `whatsappUrl` is computed on the server (the parsing library must not
  * reach the browser bundle) and is re-checked here: it only becomes an
@@ -62,16 +63,16 @@ export function PhoneValue({
       <PhoneCallLink href={telHref} value={value} personId={call?.personId} personName={call?.personName} warn={doNotCall} />
       {afterNumber}
       {waHref && (
-        <a
+        <WhatsAppLink
           className="wa-btn"
           href={waHref}
-          target="_blank"
-          rel="noopener noreferrer"
           title={labels.whatsappTitle}
-          aria-label={`${labels.whatsappLabelPrefix} ${value}`}
+          ariaLabel={`${labels.whatsappLabelPrefix} ${value}`}
+          personId={call?.personId}
+          personName={call?.personName}
         >
           <WhatsAppIcon className="icon" />
-        </a>
+        </WhatsAppLink>
       )}
     </>
   );

@@ -139,7 +139,7 @@ test("fuq_activity excludes exactly the shared no-progress types from the last-t
   assert.ok(match, "the clock filters by type");
   const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
   assert.deepEqual(bound, [...NO_PROGRESS_ACTIVITY_TYPES]);
-  assert.deepEqual(bound, ["call_attempt", "lusha_reveal", "auto_reply_received", "email_bounced", ...FOLLOW_UP_ACTIVITY_TYPES]);
+  assert.deepEqual(bound, ["call_attempt", "whatsapp_no_channel", "lusha_reveal", "auto_reply_received", "email_bounced", ...FOLLOW_UP_ACTIVITY_TYPES]);
 });
 
 // follow-up-expiry: one entry threshold for both statuses, from the exported constant (owner decision 2026-10-27).
@@ -193,7 +193,7 @@ test("only the owner's worked set closes a cycle: the bound types are WORKED_ACT
   assert.ok(match);
   const bound = match![1]!.split(",").map((p) => params[Number(p.trim().slice(1)) - 1]);
   assert.deepEqual(bound, [...CYCLE_CLOSING_ACTIVITY_TYPES]);
-  assert.deepEqual([...CYCLE_CLOSING_ACTIVITY_TYPES].sort(), ["call", "discarded", "email_sent", "meeting_logged", "note", "reply_received"]);
+  assert.deepEqual([...CYCLE_CLOSING_ACTIVITY_TYPES].sort(), ["call", "discarded", "email_sent", "meeting_logged", "note", "reply_received", "whatsapp"]);
   for (const system of ["hunter_lookup", "status_change", "status_backfill", "lusha_reveal", "call_attempt"]) assert.ok(!bound.includes(system), system);
 });
 

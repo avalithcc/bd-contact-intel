@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { resolveWorkedTodayAt, workedTodayAtSql } from "@/lib/followUp/queueSelection";
+import { resolveWorkedTodayAt, WORKED_ACTIVITY_TYPES, workedTodayAtSql } from "@/lib/followUp/queueSelection";
 
 const dialect = new PgDialect();
 
@@ -75,4 +75,19 @@ test("workedTodayAtSql(): a dedicated 'call' branch always resolves to created_a
 test("workedTodayAtSql(): the occurredAt branch's IN-list is exactly email_sent and reply_received, never 'call'", () => {
   const { params } = dialect.sqlToQuery(workedTodayAtSql());
   assert.deepEqual(params, ["email_sent", "reply_received"]);
+});
+
+test("whatsapp is a member of WORKED_ACTIVITY_TYPES", () => {
+  assert.equal(WORKED_ACTIVITY_TYPES.has("whatsapp"), true);
+});
+
+test("resolveWorkedTodayAt: a whatsapp logged today about yesterday's chat counts at its createdAt, like a call", () => {
+  const createdAt = new Date("2026-10-28T15:00:00.000Z");
+  const at = resolveWorkedTodayAt({
+    id: "w1",
+    type: "whatsapp",
+    createdAt,
+    metadata: { outcome: "sent", occurredAt: "2026-10-27T12:00:00.000Z" },
+  });
+  assert.equal(at.getTime(), createdAt.getTime());
 });

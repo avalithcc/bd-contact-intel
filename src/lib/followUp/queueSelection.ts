@@ -28,14 +28,17 @@ import { activityRowToStatusEvent, type ActivityRowForStatus } from "@/lib/statu
 
 export const FOLLOW_UP_DAILY_CAP = 10;
 
-/** The five existing quick-action activity types that count as "worked"
+/** The existing quick-action activity types that count as "worked"
  * (mockup README decision 3: "note, call, meeting, sent email, or
- * discard"), matching the exact `activity.type` values those dialogs write
+ * discard", plus WhatsApp from whatsapp-como-actividad), matching the exact `activity.type` values those dialogs write
  * (src/lib/contacts/timelineEntryBody.ts's own switch pins the same set).
  * Opening the record or creating a Tarea does NOT count. */
 export const WORKED_ACTIVITY_TYPES: ReadonlySet<string> = new Set([
   "note",
   "call",
+  // Counts for EVERY outcome, `no_whatsapp` included, exactly as `call` counts even for `wrong_number`: the BD did
+  // the work of trying. Only the STATUS rule (whatsappStage) tells the outcomes apart.
+  "whatsapp",
   "meeting_logged",
   "email_sent",
   "discarded",
@@ -58,10 +61,12 @@ export const WORKED_ACTIVITY_TYPES: ReadonlySet<string> = new Set([
  * that substitution for free (it already redirects `email_sent`/
  * `reply_received`/`call` to `occurredAt` when present), so `call` is
  * explicitly carved back out here to preserve its existing "logged-at
- * counts" semantics.
+ * counts" semantics. `whatsapp` is carved out the same way in JS (it is in OCCURRED_AT_ACTIVITY_TYPES): it is a hand-logged
+ * channel, so logging it today counts even when the chat happened yesterday. The SQL twin needs no branch for it: `whatsapp` is
+ * not in the occurredAt IN-list, so it already falls to `created_at`.
  */
 export function resolveWorkedTodayAt(row: ActivityRowForStatus): Date {
-  if (row.type === "call") return row.createdAt;
+  if (row.type === "call" || row.type === "whatsapp") return row.createdAt;
   return activityRowToStatusEvent(row).at;
 }
 

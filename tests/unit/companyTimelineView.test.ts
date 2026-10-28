@@ -33,6 +33,8 @@ const labels = {
   atMeetingRescheduled: "Reunión reprogramada",
   atCall: "Llamada",
   atCallAttempt: "Intento de llamada",
+  atWhatsapp: "WhatsApp",
+  atWhatsappNoChannel: "WhatsApp sin canal",
   atLushaReveal: "Revelado con Lusha",
   atDiscarded: "Descartado",
   atHunterLookup: "Búsqueda",

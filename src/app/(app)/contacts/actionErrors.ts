@@ -27,6 +27,7 @@ import { GmailSendError } from "@/lib/gmail/errors";
 import { DiscardNoteRequiredError, DiscardReasonRequiredError } from "@/lib/contacts/discard";
 import { MeetingDateRequiredError, MeetingOccurredAtInFutureError } from "@/lib/contacts/meeting";
 import { CallOccurredAtInFutureError, CallOutcomeRequiredError } from "@/lib/contacts/call";
+import { WhatsAppOccurredAtInFutureError, WhatsAppOutcomeRequiredError } from "@/lib/contacts/whatsapp";
 import { ManualSignalTextRequiredError } from "@/lib/contacts/manualSignal";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { InvalidAssigneeError } from "@/lib/tasks/assignee";
@@ -65,6 +66,8 @@ export type ContactActionErrorReason =
   | "meeting_occurred_at_in_future"
   | "call_outcome_required"
   | "call_occurred_at_in_future"
+  | "whatsapp_outcome_required"
+  | "whatsapp_occurred_at_in_future"
   | "signal_text_required"
   // A new email needs its own subject and body (replies are exempt: their
   // subject comes from the thread). See contacts/newEmailInput.ts.
@@ -198,6 +201,8 @@ export function contactActionErrorReason(err: unknown): ContactActionErrorReason
   if (err instanceof MeetingOccurredAtInFutureError) return "meeting_occurred_at_in_future";
   if (err instanceof CallOutcomeRequiredError) return "call_outcome_required";
   if (err instanceof CallOccurredAtInFutureError) return "call_occurred_at_in_future";
+  if (err instanceof WhatsAppOutcomeRequiredError) return "whatsapp_outcome_required";
+  if (err instanceof WhatsAppOccurredAtInFutureError) return "whatsapp_occurred_at_in_future";
   if (err instanceof ManualSignalTextRequiredError) return "signal_text_required";
   if (err instanceof AttachmentLinkError) return "attachment_missing";
   if (err instanceof OwnerValueInvalidError) return "owner_invalid";

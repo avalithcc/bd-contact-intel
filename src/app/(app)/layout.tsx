@@ -7,6 +7,7 @@ import { getAppShellBadgeCounts } from "@/lib/shell/appShellBadgeCounts";
 import { ToastProvider } from "@/components/ToastProvider";
 import { LiveUpdates } from "@/components/LiveUpdates";
 import { CallAttemptProvider } from "@/components/CallAttemptProvider";
+import { WhatsAppBarProvider } from "@/components/WhatsAppBarProvider";
 import { pickCallFormLabels } from "@/lib/contacts/callFormLabels";
 import { pickContactRecordLabels } from "@/lib/contacts/labels";
 import { ConnectionBanner } from "@/components/ConnectionBanner";
@@ -59,6 +60,7 @@ export default async function AppLayout({
     <ToastProvider>
       <LiveUpdates meId={me.id} />
       <CallAttemptProvider labels={dict.callAttempt} details={callDetails}>
+      <WhatsAppBarProvider labels={dict.whatsappBar}>
         <div className="app">
           <Sidebar
             labels={labels}
@@ -91,6 +93,7 @@ export default async function AppLayout({
             {children}
           </div>
         </div>
+      </WhatsAppBarProvider>
       </CallAttemptProvider>
     </ToastProvider>
   );

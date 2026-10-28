@@ -110,6 +110,8 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     notes: number;
     call_attempts: number;
     calls: number;
+    whatsapps: number;
+    whatsapp_no_channel: number;
     meetings: number;
     emails_sent: number;
     replies_received: number;
@@ -125,6 +127,8 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     notes: Number(r.notes),
     callAttempts: Number(r.call_attempts),
     calls: Number(r.calls),
+    whatsapps: Number(r.whatsapps),
+    whatsappNoChannel: Number(r.whatsapp_no_channel),
     meetings: Number(r.meetings),
     emailsSent: Number(r.emails_sent),
     repliesReceived: Number(r.replies_received),
