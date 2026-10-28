@@ -1019,7 +1019,10 @@ export const auditLog = pgTable(
     // 'migration_approve' | 'migration_execute' | 'bd_password_reset' |
     // 'bulk_merge_duplicates_run' | 'bulk_merge_duplicates_revert' |
     // 'bd_signature_update' (a BD saved/cleared their own email signature) |
-    // 'bd_create' (scripts/create-bd.ts added a BD to the roster) |
+    // 'bd_create' (scripts/create-bd.ts added a BD to the roster)
+    // 'bd_deleted' (scripts/delete-unused-bd.ts retired a bd account nothing
+    // referenced, Auth user first; target_bd_id would be nulled by that very
+    // delete, so the id, email, name and the nulled references are in metadata) |
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
     // recomputed person owners under the last-worked rule; also run nightly by
     // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
