@@ -59,18 +59,29 @@ async function main() {
       )})`,
     );
 
-  const byEmail = new Map<string, (typeof rows)[number]>();
-  for (const r of rows) byEmail.set((r.emailNormalized ?? r.email ?? "").trim().toLowerCase(), r);
+  // One address can sit on SEVERAL person rows after a merge: the survivor plus the row that was merged away,
+  // which keeps its email. A plain Map keyed by address silently kept whichever row came last — on
+  // rpiccolo@epagos.com.ar that was a coin flip between the live contact and a merged-away one. Group them
+  // all and prefer the live row, which is the one the composer would use.
+  const byEmail = new Map<string, (typeof rows)[number][]>();
+  for (const r of rows) {
+    const key = (r.emailNormalized ?? r.email ?? "").trim().toLowerCase();
+    byEmail.set(key, [...(byEmail.get(key) ?? []), r]);
+  }
 
   const rules = await listSuppressionRules();
   const companies = new Set<string>();
 
   for (const email of wanted) {
-    const row = byEmail.get(email);
+    const all = byEmail.get(email) ?? [];
+    const row = all.find((r) => r.mergedIntoId === null) ?? all[0];
     console.log(`── ${email}`);
     if (!row) {
       console.log("   NO ESTÁ en el CRM con esa dirección. Hay que crear el contacto antes de poder mandarle desde el compositor.\n");
       continue;
+    }
+    if (all.length > 1) {
+      console.log(`   ${all.length} filas con esa dirección (${all.filter((r) => r.mergedIntoId).length} fusionada(s)); se informa la viva.`);
     }
     const name = [row.firstName, row.lastName].filter(Boolean).join(" ") || "(sin nombre)";
     // The free-text `company` can be blank while `company_key` is set (a merge moves the key, not the text),
