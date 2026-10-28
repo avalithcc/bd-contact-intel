@@ -133,3 +133,28 @@ for (const [name, paths] of [["approved mockup styles.css", [APPROVED]], ["shipp
     assert.deepEqual([...used].filter((c) => !known.has(c)).sort(), []);
   });
 }
+
+/**
+ * A refused approval has to SAY so. `sendError` is rendered only inside the send popover, and `approveWith` used to
+ * call `router.refresh()` before setting it: a refresh that remounts the card takes the one place the message would
+ * have been read with it, so the BD saw an approval that did nothing and said nothing. Found 2026-10-28 on a draft
+ * carrying a stale Mar del Plata footer for a contact whose audience had moved to Miami — the screen already had the
+ * right words ("Al borrador le falta el pie de baja…") and never showed them. The fix is the order plus a toast, which
+ * no refresh can unmount, and which the card-menu approval path in the same file already used.
+ */
+test("a refused approval sets the message and toasts it BEFORE refreshing", () => {
+  const source = readFileSync(join("src", "app", "(app)", "sequences", "[id]", "SequenceDetailScreen.tsx"), "utf8");
+  const start = source.indexOf("async function approveWith(");
+  assert.ok(start > 0, "approveWith moved: this test can no longer see it");
+  const body = source.slice(start, source.indexOf("async function reschedule("));
+
+  const refusal = body.indexOf("if (!r.ok) {");
+  assert.ok(refusal > 0);
+  const branch = body.slice(refusal, body.indexOf("return false;", refusal));
+  const setAt = branch.indexOf("setSendError(message)");
+  const toastAt = branch.indexOf("fail(message)");
+  const refreshAt = branch.indexOf("router.refresh()");
+  assert.ok(setAt > 0, "the refusal must put its reason in sendError");
+  assert.ok(toastAt > 0, "the refusal must ALSO toast: sendError alone dies with the popover");
+  assert.ok(refreshAt > setAt && refreshAt > toastAt, "router.refresh() must come after both, or the message is lost");
+});

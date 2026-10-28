@@ -161,11 +161,19 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     setSendError(null);
     const r = await guarded(() => (bulk ? approveBulk(ids, 1, when) : approveMember(ids[0]!, 1, when)), setSendError);
     if (!r) return false;
-    router.refresh();
     if (!r.ok) {
-      setSendError(bulk ? bulkRefusalText(r) : reasonText(refusalKey(r)));
+      const message = bulk ? bulkRefusalText(r) : reasonText(refusalKey(r));
+      // The message goes out BEFORE the refresh and ALSO as a toast. `sendError` is only rendered inside the send
+      // popover, so a refresh that remounts the card takes the one place it would have been read with it — the BD
+      // then sees an approval that did nothing and says nothing. A refusal is the screen's answer, not a detail:
+      // "Al borrador le falta el pie de baja…" is what tells them to regenerate. Found 2026-10-28, when a stale
+      // Mar del Plata footer on a contact whose audience had moved to Miami refused silently.
+      setSendError(message);
+      fail(message);
+      router.refresh();
       return false;
     }
+    router.refresh();
     toastApproval(when, ids.length, r.release);
     if (bulk) setSelected([]);
     return true;
@@ -175,13 +183,15 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     setSendError(null);
     const r = await guarded(() => rescheduleMember(memberId, when), setSendError);
     if (!r) return false;
-    router.refresh();
     if (!r.ok) {
+      // Same ordering as approveWith: the message is set before the refresh that can remount the popover holding it.
       const message = reasonText(r.error);
       setSendError(message);
       if (when.kind === "now") fail(message);
+      router.refresh();
       return false;
     }
+    router.refresh();
     if (when.kind === "now") toastFor(releaseToast(r.release, 1));
     else showToast(l.toastRescheduled, "success");
     return true;
