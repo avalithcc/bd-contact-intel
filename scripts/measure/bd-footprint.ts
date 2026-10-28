@@ -63,15 +63,10 @@ async function main() {
     console.log(`${n > 0 ? "REFERENCIA" : "          "}  ${table_name}.${column_name}: ${n}`);
   }
 
-  // Columns that name a bd WITHOUT a foreign key would not appear above; audit_log keeps the actor as a
-  // plain uuid/jsonb, so it is checked explicitly rather than assumed covered.
-  const [auditRow] = await db.execute<{ n: number }>(
-    sql`select count(*)::int as n from audit_log where actor_bd_id = ${target.id}::uuid`,
-  );
-  const auditN = Number(auditRow?.n ?? 0);
-  console.log(`${auditN > 0 ? "REFERENCIA" : "          "}  audit_log.actor_bd_id (sin FK): ${auditN}`);
-
-  console.log(`\ntotal de filas que lo referencian: ${total + auditN}`);
+  // Both audit_log columns carry a real foreign key (actor_bd_id ON DELETE CASCADE, target_bd_id ON DELETE
+  // SET NULL), so the catalog sweep above already counts them; there is nothing to check separately.
+  console.log(`\ntotal de filas que lo referencian: ${total}`);
+  console.log("recordá que este conteo es sólo de claves foráneas: un id guardado dentro de un jsonb no aparece acá.");
   process.exit(0);
 }
 
