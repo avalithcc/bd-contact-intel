@@ -28,7 +28,7 @@ test("no attachments, no Cc: output is byte-identical to the pre-attachment buil
 
 const pdf = (name = "Propuesta.pdf", bytes = Buffer.from("%PDF-1.7 hello")) => ({ filename: name, contentType: "application/pdf", data: bytes });
 
-function build(over: { cc?: string[]; attachments?: ReturnType<typeof pdf>[]; content?: { body: string } | { bodyHtml: string }; to?: string; allowRecipientList?: boolean } = {}) {
+function build(over: { cc?: string[]; replyTo?: string[]; attachments?: ReturnType<typeof pdf>[]; content?: { body: string } | { bodyHtml: string }; to?: string; allowRecipientList?: boolean } = {}) {
   return buildMimeMessage({
     from: "bd@avalith.test",
     to: over.to ?? "a@example.test",
@@ -37,6 +37,7 @@ function build(over: { cc?: string[]; attachments?: ReturnType<typeof pdf>[]; co
     boundaryRandom: counter(),
     allowRecipientList: over.allowRecipientList,
     cc: over.cc,
+    replyTo: over.replyTo,
     attachments: over.attachments,
   });
 }
@@ -133,4 +134,68 @@ test("upload request wraps the message as multipart/related with threadId metada
 test("upload request without a thread sends empty metadata", () => {
   const { body } = buildUploadRequest(build({ attachments: [pdf()] }));
   assert.match(body, /Content-Type: application\/json; charset=UTF-8\r\n\r\n\{\}\r\n/);
+});
+
+/**
+ * Reply-To: added 2026-10-28, for a mail sent from a colleague's mailbox while they are away — the answers
+ * have to reach whoever is actually handling the thread. `reply-to` was already in RESERVED_HEADER_NAMES but
+ * nothing ever emitted it, so the header could not be set at all: an extra header line was refused and there
+ * was no field. The GOLDEN test above is the regression guard that a message without one is unchanged.
+ */
+test("Reply-To is emitted after Cc, and several addresses share one header", () => {
+  const one = build({ replyTo: ["ana@avalith.net"] });
+  assert.match(one, /^From: bd@avalith\.test\r\nTo: a@example\.test\r\nReply-To: ana@avalith\.net\r\nSubject: /);
+
+  const many = build({ cc: ["cc@avalith.net"], replyTo: ["ana@avalith.net", "beto@avalith.net", "caro@avalith.net"] });
+  assert.match(
+    many,
+    /^From: bd@avalith\.test\r\nTo: a@example\.test\r\nCc: cc@avalith\.net\r\nReply-To: ana@avalith\.net, beto@avalith\.net, caro@avalith\.net\r\nSubject: /,
+  );
+  assert.equal(many.match(/\r\nReply-To: /g)?.length, 1, "one header line, not one per address");
+});
+
+test("no Reply-To field means no Reply-To header at all", () => {
+  assert.ok(!build().includes("Reply-To:"));
+  assert.ok(!build({ replyTo: [] }).includes("Reply-To:"));
+});
+
+// Asserted on the MESSAGE, not just the class: both guards throw GmailSendError, so a test that only checks
+// the class would still pass with the control-character check deleted.
+test("a CR/LF in a Reply-To address is refused as a control character, before any shape check", () => {
+  assert.throws(
+    () => build({ replyTo: ["ana@avalith.net\r\nBcc: evil@example.test"] }),
+    (err: unknown) => err instanceof GmailSendError && /control character/i.test(err.message),
+  );
+});
+
+test("a Reply-To address must be one well-formed address: not malformed, not a list in one string", () => {
+  assert.throws(
+    () => build({ replyTo: ["no-es-una-direccion"] }),
+    (err: unknown) => err instanceof GmailSendError && /malformed/i.test(err.message),
+  );
+  // Two addresses in a single element would otherwise reach the header as a hand-made list.
+  assert.throws(() => build({ replyTo: ["ana@avalith.net, beto@avalith.net"] }), GmailSendError);
+  assert.throws(() => build({ replyTo: [""] }), GmailSendError);
+  // Surrounding whitespace is trimmed, like Cc.
+  assert.match(build({ replyTo: ["  ana@avalith.net  "] }), /\r\nReply-To: ana@avalith\.net\r\n/);
+});
+
+// The field is the only way in: `reply-to` stays reserved so a caller cannot add a second one by hand.
+test("Reply-To cannot also arrive as an extra header", () => {
+  assert.throws(
+    () => buildMimeMessage({ from: "bd@avalith.test", to: "a@example.test", subject: "Hola", content: { body: "T" }, extraHeaders: ["Reply-To: evil@example.test"] }),
+    (err: unknown) => err instanceof GmailSendError && /cannot be added as an extra header/i.test(err.message),
+  );
+});
+
+test("Reply-To travels through the raw and payload builders too", () => {
+  const raw = Buffer.from(
+    buildRawMessage("bd@avalith.test", "a@example.test", "Hola", { body: "Texto" }, fixed, undefined, [], false, [], ["ana@avalith.net"]),
+    "base64url",
+  ).toString("utf8");
+  assert.match(raw, /\r\nReply-To: ana@avalith\.net\r\n/);
+
+  const payload = buildSendPayload("bd@avalith.test", "a@example.test", "Hola", { body: "Texto" }, undefined, [], false, [], ["ana@avalith.net"]);
+  const decoded = Buffer.from(JSON.parse(payload).raw, "base64url").toString("utf8");
+  assert.match(decoded, /\r\nReply-To: ana@avalith\.net\r\n/);
 });

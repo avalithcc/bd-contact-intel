@@ -30,6 +30,9 @@ type SendGmailBody = {
   // email-attachments-recipients (the composed email and its scheduled form only; Sequences never set these):
   // validated internal Cc addresses (@avalith.net) ...
   cc?: string[];
+  // Where replies go when the sending mailbox is not the one that will read them (scripts/send-as-bd.ts:
+  // a mail sent from a colleague's account while they are away). Several addresses allowed.
+  replyTo?: string[];
   // ... files whose bytes were already loaded from Storage and checked (src/lib/email/attachments/load.ts) ...
   attachments?: (MimeAttachment & { size: number })[];
   // ... and ALL the "Para" contacts (the primary `personId` included) when there are several: the email is ONE message
@@ -71,12 +74,18 @@ function composedMetadata(to: string, input: SendGmailBody): Record<string, unkn
 }
 
 // Fail fast on the untrusted recipient, before any DB read or token refresh.
-function assertSafeSendInput({ to, reply, extraHeaders, allowRecipientList, cc }: SendGmailBody) {
+function assertSafeSendInput({ to, reply, extraHeaders, allowRecipientList, cc, replyTo }: SendGmailBody) {
   assertSafeHeaderValue("To", to);
   assertRecipients(to, { allowList: allowRecipientList });
   for (const address of cc ?? []) {
     assertSafeHeaderValue("Cc", address);
     assertRecipients(address); // each Cc is exactly one bare address
+  }
+  // Checked here like Cc, not only inside the MIME builder: the builder runs after the token refresh, which
+  // is a network call that can write email_account.status — a malformed address must fail before that.
+  for (const address of replyTo ?? []) {
+    assertSafeHeaderValue("Reply-To", address);
+    assertRecipients(address);
   }
   for (const line of extraHeaders ?? []) assertSafeExtraHeader(line);
   if (reply) {
@@ -114,6 +123,7 @@ export async function sendGmailMessageFromAccount(input: { accountId: string } &
 async function sendFromAccountRow(account: EmailAccountRow | undefined, input: SendGmailBody) {
   const { subject, leadId, companyKey, personId, reply, extraHeaders, activityMetadata, allowRecipientList } = input;
   const cc = input.cc ?? [];
+  const replyTo = input.replyTo ?? [];
   const attachments = input.attachments ?? [];
   const to = input.to.trim(); // the guard ran on the raw value (assertSafeSendInput); the stored and sent address is the trimmed one
   const content: MessageContent =
@@ -191,7 +201,7 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
     attachments.length
       ? uploadSendInit(
           access_token,
-          buildMimeMessage({ from: account.emailAddress, to, subject, content, reply, extraHeaders, allowRecipientList, cc, attachments }),
+          buildMimeMessage({ from: account.emailAddress, to, subject, content, reply, extraHeaders, allowRecipientList, cc, replyTo, attachments }),
           reply?.threadId,
         )
       : {
@@ -200,7 +210,7 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
             Authorization: `Bearer ${access_token}`,
             "Content-Type": "application/json",
           },
-          body: buildSendPayload(account.emailAddress, to, subject, content, reply, extraHeaders, allowRecipientList, cc),
+          body: buildSendPayload(account.emailAddress, to, subject, content, reply, extraHeaders, allowRecipientList, cc, replyTo),
         },
   );
 
@@ -258,11 +268,20 @@ async function sendFromAccountRow(account: EmailAccountRow | undefined, input: S
     alsoRecordFor: (input.recipients ?? []).filter((r) => r.personId !== personId).map((r) => r.personId),
   });
 
-  if (leadId) revalidatePath(`/leads/${leadId}`);
-  // The raw key is kept alongside the helper's canonical one: it may be an alias (a no-op path) or the only company a
-  // company-level send (no person) has, and revalidating a path that does not exist costs nothing.
-  if (companyKey) revalidatePath(`/companies/${companyKey}`);
-  if (personId) await revalidateContactSurfaces(personId);
+  // BEST-EFFORT, and deliberately after everything that matters. The mail is gone and the activity is
+  // written; a cache revalidation that fails must not make a SENT email look unsent to the caller, who would
+  // reasonably retry and mail the contact twice. `revalidatePath` throws "static generation store missing"
+  // outside a Next request context, which is exactly what an owner-run script
+  // (scripts/send-as-bd.ts) is — it used to turn a successful send into exit code 1.
+  try {
+    if (leadId) revalidatePath(`/leads/${leadId}`);
+    // The raw key is kept alongside the helper's canonical one: it may be an alias (a no-op path) or the only company a
+    // company-level send (no person) has, and revalidating a path that does not exist costs nothing.
+    if (companyKey) revalidatePath(`/companies/${companyKey}`);
+    if (personId) await revalidateContactSurfaces(personId);
+  } catch (err) {
+    console.error(`[gmail] sent ${sent.id} but could not revalidate: ${err instanceof Error ? err.message : String(err)}`);
+  }
 
   return { messageId: sent.id, threadId: sent.threadId };
 }

@@ -141,6 +141,8 @@ export interface BuildMimeInput {
   allowRecipientList?: boolean;
   /** Visible copy recipients. The caller has already applied the product rule (internal domain only); each is still shape-checked. */
   cc?: readonly string[];
+  /** Where replies should go instead of the sending mailbox. Several addresses are allowed (RFC 5322). */
+  replyTo?: readonly string[];
   /** When present the message becomes multipart/mixed: the body part(s) first, then one part per file. */
   attachments?: readonly MimeAttachment[];
 }
@@ -184,6 +186,25 @@ function checkCc(cc: readonly string[]): string[] {
 }
 
 /**
+ * `Reply-To`: where answers should go when that is not the sending mailbox — a BD sending from a colleague's
+ * account who will not be reading it, a Sequence routing replies to whoever handles them. Same guard as Cc
+ * (control characters, then the address shape), and `reply-to` stays in RESERVED_HEADER_NAMES so it can only
+ * ever be set through this field and never duplicated by an extra header line.
+ */
+function checkReplyTo(replyTo: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const raw of replyTo) {
+    assertSafeHeaderValue("Reply-To", raw);
+    const address = raw.trim();
+    if (!checkRecipientShape(address).ok) {
+      throw new GmailSendError("invalid_recipient", "The Reply-To address is not a valid recipient (malformed)", "malformed");
+    }
+    out.push(address);
+  }
+  return out;
+}
+
+/**
  * The RFC 5322 message as text (CRLF line endings, 7-bit: every body, header word and file is base64 or encoded).
  * `buildRawMessage` is this, base64url-encoded for Gmail's JSON `raw` field; an attachment send uploads it as-is.
  */
@@ -194,6 +215,7 @@ export function buildMimeMessage(input: BuildMimeInput): string {
   const to = rawTo.trim();
   assertRecipients(to, { allowList: allowRecipientList });
   const cc = checkCc(input.cc ?? []);
+  const replyTo = checkReplyTo(input.replyTo ?? []);
   if (reply) {
     assertSafeHeaderValue("In-Reply-To", reply.inReplyTo);
     assertSafeHeaderValue("References", reply.references);
@@ -206,6 +228,7 @@ export function buildMimeMessage(input: BuildMimeInput): string {
     `From: ${from}`,
     `To: ${to}`,
     ...(cc.length ? [`Cc: ${cc.join(", ")}`] : []),
+    ...(replyTo.length ? [`Reply-To: ${replyTo.join(", ")}`] : []),
     foldSubjectHeader(subject),
     ...threading,
     ...extraHeaders,
@@ -253,8 +276,9 @@ export function buildRawMessage(
   // Only a thread reply or a multi-recipient send may carry several recipients (see assertRecipients).
   allowRecipientList = false,
   cc: readonly string[] = [],
+  replyTo: readonly string[] = [],
 ): string {
-  const message = buildMimeMessage({ from, to: rawTo, subject, content, boundaryRandom, reply, extraHeaders, allowRecipientList, cc });
+  const message = buildMimeMessage({ from, to: rawTo, subject, content, boundaryRandom, reply, extraHeaders, allowRecipientList, cc, replyTo });
   return Buffer.from(message, "utf8").toString("base64url");
 }
 
@@ -274,8 +298,9 @@ export function buildSendPayload(
   extraHeaders?: string[],
   allowRecipientList = false,
   cc: readonly string[] = [],
+  replyTo: readonly string[] = [],
 ): string {
-  const raw = buildRawMessage(from, to, subject, content, undefined, reply, extraHeaders, allowRecipientList, cc);
+  const raw = buildRawMessage(from, to, subject, content, undefined, reply, extraHeaders, allowRecipientList, cc, replyTo);
   return JSON.stringify(reply ? { raw, threadId: reply.threadId } : { raw });
 }
 

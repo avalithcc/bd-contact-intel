@@ -117,3 +117,63 @@ test("a Cc that is not a single bare address is refused before any network call"
     w.restore();
   }
 });
+
+/**
+ * Reply-To (2026-10-28). It has to reach BOTH send paths: the JSON endpoint and the media upload. Before
+ * these two, dropping `replyTo` at either call site in send.ts left every test green.
+ */
+test("Reply-To reaches the JSON endpoint, as one header with every address", async () => {
+  const w = await installFakeWorld({ accountRows: [await makeAccountRow()], token: OK_TOKEN, send: OK_SEND });
+  try {
+    await send({ replyTo: ["ana@avalith.net", "beto@avalith.net"] });
+    const call = w.fetchCalls.find((c) => c.url === SEND_URL)!;
+    const raw = Buffer.from(JSON.parse(String(call.init.body)).raw, "base64url").toString("utf8");
+    assert.match(raw, /\r\nReply-To: ana@avalith\.net, beto@avalith\.net\r\n/);
+    assert.equal(raw.match(/\r\nReply-To: /g)?.length, 1);
+  } finally {
+    w.restore();
+  }
+});
+
+test("Reply-To reaches the media-upload endpoint too", async () => {
+  const w = await installFakeWorld({ accountRows: [await makeAccountRow()], token: OK_TOKEN, send: OK_SEND });
+  try {
+    await send({ attachments: [file()], replyTo: ["ana@avalith.net"] });
+    const call = w.fetchCalls.find((c) => c.url === UPLOAD_URL)!;
+    assert.match(String(call.init.body), /\r\nReply-To: ana@avalith\.net\r\n/);
+  } finally {
+    w.restore();
+  }
+});
+
+test("a malformed Reply-To is refused before the token is ever refreshed", async () => {
+  const w = await installFakeWorld({ accountRows: [await makeAccountRow()], token: OK_TOKEN, send: OK_SEND });
+  try {
+    await assert.rejects(() => send({ replyTo: ["no-es-una-direccion"] }), GmailSendError);
+    assert.equal(w.fetchCalls.length, 0, "nothing was called: the guard runs before the network");
+  } finally {
+    w.restore();
+  }
+});
+
+/**
+ * The mail is already gone by the time the cache is revalidated, so a revalidation that throws must not make
+ * the send look failed — an owner-run script (scripts/send-as-bd.ts) has no Next request store, and
+ * `revalidatePath` threw there, turning a delivered email into exit code 1 and inviting a second send.
+ */
+test("a send whose cache revalidation throws still resolves", async () => {
+  const w = await installFakeWorld({ accountRows: [await makeAccountRow()], token: OK_TOKEN, send: OK_SEND });
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const cache = require("next/cache");
+  mock.method(cache, "revalidatePath", () => {
+    throw new Error("Invariant: static generation store missing");
+  });
+  try {
+    const result = await send({});
+    assert.equal(result.messageId, "gmail-msg-1");
+    assert.ok(w.fetchCalls.some((c) => c.url === SEND_URL), "the message really was sent");
+  } finally {
+    mock.method(cache, "revalidatePath", () => undefined);
+    w.restore();
+  }
+});
