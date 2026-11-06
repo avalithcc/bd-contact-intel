@@ -4,6 +4,7 @@
  * "Agregar al CRM". Only the FIRST item is read, only when it is a current position; anything else is `null` and
  * the caller falls back to the top card. Nothing is guessed and nothing here throws.
  */
+import { waitForDom } from "./domWait";
 import { cleanText } from "./profileText";
 import { COMPANY_SEPARATOR, CURRENT_POSITION, DATE_RANGE, SELECTORS } from "./selectors";
 
@@ -75,17 +76,7 @@ export async function ensureExperienceLoaded(doc: Document, timeoutMs: number): 
     const { scrollX, scrollY } = view;
     const href = view.location.href;
     try {
-      await new Promise<void>((resolve) => {
-        const observer = new view.MutationObserver(() => {
-          if (doc.querySelector(ITEM)) finish();
-        });
-        const timer = view.setTimeout(finish, timeoutMs);
-        function finish() {
-          observer.disconnect();
-          view!.clearTimeout(timer);
-          resolve();
-        }
-        observer.observe(doc.documentElement, { childList: true, subtree: true });
+      await waitForDom(doc, view, () => Boolean(doc.querySelector(ITEM)), timeoutMs, () => {
         try {
           anchor.scrollIntoView({ block: "center", behavior: "instant" });
         } catch {

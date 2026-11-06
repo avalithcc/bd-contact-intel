@@ -112,23 +112,18 @@ test("a single company/school button leaves the company empty", async (t) => {
   assert.deepEqual(await readFixture("profile-new-layout-one-button.html"), { ...LUCIA, company: "" });
 });
 
-test("without a top card only the name is read, from the title", async (t) => {
+test("without a top card nothing is read, not even the name from the tab title", async (t) => {
   if (!browser) return t.skip(launchError ?? "no browser");
-  assert.deepEqual(await readFixture("profile-new-layout-no-topcard.html"), {
-    name: "Lucía Fernández",
-    title: "",
-    company: "",
-    location: "",
-  });
+  assert.deepEqual(await readFixture("profile-new-layout-no-topcard.html"), { name: "", title: "", company: "", location: "" });
 });
 
 const LINK = '<a href="https://www.linkedin.com/in/ana/overlay/contact-info/">Información de contacto</a>';
 const EMPTY = { name: "Ana", title: "", company: "", location: "" };
 
-test("a contact-info ancestor walk never lands on main or a container holding the aside", async (t) => {
+test("a contact-info ancestor walk never lands on main or a container holding the aside: no card, no name", async (t) => {
   if (!browser) return t.skip(launchError ?? "no browser");
   const html = `<html><head><title>Ana | LinkedIn</title></head><body><main><div componentkey="x:nothing"><p>Ana</p>${LINK}</div><aside><h2>Ads</h2><p>Promo</p></aside></main></body></html>`;
-  assert.deepEqual(await readHtml(html), EMPTY);
+  assert.deepEqual(await readHtml(html), { ...EMPTY, name: "" });
 });
 
 const card = (inner: string) =>
@@ -151,6 +146,53 @@ test("a parenthesised pronoun note is not the headline", async (t) => {
   if (!browser) return t.skip(launchError ?? "no browser");
   const html = card(`<h2>Ana</h2><p>(ella)</p><p>Consultora</p><div>${LINK}</div>`);
   assert.deepEqual(await readHtml(html), { ...EMPTY, title: "Consultora" });
+});
+
+const STALE_TITLE = "Senior Software Engineer | Avalith | LinkedIn";
+const page = (title: string, body: string) => `<html><head><title>${title}</title></head><body><main>${body}</main></body></html>`;
+
+test("a page with no top card never takes the name from the tab title, which may be the previous profile's", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  assert.deepEqual(await readHtml(page(STALE_TITLE, "<p>Loading</p>")), { name: "", title: "", company: "", location: "" });
+});
+
+test("a top card whose headings have no text falls back to the tab title for the name", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const html = page("Martin Gallego Maldonado | LinkedIn", `<div componentkey="x:Topcard"><h2></h2><div>${LINK}</div></div>`);
+  assert.equal(((await readHtml(html)) as { name: string }).name, "Martin Gallego Maldonado");
+});
+
+async function readLoadedTopCard(insertAfterMs: number | null, waitMs: number) {
+  const tab = await browser!.newPage();
+  try {
+    await tab.setContent(page(STALE_TITLE, "<p>Loading</p>"));
+    await tab.addScriptTag({ content: readerBundle });
+    if (insertAfterMs !== null) {
+      await tab.evaluate((delay) => {
+        setTimeout(() => {
+          document.querySelector("main")!.insertAdjacentHTML("beforeend", '<div componentkey="x:Topcard"><h2>Ana</h2></div>');
+        }, delay);
+      }, insertAfterMs);
+    }
+    const started = Date.now();
+    const basics = await tab.evaluate((ms) => (window as unknown as { __readLoaded(ms: number): Promise<unknown> }).__readLoaded(ms), waitMs);
+    return { basics, elapsed: Date.now() - started };
+  } finally {
+    await tab.close();
+  }
+}
+
+test("a top card that renders after the click is waited for and its name is read", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const { basics } = await readLoadedTopCard(300, 3000);
+  assert.deepEqual(basics, { name: "Ana", title: "", company: "", location: "" });
+});
+
+test("a top card that never renders ends at the timeout with an empty name, not a hang or the tab title", async (t) => {
+  if (!browser) return t.skip(launchError ?? "no browser");
+  const { basics, elapsed } = await readLoadedTopCard(null, 400);
+  assert.deepEqual(basics, { name: "", title: "", company: "", location: "" });
+  assert.ok(elapsed < 2000, `took ${elapsed}ms`);
 });
 
 const NIMBUS = { ...LUCIA, title: "Co-Founder & CEO", company: "Nimbus Labs" };

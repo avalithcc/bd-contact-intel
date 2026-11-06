@@ -5,6 +5,7 @@
  * A field it cannot read is `""`: nothing is guessed.
  */
 import type { ProfileBasics } from "../shared/messages";
+import { waitForDom } from "./domWait";
 import { ensureExperienceLoaded, readCurrentRole } from "./experience";
 import { cleanName, cleanText, companyFromLabel, stripCompanyPrefix } from "./profileText";
 import { NOT_A_HEADLINE, NOT_A_LOCATION, PAREN_NOTE, PHOTO_LABEL, SELECTORS, TITLE_NAME } from "./selectors";
@@ -109,39 +110,58 @@ function readLocation(topCard: Element, headline: string, pair: string[]): strin
   return firstText(topCard, SELECTORS.location, (text) => !NOT_A_LOCATION.test(text));
 }
 
-function readTopCard(doc: Document): ProfileBasics {
+/** Null when no top card is open: the title and the rest of the document are not tied to this profile then. */
+function readTopCard(doc: Document): ProfileBasics | null {
   const topCard = findTopCard(doc);
-  const nameElement = topCard
-    ? (SELECTORS.name.flatMap((s) => Array.from(topCard.querySelectorAll(s))).find((el) => cleanText(el.textContent)) ?? null)
-    : null;
+  if (!topCard) return null;
+  const nameElement = SELECTORS.name.flatMap((s) => Array.from(topCard.querySelectorAll(s))).find((el) => cleanText(el.textContent)) ?? null;
   let name = cleanName(nameElement?.textContent);
+  // Only here is the tab title provable: a top card is open, so the page is rendered and its title is this profile's.
   if (!name) name = cleanName(TITLE_NAME.exec(doc.title)?.[1]);
-  if (!topCard) return { name, title: "", company: "", location: "" };
 
   const title = readHeadline(topCard, nameElement);
   return { name, title, company: readCompany(topCard, nameElement), location: readLocation(topCard, title, pairTexts(topCard, nameElement)) };
 }
 
-/** Name and location from the top card; title and company from the current Experience role when there is one. */
+const EMPTY: ProfileBasics = { name: "", title: "", company: "", location: "" };
+
+/**
+ * Name and location from the top card; title and company from the current Experience role when there is one.
+ * LinkedIn navigates as an SPA: for about a second after a click `location` is already the new profile while the
+ * title and the whole page still belong to the previous one. With no top card (or on any surprise) nothing can be
+ * attributed to this profile, so nothing is returned: never the tab title, never a stale Experience item.
+ */
 export function readProfileBasics(doc: Document): ProfileBasics {
   try {
     const basics = readTopCard(doc);
+    if (!basics) return { ...EMPTY };
     const role = readCurrentRole(doc);
     return role ? { ...basics, title: role.title, company: role.company || basics.company } : basics;
   } catch {
-    // Total: a markup surprise reads as empty (name from the title if possible), never as a throw.
-    let name = "";
-    try {
-      name = cleanName(TITLE_NAME.exec(doc.title)?.[1]);
-    } catch {
-      // keep it empty
-    }
-    return { name, title: "", company: "", location: "" };
+    return { ...EMPTY };
   }
 }
 
-/** Same, after waiting (up to `timeoutMs`) for the lazy Experience section. Never throws. */
+/**
+ * Same, after waiting for the page to render. `timeoutMs` is ONE budget for the whole call: the top-card wait
+ * spends from it and the lazy Experience section gets what is left, so a page that never renders costs the BD
+ * `timeoutMs`, not twice that. Never throws.
+ */
 export async function readProfileBasicsWhenLoaded(doc: Document, timeoutMs = 3000): Promise<ProfileBasics> {
-  await ensureExperienceLoaded(doc, timeoutMs);
+  const deadline = Date.now() + timeoutMs;
+  await waitForTopCard(doc, timeoutMs);
+  await ensureExperienceLoaded(doc, Math.max(0, deadline - Date.now()));
   return readProfileBasics(doc);
+}
+
+/** Resolves once a top card exists, on timeout, or when the tab moved to another URL (that page is not this read's). */
+async function waitForTopCard(doc: Document, timeoutMs: number): Promise<void> {
+  try {
+    const view = doc.defaultView;
+    if (!view || findTopCard(doc)) return;
+    const href = view.location.href;
+    await waitForDom(doc, view, () => view.location.href !== href || findTopCard(doc) !== null, timeoutMs);
+  } catch {
+    // Never break "Agregar al CRM": the read below answers with whatever is there.
+  }
 }
