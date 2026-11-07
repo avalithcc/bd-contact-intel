@@ -3,8 +3,11 @@
  * answer becomes a state, which URLs the worker may open and the manifest's permission surface. No browser needed.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 import { parseProfileUrl, profileUrlFromLocation } from "../../extension/src/shared/profileUrl";
+import { readMayBeSent } from "../../extension/src/content/readGuard";
 import { isTrustedSender } from "../../extension/src/background/sender";
 import { classifyLookupResponse, type ResponseLike } from "../../extension/src/background/lookupResponse";
 import { TtlCache } from "../../extension/src/background/cache";
@@ -35,6 +38,40 @@ test("a received profile URL is re-parsed, never trusted", () => {
   assert.equal(parseProfileUrl("https://crm.avalith.net/api/anything"), null);
   assert.equal(parseProfileUrl("javascript:alert(1)"), null);
   assert.equal(parseProfileUrl(42), null);
+});
+
+// ---- may a finished read still be sent --------------------------------------------------------------------
+
+const ADA = "https://www.linkedin.com/in/ada-lovelace/";
+const GRACE = "https://www.linkedin.com/in/grace-hopper/";
+
+test("a read that finished after the tab moved to another profile is dropped, not filed under the old URL", () => {
+  // The URL leaves for the CRM from before the await; the basics come from after it. If the tab moved in
+  // between, the two belong to different people — the incident this guard exists for.
+  assert.equal(readMayBeSent({ startedGeneration: 7, currentGeneration: 7, startedUrl: ADA, currentUrl: GRACE }), false);
+  // Off a profile page entirely (the feed, a search, a sub-page): nothing to attribute the read to.
+  assert.equal(readMayBeSent({ startedGeneration: 7, currentGeneration: 7, startedUrl: ADA, currentUrl: null }), false);
+});
+
+test("a read is dropped when the tab left and came back to the SAME profile: the URL matches but the card does not", () => {
+  // Back/forward or a re-entry from search unmounts the card and bumps the generation. Without the
+  // generation check this case would pass the URL comparison and answer for a card that no longer exists.
+  assert.equal(readMayBeSent({ startedGeneration: 7, currentGeneration: 8, startedUrl: ADA, currentUrl: ADA }), false);
+});
+
+test("a read that finished on the profile it started on is sent", () => {
+  assert.equal(readMayBeSent({ startedGeneration: 7, currentGeneration: 7, startedUrl: ADA, currentUrl: ADA }), true);
+  assert.equal(readMayBeSent({ startedGeneration: 0, currentGeneration: 0, startedUrl: GRACE, currentUrl: GRACE }), true);
+});
+
+test("the send in linkedin.ts is guarded by readMayBeSent — a source check, because that file has no harness", () => {
+  // linkedin.ts runs `void start()` on import and needs the whole chrome.* surface, so no test reaches
+  // addToCrm. The rule above is pinned properly; this only pins that the call site still uses it, which is
+  // the regression that would silently reopen the bug. It asserts nothing about WHEN the rule says yes.
+  const source = readFileSync(path.join(import.meta.dirname, "../../extension/src/content/linkedin.ts"), "utf8");
+  const send = /if \(readMayBeSent\([^)]*\)\) await ask\(\{ type: "open-add"/.exec(source);
+  assert.ok(send, 'the "open-add" send must sit behind readMayBeSent(...)');
+  assert.doesNotMatch(source, /if \(mine === generation\) await ask\(\{ type: "open-add"/, "the old generation-only guard is not enough: it misses a move sync() has not seen yet");
 });
 
 // ---- who may talk to the worker -----------------------------------------------------------------------------

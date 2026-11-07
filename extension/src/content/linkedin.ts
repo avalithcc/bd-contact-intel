@@ -8,6 +8,7 @@ import { profileUrlFromLocation } from "../shared/profileUrl";
 import type { LookupResult, WorkerRequest } from "../shared/messages";
 import { Card } from "./card";
 import { readProfileBasicsWhenLoaded } from "./profileReader";
+import { readMayBeSent } from "./readGuard";
 import { buildCardView, type CardState } from "./viewModel";
 
 const COLLAPSED_KEY = "collapsed";
@@ -36,7 +37,10 @@ async function addToCrm(url: string): Promise<void> {
   render();
   try {
     const basics = await readProfileBasicsWhenLoaded(document);
-    if (mine === generation) await ask({ type: "open-add", profileUrl: url, basics });
+    // `url` was captured before this await: only send the basics if the tab is still on the profile they
+    // were read from, or one profile's text would be filed under another's URL (see readGuard.ts).
+    const origin = { startedGeneration: mine, currentGeneration: generation, startedUrl: url, currentUrl: profileUrlFromLocation(location) };
+    if (readMayBeSent(origin)) await ask({ type: "open-add", profileUrl: url, basics });
   } catch {
     // Nothing to open; the button comes back so the BD can retry.
   } finally {
