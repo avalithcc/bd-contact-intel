@@ -5,10 +5,17 @@
  * `newTotal` IS that cohort's size; `contactedOrMore`/`repliedOrMore`/
  * `meeting` are how far those SAME persons have progressed as of now
  * (cumulative — a person in "Reunión" also counts in "Contactado" and
- * "Respondió"). "Tasa de respuesta" reuses these same numbers
- * (Respondió-or-further ÷ Contactado-or-further) rather than a second,
- * separately-scoped query — decision 6 names this the cheap, honest
- * "snapshot ratio" (not real per-cohort reply-latency tracking).
+ * "Respondió"). That card stays a snapshot by current status on purpose: it
+ * answers "the contacts that entered this period — where are they now?".
+ *
+ * "Tasa de respuesta" does NOT reuse those numbers any more (owner decision
+ * 2026-11-06). A rate needs numerator and denominator in the same period and
+ * both from dated events, so `rateContacted`/`rateReplied` come from
+ * `replyRateEvidence.ts`'s dated query and are REQUIRED here: the old
+ * `?? contactedOrMore` / `?? repliedOrMore` fallbacks were the bug itself (a
+ * LinkedIn message received in 2012 made a person `replied` today), and the
+ * funnel's Respondió row no longer shows a competing "% de Contactado", so the
+ * page has exactly one response rate — the dated one.
  */
 
 export interface FunnelCounts {
@@ -20,37 +27,30 @@ export interface FunnelCounts {
 }
 
 /**
- * The reply-rate tile's own counts: same statuses as `contactedOrMore`/`repliedOrMore`, but current clients (won +
- * active) are left out of numerator and denominator (owner decision 2026-10-19). Optional so callers that only have
- * the everyone-counts fall back to them.
+ * The reply-rate tile's own counts, from the dated query (queries.ts
+ * `rpt_rate_scope`): persons with an outreach event inside the period, and the
+ * ones among them whose reply event also falls inside it, at or after that
+ * first outreach. Current clients (won + active) are left out of both (owner
+ * decision 2026-10-19). Required, never optional: a fallback to the snapshot
+ * counts is the bug this replaced.
  */
 export interface ReplyRateCounts {
   rateContacted: number;
   rateReplied: number;
 }
 
-export interface FunnelBreakdown extends FunnelCounts {
-  /** The "Tasa de respuesta" tile (clients excluded): percentage, whether it is a rate, and the "replied / contacted" fraction. */
+export interface FunnelBreakdown extends FunnelCounts, ReplyRateCounts {
+  /** The "Tasa de respuesta" tile: percentage, whether it is a rate, and the "replied / contacted" fraction. */
   rateReplyPct: number;
   rateReplyIsRate: boolean;
   rateReplyFraction: string;
-  rateContacted: number;
-  rateReplied: number;
   contactedPct: number;
   repliedPct: number;
   meetingPct: number;
   discardedPct: number;
-  /** Respondió-or-further ÷ Contactado-or-further (decision 6) — the "Tasa de respuesta" KPI. */
-  replyRatePct: number;
-  /** Same value as replyRatePct, exposed under the funnel row's own label ("% de Contactado"). */
-  repliedOfContactedPct: number;
-  /** Reunión ÷ Respondió-or-further ("% de Respondió" on the funnel's last row). */
+  /** Reunión ÷ Respondió-or-further ("% de Respondió" on the funnel's last row — a cohort ratio, not a rate over time). */
   meetingOfRepliedPct: number;
-  /** False when the reply-rate denominator is below MIN_RATE_SAMPLE: the percentage must not be shown as a rate. */
-  replyRateIsRate: boolean;
-  /** "replied / contacted" raw fraction, shown instead of the percentage when `replyRateIsRate` is false. */
-  replyRateFraction: string;
-  /** Same rule for Reunión ÷ Respondió-or-further. */
+  /** False below MIN_RATE_SAMPLE: the fraction is shown instead of the percentage. */
   meetingOfRepliedIsRate: boolean;
   meetingOfRepliedFraction: string;
 }
@@ -62,14 +62,10 @@ function pct(numerator: number, denominator: number): number {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
 }
 
-export function buildFunnelBreakdown(counts: FunnelCounts & Partial<ReplyRateCounts>): FunnelBreakdown {
-  const replyRatePct = pct(counts.repliedOrMore, counts.contactedOrMore);
-  const rateContacted = counts.rateContacted ?? counts.contactedOrMore;
-  const rateReplied = counts.rateReplied ?? counts.repliedOrMore;
+export function buildFunnelBreakdown(counts: FunnelCounts & ReplyRateCounts): FunnelBreakdown {
+  const { rateContacted, rateReplied } = counts;
   return {
     ...counts,
-    rateContacted,
-    rateReplied,
     rateReplyPct: pct(rateReplied, rateContacted),
     rateReplyIsRate: rateContacted >= MIN_RATE_SAMPLE,
     rateReplyFraction: `${rateReplied} / ${rateContacted}`,
@@ -77,11 +73,7 @@ export function buildFunnelBreakdown(counts: FunnelCounts & Partial<ReplyRateCou
     repliedPct: pct(counts.repliedOrMore, counts.newTotal),
     meetingPct: pct(counts.meeting, counts.newTotal),
     discardedPct: pct(counts.discarded, counts.newTotal),
-    replyRatePct,
-    repliedOfContactedPct: replyRatePct,
     meetingOfRepliedPct: pct(counts.meeting, counts.repliedOrMore),
-    replyRateIsRate: counts.contactedOrMore >= MIN_RATE_SAMPLE,
-    replyRateFraction: `${counts.repliedOrMore} / ${counts.contactedOrMore}`,
     meetingOfRepliedIsRate: counts.repliedOrMore >= MIN_RATE_SAMPLE,
     meetingOfRepliedFraction: `${counts.meeting} / ${counts.repliedOrMore}`,
   };

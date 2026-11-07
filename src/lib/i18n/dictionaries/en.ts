@@ -2557,7 +2557,9 @@ export const en = {
     kpiNewContacts: "New contacts",
     kpiNewContactsFoot: "people who entered the funnel in the period",
     kpiReplyRate: "Reply rate",
-    kpiReplyRateFoot: (replied: number, contacted: number) => `Replied ${replied} ÷ Contacted ${contacted}`,
+    // Owner decision 2026-11-06: both sides are dated events INSIDE the
+    // period, not the cohort's current status.
+    kpiReplyRateFoot: (replied: number, contacted: number) => `${replied} replied ÷ ${contacted} contacted in the period`,
     // Below MIN_RATE_SAMPLE the tile inverts: the fraction is the value and
     // the percentage drops to the foot. Owner direction 2026-10-14 — the
     // explanatory "sample too small" copy was dropped once the hierarchy
@@ -2585,7 +2587,6 @@ export const en = {
     funnelContacted: "Contacted",
     funnelReplied: "Replied",
     funnelMeeting: "Meeting",
-    funnelOfContacted: "of Contacted",
     funnelOfReplied: "of Replied",
     funnelDiscardedFoot: (count: number, pct: number) =>
       `Besides the funnel: ${count} discarded (${pct}% of New) — not a forward stage.`,
@@ -2656,6 +2657,9 @@ export const en = {
     cohortNote: "Current status of each contact, not the period's activity.",
     cohortNoteReplied: (period: string) =>
       `Current status of each contact, not the period's activity: "created ${period}" is the cohort, not when they replied.`,
+    cohortHeaderRate: (count: string, base: string, period: string) => `${count} of ${base} contacted ${period}`,
+    cohortNoteRate: (period: string) =>
+      `Outreach and reply both dated ${period}: a reply only counts if it came after the period's first outreach.`,
     cohortColContact: "Contact",
     cohortColCompany: "Company",
     cohortColBd: "Owner BD",

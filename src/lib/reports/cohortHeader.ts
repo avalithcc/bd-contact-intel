@@ -6,8 +6,8 @@
  * the resulting strings are passed down as props.
  */
 import { addDaysToDateString } from "@/lib/tasks/argentinaDate";
-import { cohortBase, cohortCount, type CohortPopulation } from "./cohortDrilldown";
-import type { FunnelCounts } from "./funnel";
+import { cohortBase, cohortCount, rateBase, rateCount, type CohortPopulation } from "./cohortDrilldown";
+import type { FunnelCounts, ReplyRateCounts } from "./funnel";
 import type { ReportPeriod } from "./period";
 
 export interface CohortHeaderWords {
@@ -22,6 +22,8 @@ export interface CohortHeaderWords {
   cohortHeaderMeeting: (count: string, base: string, period: string) => string;
   cohortNote: string;
   cohortNoteReplied: (period: string) => string;
+  cohortHeaderRate: (count: string, base: string, period: string) => string;
+  cohortNoteRate: (period: string) => string;
 }
 
 function ymd(date: string): { y: number; m: number; d: number } {
@@ -51,4 +53,17 @@ export function cohortHeaderLines(
   if (population === "contacted") return { summary: w.cohortHeaderContacted(count, base, periodPhrase), note: w.cohortNote };
   if (population === "replied") return { summary: w.cohortHeaderReplied(count, base, periodPhrase), note: w.cohortNoteReplied(periodPhrase) };
   return { summary: w.cohortHeaderMeeting(count, base, periodPhrase), note: w.cohortNote };
+}
+
+/**
+ * The reply-rate dialog's header. Its denominator is `rateContacted` — the
+ * persons CONTACTED in the period, not the ones created in it — and the note
+ * has to say that both sides are dated, because the four cohort dialogs next
+ * to it say the opposite about themselves.
+ */
+export function rateHeaderLines(rate: ReplyRateCounts, periodPhrase: string, w: CohortHeaderWords): { summary: string; note: string } {
+  return {
+    summary: w.cohortHeaderRate(rateCount(rate).toLocaleString(w.numberLocale), rateBase(rate).toLocaleString(w.numberLocale), periodPhrase),
+    note: w.cohortNoteRate(periodPhrase),
+  };
 }

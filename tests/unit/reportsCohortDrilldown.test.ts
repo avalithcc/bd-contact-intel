@@ -7,13 +7,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { buildCohortDrilldownQuery, buildReportAggregatesQuery } from "@/lib/reports/queries";
+import { buildCohortDrilldownQuery, buildRateDrilldownQuery, buildReportAggregatesQuery } from "@/lib/reports/queries";
 import {
   COHORT_STATUSES,
   buildCohortDrilldownRows,
   cohortBase,
   cohortCount,
-  cohortHasReplyColumns,
+  drilldownHasReplyColumns,
+  isDrilldownPopulation,
+  rateBase,
+  rateCount,
+  RATE_POPULATION,
   roleGroupCell,
   contactSubline,
   jobTitleLine,
@@ -73,25 +77,48 @@ test("reply populations left-join reply time and Sequence so a null replied_at n
 });
 
 test("the count behind each tile/row is the funnel number, independent of the rate-sample display rule", () => {
-  const counts = { newTotal: 19, contactedOrMore: 7, repliedOrMore: 3, meeting: 1, discarded: 2 };
+  const counts = { newTotal: 19, contactedOrMore: 7, repliedOrMore: 3, meeting: 1, discarded: 2, rateContacted: 7, rateReplied: 3 };
   const f = buildFunnelBreakdown(counts);
-  assert.equal(f.replyRateIsRate, false); // 7 < MIN_RATE_SAMPLE: tile shows "3 / 7"
-  assert.ok(counts.contactedOrMore < MIN_RATE_SAMPLE);
+  assert.equal(f.rateReplyIsRate, false); // 7 < MIN_RATE_SAMPLE: tile shows "3 / 7"
+  assert.ok(counts.rateContacted < MIN_RATE_SAMPLE);
   assert.equal(cohortCount(counts, "contacted"), f.contactedOrMore);
   assert.equal(cohortCount(counts, "replied"), f.repliedOrMore); // still 3, not filtered out
   assert.equal(cohortCount(counts, "meeting"), f.meeting);
   assert.equal(cohortBase(counts, "contacted"), f.newTotal);
   assert.equal(cohortBase(counts, "replied"), f.contactedOrMore);
   assert.equal(cohortBase(counts, "meeting"), f.repliedOrMore);
+  // The rate's list keeps its own pair, so the funnel numbers stay honest.
+  assert.equal(rateCount(counts), 3);
+  assert.equal(rateBase(counts), 7);
+});
+
+test("the reply-rate list is its own population, never one of the four cohort ones", () => {
+  assert.equal(isDrilldownPopulation(RATE_POPULATION), true);
+  assert.equal(isCohortPopulation(RATE_POPULATION), false, "it must not reach COHORT_STATUSES");
+  assert.equal(Object.prototype.hasOwnProperty.call(COHORT_STATUSES, RATE_POPULATION), false);
+  assert.equal(drilldownHasReplyColumns(RATE_POPULATION), true);
+  // Its number and denominator come from the dated counts, not from the cohort.
+  const counts = { newTotal: 19, contactedOrMore: 7, repliedOrMore: 3, meeting: 1, discarded: 2, rateContacted: 4, rateReplied: 1 };
+  assert.equal(rateCount(counts), 1);
+  assert.equal(rateBase(counts), 4);
+  assert.notEqual(rateBase(counts), cohortBase(counts, "replied"));
+});
+
+test("the reply-rate list is bounded and ordered by its own reply date", () => {
+  const { sql, params } = dialect.sqlToQuery(buildRateDrilldownQuery({ fromIso: FROM, toIso: TO, bdId: BD }));
+  assert.match(sql, /order by rpt_rate_replied\.pbc_reply_at desc, person\.id/);
+  assert.equal(params[params.length - 1], DRILLDOWN_ROW_LIMIT);
+  assert.ok(!params.includes(MIN_RATE_SAMPLE));
 });
 
 test("population guards", () => {
   assert.equal(isCohortPopulation("replied"), true);
   assert.equal(isCohortPopulation("bogus"), false);
   assert.equal(isCohortPopulation(undefined), false);
-  assert.equal(cohortHasReplyColumns("contacted"), false);
-  assert.equal(cohortHasReplyColumns("replied"), true);
-  assert.equal(cohortHasReplyColumns("meeting"), true);
+  assert.equal(isDrilldownPopulation("bogus"), false);
+  assert.equal(drilldownHasReplyColumns("contacted"), false);
+  assert.equal(drilldownHasReplyColumns("replied"), true);
+  assert.equal(drilldownHasReplyColumns("meeting"), true);
 });
 
 const RAW: CohortRawRow = {
@@ -166,7 +193,7 @@ test("new population: whole cohort, no status predicate, same count as the Conta
   assert.doesNotMatch(norm(sql), /rpt_cohort_reply|sequence_member/);
   assert.deepEqual(COHORT_STATUSES.new, []);
   assert.equal(isCohortPopulation("new"), true);
-  assert.equal(cohortHasReplyColumns("new"), false);
+  assert.equal(drilldownHasReplyColumns("new"), false);
   const f = { newTotal: 118, contactedOrMore: 43, repliedOrMore: 12, meeting: 4, discarded: 6 };
   assert.equal(cohortCount(f, "new"), 118);
   assert.equal(cohortBase(f, "new"), 118);

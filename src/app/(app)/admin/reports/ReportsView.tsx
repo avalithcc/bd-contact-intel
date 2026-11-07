@@ -16,8 +16,8 @@ import { WonCompaniesKpiCard, type WonCompaniesKpiCardLabels } from "./WonCompan
 import { PeriodPicker, type PeriodPickerLabels } from "./PeriodPicker";
 import { MeetingsKpiCard, type MeetingsKpiCardLabels } from "./MeetingsKpiCard";
 import { CohortFunnelRow, CohortTile, type CohortDrilldownLabels } from "./CohortDrilldown";
-import { cohortCount, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
-import { cohortHeaderLines, cohortPeriodPhrase } from "@/lib/reports/cohortHeader";
+import { cohortCount, RATE_POPULATION, type CohortPopulation, type DrilldownPopulation } from "@/lib/reports/cohortDrilldown";
+import { cohortHeaderLines, cohortPeriodPhrase, rateHeaderLines } from "@/lib/reports/cohortHeader";
 
 const dict = es.reports;
 
@@ -72,6 +72,7 @@ const periodPickerLabels: PeriodPickerLabels = {
 };
 const cohortLabels: CohortDrilldownLabels = {
   kpiNewContacts: dict.kpiNewContacts,
+  kpiReplyRate: dict.kpiReplyRate,
   funnelContacted: dict.funnelContacted,
   funnelReplied: dict.funnelReplied,
   funnelMeeting: dict.funnelMeeting,
@@ -157,22 +158,26 @@ export function ReportsView({
   // persons its number counted (cohortDrilldown.ts). The header words are
   // built here because they use dictionary formatters (server-only).
   const periodPhrase = cohortPeriodPhrase(period, range.fromDate, addDaysToDateString(range.lastDate, 1), dict);
-  // `rate` = the reply-rate tile: its counts (and its list) leave out current clients, so the header quotes those counts.
-  const cohortQuery = (population: CohortPopulation, rate = false) => {
-    const lines = cohortHeaderLines(
-      population,
-      rate ? { ...aggregates.funnel, repliedOrMore: funnel.rateReplied, contactedOrMore: funnel.rateContacted } : aggregates.funnel,
-      periodPhrase,
-      dict,
-    );
-    return {
-      population,
-      fromIso: range.fromIso,
-      toIso: range.toIso,
-      bdId,
-      ...(rate ? { excludeClients: true, summary: lines.summary, note: `${lines.note} ${dict.excludesActiveClients}.` } : lines),
-      labels: cohortLabels,
-    };
+  const cohortQuery = (population: CohortPopulation) => ({
+    population,
+    fromIso: range.fromIso,
+    toIso: range.toIso,
+    bdId,
+    ...cohortHeaderLines(population, aggregates.funnel, periodPhrase, dict),
+    labels: cohortLabels,
+  });
+  // The reply-rate tile is NOT a cohort population (owner decision 2026-11-06):
+  // its number and its list are dated events inside the period, and both leave
+  // current clients out.
+  const rateLines = rateHeaderLines(aggregates.funnel, periodPhrase, dict);
+  const rateQuery = {
+    population: RATE_POPULATION as DrilldownPopulation,
+    fromIso: range.fromIso,
+    toIso: range.toIso,
+    bdId,
+    summary: rateLines.summary,
+    note: `${rateLines.note} ${dict.excludesActiveClients}.`,
+    labels: cohortLabels,
   };
   const sourceRows = buildSourceConversionRows(aggregates.sourceStatus);
   const sourceTotal = sourceRows.reduce(
@@ -271,7 +276,7 @@ export function ReportsView({
           foot={dict.kpiNewContactsFoot}
         />
         <CohortTile
-          {...cohortQuery("replied", true)}
+          {...rateQuery}
           toneClass={funnel.rateReplyIsRate ? "info" : "neutral"}
           label={dict.kpiReplyRate}
           count={funnel.rateReplied}
@@ -358,18 +363,16 @@ export function ReportsView({
               <div className="bar-track">
                 <span className="bar-info" style={{ width: `${funnel.contactedPct}%` }} />
               </div>
+              {/* No "% de Contactado" detail here on purpose (owner decision
+                  2026-11-06): this row is a cohort snapshot by current status,
+                  and the ratio it used to show contradicted the "Tasa de
+                  respuesta" tile above, which is now the page's ONE response
+                  rate — the dated one. The count and the bar stay. */}
               <CohortFunnelRow
                 {...cohortQuery("replied")}
                 count={funnel.repliedOrMore}
                 label={dict.funnelReplied}
                 ariaLabel={dict.funnelOpenReplied(funnel.repliedOrMore)}
-                detail={
-                  <span className="soft small">
-                    {funnel.replyRateIsRate
-                      ? `(${funnel.repliedOfContactedPct}% ${dict.funnelOfContacted} · ${funnel.replyRateFraction})`
-                      : `(${funnel.replyRateFraction} ${dict.funnelOfContacted} · ${funnel.repliedOfContactedPct}%)`}
-                  </span>
-                }
               />
               <div className="bar-track">
                 <span className="bar-warn" style={{ width: `${funnel.repliedPct}%` }} />

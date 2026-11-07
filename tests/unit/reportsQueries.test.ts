@@ -9,14 +9,17 @@ import { test } from "node:test";
 import { PgDialect } from "drizzle-orm/pg-core";
 import {
   buildMeetingsDrilldownQuery,
+  buildRateDrilldownQuery,
   buildReportAggregatesQuery,
   buildReportPerBdQuery,
   buildWonCompaniesDrilldownQuery,
   type MeetingsDrilldownParams,
+  type RateDrilldownParams,
   type ReportAggregatesParams,
   type ReportPerBdParams,
   type WonCompaniesDrilldownParams,
 } from "@/lib/reports/queries";
+import { STATUS_NEUTRAL_ACTIVITY_TYPES } from "@/lib/status/deriveStatus";
 
 const dialect = new PgDialect();
 
@@ -41,6 +44,101 @@ test("buildReportAggregatesQuery: person scope excludes merged persons and filte
   assert.match(sql, /person\.merged_into_id is null/i);
   assert.match(sql, /person\.created_at >= \$\d+::timestamptz/i);
   assert.match(sql, /person\.created_at < \$\d+::timestamptz/i);
+});
+
+/** Everything from the first rate CTE to the end of the rate counts — the dated reply-rate block. */
+function rateSection(sql: string): string {
+  const start = sql.indexOf("rpt_rate_events");
+  assert.notEqual(start, -1, "the dated reply-rate CTEs are missing");
+  const end = sql.indexOf("rpt_source_status");
+  return sql.slice(start, end === -1 ? undefined : end);
+}
+
+test("buildReportAggregatesQuery: the reply rate is NOT the status cache over the created-in-period cohort any more", () => {
+  const { sql } = renderAgg();
+  assert.doesNotMatch(sql, /pbc_in_rate/, "the per-cohort-person client flag only existed to filter the snapshot rate");
+  const section = rateSection(sql);
+  assert.doesNotMatch(section, /rpt_person_scope/, "the rate must not read the created-in-period cohort at all");
+  assert.doesNotMatch(section, /person\.status/, "the rate must not be derived from the person.status cache");
+  assert.doesNotMatch(section, /person\.created_at/, "the denominator is 'contacted in the period', not 'created in the period'");
+  assert.match(section, /min\(rpt_rate_events\.pbc_at\) filter \(where rpt_rate_events\.pbc_outreach\)/);
+  assert.match(section, /max\(rpt_rate_events\.pbc_at\) filter \(where rpt_rate_events\.pbc_reply\)/);
+  assert.match(section, /pbc_last_reply_at >= rpt_rate_person\.pbc_first_outreach_at/, "a reply before the period's first outreach never counts");
+});
+
+test("buildReportAggregatesQuery: the rate's activity evidence is dated by effectiveActivityAtSql and only the non-neutral types", () => {
+  const section = rateSection(renderAgg().sql);
+  assert.match(section, /when "activity"\."type" = .status_backfill./i, "a backfill must be dated by metadata.originalAt");
+  assert.match(section, /activity\.type in \('email_sent', 'call', 'whatsapp', 'status_change', 'status_backfill', 'reply_received', 'meeting_logged'\)/);
+  assert.match(section, /activity\.metadata->>'direction' = 'outbound'/);
+  assert.match(section, /activity\.metadata->>'outcome' = 'connected'/);
+  // Outreach is 'contacted' ALONE: a manual move to 'replied' would otherwise be its own outreach at the same
+  // instant, and `max(reply) >= min(outreach)` would hold by equality — one click, a guaranteed 1/1.
+  assert.match(section, /activity\.metadata->>'status' in \('contacted'\)/);
+  assert.doesNotMatch(section, /activity\.metadata->>'status' in \('contacted', 'replied', 'meeting'\)/);
+  assert.match(section, /activity\.metadata->>'status' in \('replied', 'meeting'\)/);
+  for (const type of STATUS_NEUTRAL_ACTIVITY_TYPES) {
+    assert.doesNotMatch(section, new RegExp(`'${type}'`), `${type} moves nothing and must not appear in the rate's evidence`);
+  }
+});
+
+test("buildReportAggregatesQuery: LinkedIn conversation traffic is NOT evidence — `activity` is the only source", () => {
+  // Owner decision 2026-11-06: 1044 of the 1259 persons in the metric arrived through imported chat traffic alone,
+  // at a visibly different rate (55.8% vs 36.7%). The `message`/`conversation` union arm was deleted, not disabled.
+  const { sql } = renderAgg({ ...AGG_PARAMS, bdId: "00000000-0000-0000-0000-000000000001" });
+  const section = rateSection(sql);
+  for (const forbidden of ["message", "conversation", "peer_profile_key", "is_draft", "sender_profile_key", "profile_key"]) {
+    assert.doesNotMatch(section, new RegExp(forbidden), `the rate must not read ${forbidden}`);
+  }
+  assert.doesNotMatch(section, /union all/, "there is a single evidence source now");
+  // The whole statement must not pull those tables in for the rate's sake either.
+  assert.doesNotMatch(sql, /from "message"|join "conversation"/);
+});
+
+test("buildRateDrilldownQuery: the list reads the same single source, no LinkedIn arm", () => {
+  const { sql } = dialect.sqlToQuery(buildRateDrilldownQuery(RATE_DRILLDOWN_PARAMS));
+  assert.doesNotMatch(sql, /from "message"|join "conversation"|peer_profile_key/);
+});
+
+test("buildReportAggregatesQuery: the rate's person scope is non-merged, BD-scoped and still excludes current clients", () => {
+  const section = rateSection(renderAgg({ ...AGG_PARAMS, bdId: "00000000-0000-0000-0000-000000000001" }).sql);
+  const scope = section.slice(section.indexOf("rpt_rate_scope"));
+  assert.match(scope, /person\.merged_into_id is null/);
+  assert.match(scope, /\$\d+::uuid is null or person\.owner_bd_id = \$\d+::uuid/);
+  assert.match(scope, /cc_client\.relationship_stage = 'won'[\s\S]*?cc_client\.client_status = 'active'/);
+  assert.match(scope, /company_alias/, "the client check canonicalizes company_key through the aliases");
+});
+
+test('buildReportAggregatesQuery: "Embudo de contactos" stays a snapshot by current status over the created-in-period cohort', () => {
+  const { sql } = renderAgg();
+  const funnel = sql.slice(sql.indexOf("rpt_funnel"), sql.indexOf("rpt_source_status"));
+  assert.match(funnel, /count\(\*\) filter \(where rpt_person_scope\.status in \('contacted','replied','meeting'\)\)::int as pbc_contacted_or_more/);
+  assert.match(funnel, /count\(\*\) filter \(where rpt_person_scope\.status in \('replied','meeting'\)\)::int as pbc_replied_or_more/);
+  assert.match(funnel, /count\(\*\) filter \(where rpt_person_scope\.status = 'meeting'\)::int as pbc_meeting/);
+  assert.match(sql, /'rateContacted', pbc_rate_contacted/);
+  assert.match(sql, /'rateReplied', pbc_rate_replied/);
+});
+
+const RATE_DRILLDOWN_PARAMS: RateDrilldownParams = { fromIso: AGG_PARAMS.fromIso, toIso: AGG_PARAMS.toIso, bdId: null };
+
+test("buildRateDrilldownQuery: lists exactly the numerator's persons, with the FIRST qualifying reply as their reply date", () => {
+  const { sql, params } = dialect.sqlToQuery(buildRateDrilldownQuery(RATE_DRILLDOWN_PARAMS));
+  assert.match(sql, /rpt_rate_events/, "same evidence CTEs as the number it opens");
+  assert.match(sql, /rpt_rate_scope/);
+  assert.match(sql, /min\(rpt_rate_events\.pbc_at\) as pbc_reply_at/);
+  assert.match(sql, /rpt_rate_events\.pbc_reply\s*\n\s*and rpt_rate_events\.pbc_at >= rpt_rate_scope\.pbc_first_outreach_at/);
+  assert.doesNotMatch(sql, /person\.status in/, "the list is defined by dated events, never by the status cache");
+  assert.doesNotMatch(sql, /sequence_member\.replied_at as reply_at/, "the shown date is the qualifying event, not sequence_member");
+  assert.equal(params[params.length - 1], 500);
+});
+
+test("buildRateDrilldownQuery: the reply date comes from the qualifying activity row, which is why it is never null here", () => {
+  const { sql } = dialect.sqlToQuery(buildRateDrilldownQuery(RATE_DRILLDOWN_PARAMS));
+  const events = sql.slice(sql.indexOf("rpt_rate_events"), sql.indexOf("rpt_rate_person"));
+  assert.match(events, /activity\.type in \('reply_received', 'meeting_logged'\)/);
+  assert.match(events, /as pbc_reply/);
+  // reply_at is selected from the events CTE, never left to a nullable side lookup.
+  assert.match(sql, /rpt_rate_replied\.pbc_reply_at as reply_at/);
 });
 
 test("buildReportAggregatesQuery: nullable bd filter uses the same '::uuid is null or column = ::uuid' shape for person and company", () => {

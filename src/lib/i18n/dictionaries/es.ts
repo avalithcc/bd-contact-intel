@@ -2534,7 +2534,11 @@ export const es: typeof en = {
     kpiNewContacts: "Contactos nuevos",
     kpiNewContactsFoot: "personas que entraron al embudo en el período",
     kpiReplyRate: "Tasa de respuesta",
-    kpiReplyRateFoot: (replied: number, contacted: number) => `Respondió ${replied} ÷ Contactado ${contacted}`,
+    // Owner decision 2026-11-06: numerador y denominador son hechos fechados
+    // DENTRO del período, no el estado actual de la cohorte. El pie tiene que
+    // decirlo, porque "Respondió ÷ Contactado" se leía como la instantánea del
+    // embudo que estaba al lado.
+    kpiReplyRateFoot: (replied: number, contacted: number) => `${replied} respondieron ÷ ${contacted} contactados en el período`,
     // Below MIN_RATE_SAMPLE the tile inverts: the fraction is the value and
     // the percentage drops to the foot. Owner direction 2026-10-14 — the
     // explanatory "sample too small" copy was dropped once the hierarchy
@@ -2571,7 +2575,6 @@ export const es: typeof en = {
     funnelContacted: "Contactado",
     funnelReplied: "Respondió",
     funnelMeeting: "Reunión",
-    funnelOfContacted: "de Contactado",
     funnelOfReplied: "de Respondió",
     funnelDiscardedFoot: (count: number, pct: number) =>
       `Aparte del embudo: ${count} descartado(s) (${pct}% de Nuevo) — no es una etapa de avance.`,
@@ -2647,6 +2650,9 @@ export const es: typeof en = {
     cohortNote: "Estado actual de cada contacto, no la actividad del período.",
     cohortNoteReplied: (period: string) =>
       `Estado actual de cada contacto, no la actividad del período: «creados ${period}» es la cohorte, no cuándo respondieron.`,
+    cohortHeaderRate: (count: string, base: string, period: string) => `${count} de ${base} contactados ${period}`,
+    cohortNoteRate: (period: string) =>
+      `Contacto y respuesta fechados ${period}: la respuesta cuenta solo si llegó después del primer contacto del período.`,
     cohortColContact: "Contacto",
     cohortColCompany: "Empresa",
     cohortColBd: "BD dueño",

@@ -43,8 +43,9 @@ import { activity, bd, company, followUpQueueItem, meeting, person, sequence, se
 import { effectiveActivityAtSql, happenedAtDisplaySql, happenedAtSql, safeTimestamptzText } from "@/lib/contacts/effectiveActivityTime";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 import { notCurrentClientPersonSql } from "@/lib/reports/currentClient";
+import { rateEventActivityTypesSql, rateOutreachActivitySql, rateReplyActivitySql } from "@/lib/reports/replyRateEvidence";
 import { WON_TRACKING_STARTS_AT_ISO } from "@/lib/reports/wonTracking";
-import { COHORT_STATUSES, cohortHasReplyColumns, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
+import { COHORT_STATUSES, drilldownHasReplyColumns, type CohortPopulation } from "@/lib/reports/cohortDrilldown";
 import { DRILLDOWN_ROW_LIMIT } from "@/lib/reports/drilldownLimit";
 
 /**
@@ -118,9 +119,9 @@ export interface ReportAggregatesParams {
  * The period's cohort: non-merged persons created in the period, owner-scoped
  * when a BD is selected. Shared by `rpt_person_scope` (the funnel counts) and
  * the cohort drill-down list, so a tile and the list behind it can never
- * disagree about WHO is in scope. Everyone is in the cohort, current clients included: only the reply rate leaves them
- * out (owner decision 2026-10-19), via `rpt_person_scope.pbc_in_rate` and the drill-down's `excludeClients`.
- * Call sites FROM `${person}` un-aliased.
+ * disagree about WHO is in scope. Everyone is in the cohort, current clients included — the reply rate is not a
+ * cohort at all any more (`rateScopeCtesSql`), and it is the only place current clients are left out (owner decision
+ * 2026-10-19). Call sites FROM `${person}` un-aliased.
  */
 function cohortScopeSql({ fromIso, toIso, bdId }: ReportAggregatesParams) {
   return sql`person.merged_into_id is null
@@ -129,10 +130,78 @@ function cohortScopeSql({ fromIso, toIso, bdId }: ReportAggregatesParams) {
         and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)`;
 }
 
+/**
+ * "Tasa de respuesta" (owner decision 2026-11-06): the three CTEs behind BOTH
+ * the tile's number and the list behind it, so they can never disagree. The
+ * evidence rule itself lives in replyRateEvidence.ts (with its pure twin and
+ * its tests); this only dates it and scopes the persons.
+ *
+ *  - `rpt_rate_events`  every dated piece of evidence inside [from, to), one
+ *    row per event, with its two flags, dated by the shared
+ *    `effectiveActivityAtSql()` (so a `status_backfill` lands in the period it
+ *    reconstructs, via `metadata.originalAt`, and a soft-deleted row drops
+ *    out). The window is applied HERE, before any per-person work — this is
+ *    deliberately not a correlated EXISTS per person: at 26,600 persons that
+ *    would be 26,600 index probes into `activity`. One windowed pass instead.
+ *  - `rpt_rate_person`  per person: the FIRST outreach and the LAST reply.
+ *    "a reply at or after the first outreach exists" is exactly
+ *    `max(reply) >= min(outreach)`, so the numerator needs no second pass.
+ *  - `rpt_rate_scope`   the person rules, applied only to the persons that
+ *    actually have evidence (a far smaller set than the whole table):
+ *    non-merged, owner-scoped when a BD is selected, and current clients still
+ *    excluded (owner decision 2026-10-19).
+ *
+ * `activity` is the ONLY source. LinkedIn `message`/`conversation` rows were an
+ * arm of this union and were removed by owner decision 2026-11-06 — see
+ * replyRateEvidence.ts's doc comment for the measurement that forced it (83%
+ * of the persons in the metric arrived through imported chat traffic). Do not
+ * add them back.
+ *
+ * Call sites FROM `${person}`/`${activity}` un-aliased (rule 4,
+ * `notCurrentClientPersonSql`/`effectiveActivityAtSql` both require it), and
+ * every CTE column is `pbc_`-prefixed so it cannot collide with a joined
+ * table's own columns.
+ */
+function rateScopeCtesSql({ fromIso, toIso, bdId }: ReportAggregatesParams) {
+  return sql`rpt_rate_events as (
+      select
+        activity.person_id as pbc_person_id,
+        ${effectiveActivityAtSql()} as pbc_at,
+        ${rateOutreachActivitySql()} as pbc_outreach,
+        ${rateReplyActivitySql()} as pbc_reply
+      from ${activity}
+      where activity.person_id is not null
+        and activity.type in (${rateEventActivityTypesSql()})
+        and (${rateOutreachActivitySql()} or ${rateReplyActivitySql()})
+        and ${effectiveActivityAtSql()} >= ${fromIso}::timestamptz
+        and ${effectiveActivityAtSql()} < ${toIso}::timestamptz
+    ),
+    rpt_rate_person as (
+      select
+        rpt_rate_events.pbc_person_id as pbc_person_id,
+        min(rpt_rate_events.pbc_at) filter (where rpt_rate_events.pbc_outreach) as pbc_first_outreach_at,
+        max(rpt_rate_events.pbc_at) filter (where rpt_rate_events.pbc_reply) as pbc_last_reply_at
+      from rpt_rate_events
+      group by rpt_rate_events.pbc_person_id
+    ),
+    rpt_rate_scope as (
+      select
+        rpt_rate_person.pbc_person_id as pbc_id,
+        rpt_rate_person.pbc_first_outreach_at as pbc_first_outreach_at,
+        coalesce(rpt_rate_person.pbc_last_reply_at >= rpt_rate_person.pbc_first_outreach_at, false) as pbc_replied
+      from rpt_rate_person
+      join ${person} on person.id = rpt_rate_person.pbc_person_id
+      where rpt_rate_person.pbc_first_outreach_at is not null
+        and person.merged_into_id is null
+        and (${bdId}::uuid is null or person.owner_bd_id = ${bdId}::uuid)
+        and ${notCurrentClientPersonSql()}
+    )`;
+}
+
 export function buildReportAggregatesQuery({ fromIso, toIso, scheduledToIso = toIso, bdId }: ReportAggregatesParams) {
   return sql`
     with rpt_person_scope as (
-      select person.id, person.status, person.source_key, ${notCurrentClientPersonSql()} as pbc_in_rate
+      select person.id, person.status, person.source_key
       from ${person}
       where ${cohortScopeSql({ fromIso, toIso, bdId })}
     ),
@@ -141,11 +210,16 @@ export function buildReportAggregatesQuery({ fromIso, toIso, scheduledToIso = to
         count(*)::int as pbc_new_total,
         count(*) filter (where rpt_person_scope.status in ('contacted','replied','meeting'))::int as pbc_contacted_or_more,
         count(*) filter (where rpt_person_scope.status in ('replied','meeting'))::int as pbc_replied_or_more,
-        count(*) filter (where rpt_person_scope.pbc_in_rate and rpt_person_scope.status in ('contacted','replied','meeting'))::int as pbc_rate_contacted,
-        count(*) filter (where rpt_person_scope.pbc_in_rate and rpt_person_scope.status in ('replied','meeting'))::int as pbc_rate_replied,
         count(*) filter (where rpt_person_scope.status = 'meeting')::int as pbc_meeting,
         count(*) filter (where rpt_person_scope.status = 'discarded')::int as pbc_discarded
       from rpt_person_scope
+    ),
+    ${rateScopeCtesSql({ fromIso, toIso, bdId })},
+    rpt_rate as (
+      select
+        count(*)::int as pbc_rate_contacted,
+        count(*) filter (where rpt_rate_scope.pbc_replied)::int as pbc_rate_replied
+      from rpt_rate_scope
     ),
     rpt_source_status as (
       select rpt_person_scope.source_key as pbc_source_key, rpt_person_scope.status as pbc_status, count(*)::int as pbc_count
@@ -214,7 +288,7 @@ export function buildReportAggregatesQuery({ fromIso, toIso, scheduledToIso = to
         'rateReplied', pbc_rate_replied,
         'meeting', pbc_meeting,
         'discarded', pbc_discarded
-      ) from rpt_funnel) as funnel,
+      ) from rpt_funnel cross join rpt_rate) as funnel,
       coalesce((select json_agg(json_build_object('sourceKey', pbc_source_key, 'status', pbc_status, 'count', pbc_count)) from rpt_source_status), '[]'::json) as source_status,
       coalesce((select json_agg(json_build_object('reason', pbc_reason, 'count', pbc_count)) from rpt_discard_reasons), '[]'::json) as discard_reasons,
       coalesce((select json_agg(json_build_object('stage', pbc_stage, 'count', pbc_count)) from rpt_pipeline), '[]'::json) as pipeline,
@@ -500,15 +574,82 @@ export type MeetingDrilldownRawResultRow = {
 
 export interface CohortDrilldownParams extends ReportAggregatesParams {
   population: CohortPopulation;
-  /** The reply-rate tile's list: leaves out current clients (won + active), exactly like its number. */
-  excludeClients?: boolean;
+}
+
+export interface RateDrilldownParams {
+  fromIso: string;
+  toIso: string;
+  bdId: string | null;
 }
 
 /**
- * Cohort drill-down behind "Tasa de respuesta" and the funnel's Contactado /
+ * The list behind "Tasa de respuesta": EXACTLY the persons `rpt_rate`
+ * counted as replied — same `rateScopeCtesSql`, same window, same BD and
+ * client rules — because cohortDrilldown.ts's rule is that the list behind a
+ * number is the same persons.
+ *
+ * `reply_at` is the dated reply event that actually qualified the person: the
+ * FIRST reply at or after that period's first outreach, LinkedIn messages
+ * included. The old list read `reply_at` only from `reply_received` activity
+ * and `sequence_member.replied_at`, which is why the 2832 persons who were in
+ * the numerator through their imported LinkedIn history showed no reply date
+ * at all. `sequence_name` stays a best-effort LEFT JOIN (and never the date's
+ * source), so a person with no Sequence is never dropped.
+ */
+export function buildRateDrilldownQuery(params: RateDrilldownParams) {
+  return sql`
+    with ${rateScopeCtesSql(params)},
+    rpt_rate_replied as (
+      select
+        rpt_rate_scope.pbc_id as pbc_id,
+        min(rpt_rate_events.pbc_at) as pbc_reply_at
+      from rpt_rate_scope
+      join rpt_rate_events on rpt_rate_events.pbc_person_id = rpt_rate_scope.pbc_id
+      where rpt_rate_events.pbc_reply
+        and rpt_rate_events.pbc_at >= rpt_rate_scope.pbc_first_outreach_at
+      group by rpt_rate_scope.pbc_id
+    ),
+    rpt_rate_sequence as (
+      select distinct on (sequence_member.person_id)
+        sequence_member.person_id as pbc_person_id,
+        sequence.id as pbc_sequence_id,
+        sequence.name as pbc_sequence_name
+      from ${sequenceMember}
+      join ${sequence} on sequence.id = sequence_member.sequence_id
+      where sequence_member.replied_at is not null
+        and exists (select 1 from rpt_rate_replied where rpt_rate_replied.pbc_id = sequence_member.person_id)
+      order by sequence_member.person_id, sequence_member.replied_at desc, sequence_member.id
+    )
+    select
+      person.id as person_id,
+      person.first_name as first_name,
+      person.last_name as last_name,
+      company.display_name as company_name,
+      bd.name as owner_bd_name,
+      person.status as status,
+      person.role_group as role_group,
+      person.job_title as job_title,
+      person.created_at as created_at,
+      rpt_rate_replied.pbc_reply_at as reply_at,
+      rpt_rate_sequence.pbc_sequence_id as sequence_id,
+      rpt_rate_sequence.pbc_sequence_name as sequence_name
+    from rpt_rate_replied
+    join ${person} on person.id = rpt_rate_replied.pbc_id
+    left join ${company} on company.company_key = person.company_key
+    left join ${bd} on bd.id = person.owner_bd_id
+    left join rpt_rate_sequence on rpt_rate_sequence.pbc_person_id = rpt_rate_replied.pbc_id
+    order by rpt_rate_replied.pbc_reply_at desc, person.id
+    limit ${DRILLDOWN_ROW_LIMIT}
+  `;
+}
+
+/**
+ * Cohort drill-down behind "Contactos nuevos" and the funnel's Contactado /
  * Respondió / Reunión rows (reports-kpi-drilldown): the persons `rpt_funnel`
  * counted for `population`, by CURRENT status, in the same cohort scope.
- * MIN_RATE_SAMPLE never reaches this query — it is a display rule only.
+ * MIN_RATE_SAMPLE never reaches this query — it is a display rule only. The
+ * reply-rate tile has its own dated list (`buildRateDrilldownQuery`); it is
+ * not a cohort population, which is why nothing here filters clients any more.
  *
  * Reply populations add two best-effort columns, both LEFT-joined so a missing
  * value never drops a person: the latest `reply_received` activity's effective
@@ -525,7 +666,7 @@ export function buildCohortDrilldownQuery(params: CohortDrilldownParams) {
   // "new" (empty list) is the whole cohort: no status predicate at all.
   const statusFilter = COHORT_STATUSES[params.population].length > 0 ? sql`
         and person.status in (${statuses})` : sql``;
-  const withReply = cohortHasReplyColumns(params.population);
+  const withReply = drilldownHasReplyColumns(params.population);
   const replyCtes = withReply
     ? sql`,
     rpt_cohort_reply as (
@@ -572,8 +713,7 @@ export function buildCohortDrilldownQuery(params: CohortDrilldownParams) {
         person.job_title as pbc_job_title,
         person.created_at as pbc_created_at
       from ${person}
-      where ${cohortScopeSql(params)}${statusFilter}${params.excludeClients ? sql`
-        and ${notCurrentClientPersonSql()}` : sql``}
+      where ${cohortScopeSql(params)}${statusFilter}
     )${replyCtes}
     select
       rpt_cohort.pbc_id as person_id,

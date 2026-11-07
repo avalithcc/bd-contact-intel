@@ -1,18 +1,31 @@
 /**
- * Cohort drill-down behind "Tasa de respuesta" and the funnel's Contactado /
- * Respondió / Reunión rows (reports-kpi-drilldown). Each number on the page is
- * a count over the period's COHORT (non-merged persons created in the period,
- * optionally owner-scoped) by CURRENT status; the list behind it must be the
- * same persons. `COHORT_STATUSES` is the one mapping the list query uses and
- * the tests pin against `rpt_funnel`'s own status lists in queries.ts.
+ * Drill-down lists behind the numbers on /admin/reports (reports-kpi-drilldown).
+ * The one rule: the list behind a number is the same persons the number counted.
+ *
+ * Two different questions, so two different populations:
+ *  - the four COHORT populations ("Contactos nuevos" and the funnel's
+ *    Contactado / Respondió / Reunión rows) count non-merged persons CREATED in
+ *    the period by CURRENT status. `COHORT_STATUSES` is the one mapping the
+ *    list query uses, pinned against `rpt_funnel`'s own status lists in
+ *    queries.ts.
+ *  - `RATE_POPULATION` ("Tasa de respuesta", owner decision 2026-11-06) is not
+ *    a cohort at all: it counts persons with a DATED reply event inside the
+ *    period, at or after their first dated outreach inside it, whatever their
+ *    creation date (queries.ts#buildRateDrilldownQuery). It is kept apart from
+ *    the cohort populations precisely so `cohortCount`/`cohortBase` stay honest
+ *    about the funnel's own numbers.
  *
  * MIN_RATE_SAMPLE (funnel.ts) only changes how the tile DISPLAYS the ratio;
  * nothing here reads it, so a small sample never shrinks the list.
  */
 import { parseDbTimestamp } from "@/lib/db/timestamp";
-import type { FunnelCounts } from "./funnel";
+import type { FunnelCounts, ReplyRateCounts } from "./funnel";
 
 export type CohortPopulation = "new" | "contacted" | "replied" | "meeting";
+
+/** The reply-rate tile's own list — see this file's doc comment. */
+export const RATE_POPULATION = "rate_replied";
+export type DrilldownPopulation = CohortPopulation | typeof RATE_POPULATION;
 
 /**
  * Status list per population. An EMPTY list means "any status": "new" is the
@@ -30,8 +43,12 @@ export function isCohortPopulation(value: unknown): value is CohortPopulation {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(COHORT_STATUSES, value);
 }
 
+export function isDrilldownPopulation(value: unknown): value is DrilldownPopulation {
+  return value === RATE_POPULATION || isCohortPopulation(value);
+}
+
 /** Nuevos and Contactado have no reply columns: nobody in them has to have replied. */
-export function cohortHasReplyColumns(population: CohortPopulation): boolean {
+export function drilldownHasReplyColumns(population: DrilldownPopulation): boolean {
   return population !== "contacted" && population !== "new";
 }
 
@@ -82,6 +99,15 @@ export function cohortBase(funnel: FunnelCounts, population: CohortPopulation): 
   return population === "new" || population === "contacted" ? funnel.newTotal : population === "replied" ? funnel.contactedOrMore : funnel.repliedOrMore;
 }
 
+/** The reply-rate list's own number and denominator: both dated, neither from the cohort. */
+export function rateCount(rate: ReplyRateCounts): number {
+  return rate.rateReplied;
+}
+
+export function rateBase(rate: ReplyRateCounts): number {
+  return rate.rateContacted;
+}
+
 export interface CohortRawRow {
   personId: string;
   firstName: string | null;
@@ -108,7 +134,11 @@ export interface CohortRow {
   /** Raw `person.job_title` (free text). */
   jobTitle: string | null;
   createdAt: Date;
-  /** `null` for a contact moved to Respondió by hand (no reply event). */
+  /**
+   * The cohort lists: the latest `reply_received` activity, `null` for a
+   * contact moved to Respondió by hand. The reply-rate list: always set — it
+   * IS the dated event that qualified the person (LinkedIn message included).
+   */
   replyAt: Date | null;
   /** `null` until `sequence_member.replied_at` is populated, or for a manual change. */
   sequenceId: string | null;

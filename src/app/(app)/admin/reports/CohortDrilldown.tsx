@@ -7,7 +7,7 @@ import { ChevronRightIcon } from "@/components/icons";
 import { KpiDrilldownCard, DrilldownDialog, useDrilldown } from "./KpiDrilldownCard";
 import { getCohortDrilldownAction } from "./actions";
 import { drilldownCacheKey } from "@/lib/reports/drilldownCacheKey";
-import { cohortHasReplyColumns, contactSubline, type CohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
+import { contactSubline, drilldownHasReplyColumns, RATE_POPULATION, type CohortRow, type DrilldownPopulation } from "@/lib/reports/cohortDrilldown";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import type { ClientStrings } from "@/lib/i18n/clientStrings";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -19,6 +19,7 @@ export type CohortDrilldownLabels = ClientStrings<
   Pick<
     Dictionary["reports"],
     | "kpiNewContacts"
+    | "kpiReplyRate"
     | "funnelContacted"
     | "funnelReplied"
     | "funnelMeeting"
@@ -44,20 +45,32 @@ export type CohortDrilldownLabels = ClientStrings<
 > & { leadStatuses: Dictionary["leadStatuses"]; roleGroups: Dictionary["roleGroups"] };
 
 interface CohortQuery {
-  population: CohortPopulation;
+  population: DrilldownPopulation;
   fromIso: string;
   toIso: string;
   bdId: string | null;
-  /** The reply-rate tile only: leave current clients out of the list, like its number. */
-  excludeClients?: boolean;
-  /** Header text, built server-side by cohortHeaderLines. */
+  /** Header text, built server-side by cohortHeaderLines / rateHeaderLines. */
   summary: string;
   note: string;
   labels: CohortDrilldownLabels;
 }
 
-const TITLE_KEY = { new: "kpiNewContacts", contacted: "funnelContacted", replied: "funnelReplied", meeting: "funnelMeeting" } as const;
-const EMPTY_KEY = { new: "cohortEmptyNew", contacted: "cohortEmptyContacted", replied: "cohortEmptyReplied", meeting: "cohortEmptyMeeting" } as const;
+// `rate_replied` reuses the Respondió empty state (it is still "nobody
+// replied"), but its own tile label as the dialog title.
+const TITLE_KEY = {
+  new: "kpiNewContacts",
+  contacted: "funnelContacted",
+  replied: "funnelReplied",
+  meeting: "funnelMeeting",
+  [RATE_POPULATION]: "kpiReplyRate",
+} as const;
+const EMPTY_KEY = {
+  new: "cohortEmptyNew",
+  contacted: "cohortEmptyContacted",
+  replied: "cohortEmptyReplied",
+  meeting: "cohortEmptyMeeting",
+  [RATE_POPULATION]: "cohortEmptyReplied",
+} as const;
 
 function CohortSubtitle({ summary, note }: { summary: string; note: string }) {
   return (
@@ -92,9 +105,9 @@ function ContactSubline({ jobTitle, roleGroup, l }: { jobTitle: string | null; r
   );
 }
 
-function CohortRowsTable({ population, rows, labels: l }: { population: CohortPopulation; rows: CohortRow[]; labels: CohortDrilldownLabels }) {
+function CohortRowsTable({ population, rows, labels: l }: { population: DrilldownPopulation; rows: CohortRow[]; labels: CohortDrilldownLabels }) {
   if (rows.length === 0) return <p className="meta">{l[EMPTY_KEY[population]]}</p>;
-  const withReply = cohortHasReplyColumns(population);
+  const withReply = drilldownHasReplyColumns(population);
   return (
     <table className="data compact">
       <thead>
@@ -175,10 +188,10 @@ function CohortDialog({
 }
 
 /**
- * KPI tile that opens a cohort list via the shared KpiDrilldownCard:
- * "Tasa de respuesta" (replied — the rate's numerator) and "Contactos nuevos"
- * (new — the whole cohort). `count` (not the displayed "28%"/"3 / 7") decides
- * clickability.
+ * KPI tile that opens a drill-down list via the shared KpiDrilldownCard:
+ * "Tasa de respuesta" (`rate_replied` — the dated numerator) and "Contactos
+ * nuevos" (`new` — the whole cohort). `count` (not the displayed "28%"/"3 / 7")
+ * decides clickability.
  */
 export function CohortTile({
   toneClass,
@@ -209,8 +222,8 @@ export function CohortTile({
       closeLabel={l.dialogClose}
       loadingLabel={l.dialogLoading}
       errorLabel={l.dialogError}
-      cacheKey={drilldownCacheKey({ kind: query.excludeClients ? `${query.population}_rate` : query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
-      fetchRows={() => getCohortDrilldownAction({ population: query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId, excludeClients: query.excludeClients })}
+      cacheKey={drilldownCacheKey({ kind: query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
+      fetchRows={() => getCohortDrilldownAction({ population: query.population, fromIso: query.fromIso, toIso: query.toIso, bdId: query.bdId })}
       renderList={(rows) => <CohortRowsTable population={query.population} rows={rows} labels={l} />}
     />
   );
@@ -227,7 +240,7 @@ export function CohortFunnelRow({
   detail,
   ariaLabel,
   ...query
-}: CohortQuery & { count: number; label: string; detail: React.ReactNode; ariaLabel: string }) {
+}: CohortQuery & { count: number; label: string; detail?: React.ReactNode; ariaLabel: string }) {
   const drilldown = useCohortList(query);
   if (count < 1) {
     return (

@@ -11,9 +11,9 @@
 import { unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { isUuid } from "@/lib/uuid";
-import { getCohortDrilldown, getMeetingsDrilldown, getWonCompaniesDrilldown } from "@/lib/reports/queriesDb";
+import { getCohortDrilldown, getMeetingsDrilldown, getRateDrilldown, getWonCompaniesDrilldown } from "@/lib/reports/queriesDb";
 import { isValidReportWindow } from "@/lib/reports/period";
-import { isCohortPopulation, type CohortRow } from "@/lib/reports/cohortDrilldown";
+import { isDrilldownPopulation, RATE_POPULATION, type CohortRow } from "@/lib/reports/cohortDrilldown";
 import type { MeetingDrilldownRow } from "@/lib/reports/meetingsDrilldown";
 import type { WonCompanyDrilldownRow } from "@/lib/reports/wonCompaniesDrilldown";
 
@@ -66,20 +66,19 @@ export async function getCohortDrilldownAction(params: {
   fromIso: string;
   toIso: string;
   bdId: string | null;
-  excludeClients?: boolean;
 }): Promise<DrilldownResult<CohortRow>> {
   try {
     await requireAdmin();
-    if (!isCohortPopulation(params.population) || !isValidReportWindow(params.fromIso, params.toIso)) {
+    if (!isDrilldownPopulation(params.population) || !isValidReportWindow(params.fromIso, params.toIso)) {
       return { ok: false };
     }
-    const rows = await getCohortDrilldown({
-      population: params.population,
-      fromIso: params.fromIso,
-      toIso: params.toIso,
-      bdId: normalizedBdId(params.bdId),
-      excludeClients: params.excludeClients === true,
-    });
+    const window = { fromIso: params.fromIso, toIso: params.toIso, bdId: normalizedBdId(params.bdId) };
+    // The reply-rate list is not a cohort population: it has its own dated
+    // query (cohortDrilldown.ts), and it always leaves current clients out.
+    const rows =
+      params.population === RATE_POPULATION
+        ? await getRateDrilldown(window)
+        : await getCohortDrilldown({ ...window, population: params.population });
     return { ok: true, rows };
   } catch (err) {
     unstable_rethrow(err);

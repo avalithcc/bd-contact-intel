@@ -8,6 +8,7 @@ import { db } from "@/db";
 import {
   buildCohortDrilldownQuery,
   buildMeetingsDrilldownQuery,
+  buildRateDrilldownQuery,
   buildReportAggregatesQuery,
   buildReportPerBdQuery,
   buildWonCompaniesDrilldownQuery,
@@ -15,6 +16,7 @@ import {
   type CohortDrilldownRawResultRow,
   type MeetingDrilldownRawResultRow,
   type MeetingsDrilldownParams,
+  type RateDrilldownParams,
   type ReportAggregatesParams,
   type ReportAggregatesResult,
   type ReportPerBdParams,
@@ -82,9 +84,17 @@ export async function getMeetingsDrilldown(params: MeetingsDrilldownParams): Pro
   );
 }
 
-/** Cohort drill-down for the funnel/"Tasa de respuesta" — see queries.ts#buildCohortDrilldownQuery. */
+/** Cohort drill-down for "Contactos nuevos" and the funnel rows — see queries.ts#buildCohortDrilldownQuery. */
 export async function getCohortDrilldown(params: CohortDrilldownParams): Promise<CohortRow[]> {
-  const rows = await db.execute<CohortDrilldownRawResultRow>(buildCohortDrilldownQuery(params));
+  return mapCohortRows(await db.execute<CohortDrilldownRawResultRow>(buildCohortDrilldownQuery(params)));
+}
+
+/** "Tasa de respuesta" drill-down — the dated numerator's own list, see queries.ts#buildRateDrilldownQuery. */
+export async function getRateDrilldown(params: RateDrilldownParams): Promise<CohortRow[]> {
+  return mapCohortRows(await db.execute<CohortDrilldownRawResultRow>(buildRateDrilldownQuery(params)));
+}
+
+function mapCohortRows(rows: readonly CohortDrilldownRawResultRow[]): CohortRow[] {
   return buildCohortDrilldownRows(
     rows.map((r) => ({
       personId: r.person_id,
