@@ -2543,7 +2543,7 @@ export const es: typeof en = {
     // the percentage drops to the foot. Owner direction 2026-10-14 — the
     // explanatory "sample too small" copy was dropped once the hierarchy
     // itself carries the message.
-    kpiReplyRateSmallFoot: (pct: number) => `${pct}%`,
+    kpiReplyRateSmallFoot: (pct: number) => `${pct}% en el período`,
     kpiMeetings: "Reuniones realizadas",
     kpiMeetingsScheduled: "Reuniones agendadas",
     kpiMeetingsScheduledFoot: "por venir o por confirmar",

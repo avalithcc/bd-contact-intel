@@ -2564,7 +2564,7 @@ export const en = {
     // the percentage drops to the foot. Owner direction 2026-10-14 — the
     // explanatory "sample too small" copy was dropped once the hierarchy
     // itself carries the message.
-    kpiReplyRateSmallFoot: (pct: number) => `${pct}%`,
+    kpiReplyRateSmallFoot: (pct: number) => `${pct}% in the period`,
     kpiMeetings: "Meetings held",
     kpiMeetingsScheduled: "Meetings scheduled",
     kpiMeetingsScheduledFoot: "upcoming or to confirm",
