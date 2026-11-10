@@ -11,9 +11,9 @@ import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 
 const NOW = new Date("2026-10-15T14:00:00Z");
-const facts = (over: Partial<CardFacts>): CardFacts => ({ state: "drafted", hasDraft: true, holdReason: null, reminderDueAt: null, florida: false, discardReason: null, ...over });
+const facts = (over: Partial<CardFacts>): CardFacts => ({ state: "drafted", hasDraft: true, holdReason: null, reminderDueAt: null, florida: false, discardReason: null, reminderApproved: false, ...over });
 const ids = (c: ReturnType<typeof mapMemberCard>) => c.actions.map((a) => a.id);
-const WRITES = ["generate", "approve", "cancel", "advanceReminder", "readmit", "regenerate", "remove", "optOut", "reviewDraft", "reviewReminder"];
+const WRITES = ["generate", "approve", "cancel", "cancelReminder", "advanceReminder", "readmit", "regenerate", "remove", "optOut", "reviewDraft", "reviewReminder"];
 
 test("the view is read-only exactly when the viewer is not the owner", () => {
   assert.equal(isReadOnlyView("bd-a", "bd-a"), false);
@@ -35,9 +35,13 @@ test("read-only cards: one read action per state, the menu keeps only Abrir fich
     const c = mapMemberCard(facts(over), NOW, true);
     assert.deepEqual([ids(c), c.menu], [actions, menu], JSON.stringify(over));
   }
+  // Both reminder variants, with a due date set: an approved reminder is a card of its own, and its "Cancelar envío"
+  // writes, so it must not survive read-only either. Without the second pass this loop never reaches that card.
   for (const state of MEMBER_STATES) {
-    const c = mapMemberCard(facts({ state }), NOW, true);
-    for (const id of [...ids(c), ...c.menu]) assert.ok(!WRITES.includes(id), `${state} offers ${id}`);
+    for (const reminderApproved of [false, true]) {
+      const c = mapMemberCard(facts({ state, reminderDueAt: new Date("2026-10-14T13:00:00Z"), reminderApproved }), NOW, true);
+      for (const id of [...ids(c), ...c.menu]) assert.ok(!WRITES.includes(id), `${state} (approved reminder: ${reminderApproved}) offers ${id}`);
+    }
   }
 });
 
@@ -81,4 +85,10 @@ test("the read-only strings exist in both languages", () => {
     for (const k of [l.readOnlyTitle, l.readOnlyBody, l.readOnlyBack, l.readOnlyDialogNotice, l.readOnlyIntroLead, l.readOnlyIntroStrong, l.readOnlyIntroTail, l.actions.viewDraft, l.actions.viewReminder]) assert.ok(k.length > 0);
   }
   assert.match(es.sequences.readOnlyTitle, /\{owner\}/);
+});
+
+test("a read-only approved reminder keeps exactly viewReminder and drops cancelReminder", () => {
+  const c = mapMemberCard(facts({ state: "sent", reminderDueAt: new Date("2026-10-14T13:00:00Z"), reminderApproved: true }), NOW, true);
+  assert.deepEqual([c.kind, ids(c), c.menu], ["reminderApproved", ["viewReminder"], []]);
+  assert.equal(cardStep("cancelReminder"), 2);
 });

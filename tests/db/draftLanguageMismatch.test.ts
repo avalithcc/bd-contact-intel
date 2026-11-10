@@ -330,7 +330,7 @@ test("after an edit a manual_check hold is still on the card of the drafted memb
   const detail = await getSequenceDetail({ id: bdId, role: "bd" }, sequenceId);
   const cardOf = (id: string) => {
     const d = detail!.members.find((x) => x.memberId === id)!;
-    return mapMemberCard({ state: d.state, hasDraft: d.draft !== null, holdReason: d.holdReason, reminderDueAt: d.reminderDueAt, florida: d.florida, discardReason: d.discardReason }, NOW);
+    return mapMemberCard({ state: d.state, hasDraft: d.draft !== null, holdReason: d.holdReason, reminderDueAt: d.reminderDueAt, florida: d.florida, discardReason: d.discardReason, reminderApproved: d.reminderDraft?.approvedAt != null }, NOW);
   };
   assert.deepEqual([cardOf(unconfirmed.memberId).kind, cardOf(unconfirmed.memberId).holdReason], ["draft", "manual_check"]);
   assert.deepEqual([cardOf(stale.memberId).kind, cardOf(stale.memberId).holdReason], ["draft", null]);

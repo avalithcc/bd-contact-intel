@@ -32,7 +32,7 @@ test("no approval and no stored moment: nothing to describe", () => {
   assert.equal(approvedMoment({ scheduledFor: null, approvedAt: null }, DEFAULT_SCHEDULE, NOW), null);
 });
 
-const facts = (over: Partial<CardFacts>): CardFacts => ({ state: "approved", hasDraft: true, holdReason: null, reminderDueAt: null, florida: false, discardReason: null, ...over });
+const facts = (over: Partial<CardFacts>): CardFacts => ({ state: "approved", hasDraft: true, holdReason: null, reminderDueAt: null, florida: false, discardReason: null, reminderApproved: false, ...over });
 const ids = (c: ReturnType<typeof mapMemberCard>) => c.actions.map((a) => a.id);
 
 test("scheduled card: 'Programado' badge with view, change, send now and cancel the schedule", () => {

@@ -244,14 +244,33 @@ test("approving step 1 does not approve the reminder, and the reminder is approv
   const m = await mkSent("reminder");
   await db.update(sequenceDraft).set({ approvedAt: new Date(), approvedByBdId: bdId }).where(and(eq(sequenceDraft.sequenceMemberId, m.memberId), eq(sequenceDraft.step, 1)));
   assert.equal((await draftOf(m.memberId, 2)).approvedAt, null, "step 1 approval implies nothing about step 2");
-  assert.deepEqual(await approveMember(bdId, m.memberId, 2), { ok: true, approved: [m.memberId] });
+  const approvedResult = await approveMember(bdId, m.memberId, 2);
   const reminder = await draftOf(m.memberId, 2);
+  assert.ok(approvedResult.ok && approvedResult.approved.length === 1 && approvedResult.approved[0] === m.memberId);
   assert.equal(reminder.approvedByBdId, bdId);
   const member = await stateOf(m.memberId);
   assert.equal(member.state, "sent");
   assert.equal(reminder.scheduledFor?.toISOString(), reminderReleaseAt(member.reminderDueAt!, reminder.approvedAt!)!.toISOString());
   const audit = await auditFor(m.personId, "sequence_member_approve");
   assert.deepEqual(audit.map((a) => (a.metadata as { step: number }).step), [2]);
+});
+
+test("a single step 2 approval returns the release instant it stored; step 1 and a bulk return none", async () => {
+  const { approveBulk, approveMember } = await import("@/lib/sequences/approvalQueries");
+  const { reminderReleaseAt } = await import("@/lib/sequences/schedule");
+  const one = await mkSent("rem-instant");
+  const r = await approveMember(bdId, one.memberId, 2);
+  const stored = await draftOf(one.memberId, 2);
+  const member = await stateOf(one.memberId);
+  assert.ok(r.ok && r.scheduledFor instanceof Date);
+  if (r.ok) assert.equal(r.scheduledFor?.toISOString(), reminderReleaseAt(member.reminderDueAt!, stored.approvedAt!)!.toISOString());
+  if (r.ok) assert.equal(r.scheduledFor?.toISOString(), stored.scheduledFor?.toISOString());
+  const step1 = await approveMember(bdId, (await mkMember("rem-instant-s1")).memberId);
+  assert.ok(step1.ok && step1.scheduledFor === undefined);
+  const a = await mkSent("rem-instant-a", { reviewed: true });
+  const b = await mkSent("rem-instant-b", { reviewed: true });
+  const bulk = await approveBulk(bdId, [a.memberId, b.memberId], 2);
+  assert.ok(bulk.ok && bulk.approved.length === 2 && bulk.scheduledFor === undefined);
 });
 
 test("a reminder cannot be approved unless the member is sent and the reminder is due-scheduled", async () => {

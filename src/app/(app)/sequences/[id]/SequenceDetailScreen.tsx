@@ -17,7 +17,7 @@ import { choiceToStore } from "@/lib/sequences/languageChoice";
 import type { AudienceLanguage } from "@/lib/sequences/complianceAudience";
 import { generationLock } from "@/lib/sequences/generationLock";
 import { isReadOnlyAction, isReadOnlyView } from "@/lib/sequences/readOnly";
-import { agoText, fill, type SequenceLabels } from "@/lib/sequences/viewText";
+import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
 import {
   addMembers as _unused,
   advanceReminder,
@@ -295,11 +295,15 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
         if (!m) return;
         return void guarded(() => approveMember(a.memberId, approveStep(m, now))).then((r) => {
           if (!r) return;
-          if (r.ok) showToast(l.toastApproved, "success");
-          else fail(reasonText(refusalKey(r)));
+          if (r.ok) {
+            // A reminder's send instant is computed and stored at approval: say the date instead of "next send".
+            if (r.scheduledFor) { const w = miamiWhen(r.scheduledFor, now); showToast(fill(l.toastReminderApproved, { date: w.ddmm, time: w.hhmm }), "success"); }
+            else showToast(l.toastApproved, "success");
+          } else fail(reasonText(refusalKey(r)));
           router.refresh();
         });
       }
+      case "cancelReminder": return void guarded(() => cancelApproval(a.memberId, 2)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastReminderCancelled, "success"); else fail(); router.refresh(); });
       case "cancel": return void guarded(() => cancelApproval(a.memberId, 1)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastCancelled, "success"); else fail(); router.refresh(); });
       case "advanceReminder": return void guarded(() => advanceReminder(a.memberId)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastAdvanced, "success"); else fail(); router.refresh(); });
       case "readmit": return void guarded(() => reinstateMember(a.memberId)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastReadmitted, "success"); else fail((l.reinstateErrors as Record<string, string>)[r.error] ?? l.actionFailed); router.refresh(); });
@@ -341,11 +345,12 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     const stored = (step === 2 ? m.reminderDraft : m.draft) ?? { subject: "", body: "" };
     const when = a.type === "approve" ? a.when : undefined;
     let release: ReleaseOutcome | undefined;
+    let scheduledFor: Date | undefined;
     const result = await guarded(() => runReviewIntent(intent, { stored: { subject: stored.subject, body: stored.body }, text: { subject, body } }, {
       save: () => saveSequenceDraft(memberId, { subject, body }, step),
       approve: async () => {
         const approved = await approveMember(memberId, step, when);
-        if (approved.ok) release = approved.release;
+        if (approved.ok) { release = approved.release; scheduledFor = approved.scheduledFor; }
         return approved;
       },
     }), setError);
@@ -356,6 +361,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     if (result.ok) {
       if (intent === "save") showToast(l.toastSaved, "success");
       else if (when) toastApproval(when, 1, release);
+      else if (scheduledFor) { const w = miamiWhen(scheduledFor, now); showToast(fill(l.toastReminderApproved, { date: w.ddmm, time: w.hhmm }), "success"); }
       else showToast(l.toastApproved, "success");
       closeDialogs();
     } else setError(reasonText(result.error));

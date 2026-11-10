@@ -13,6 +13,7 @@ const facts = (over: Partial<CardFacts>): CardFacts => ({
   reminderDueAt: null,
   florida: false,
   discardReason: null,
+  reminderApproved: false,
   ...over,
 });
 const ids = (c: ReturnType<typeof mapMemberCard>) => c.actions.map((a) => a.id);
@@ -181,4 +182,21 @@ test("discardedView: the 'nunca salió' marker appears only on a bounce or opt-o
 test("discardedView: nobody claims a removal the BD did not make", () => {
   assert.equal(discardedView({ discardReason: "wrong_profile", sentAt: SENT, discardedByBdId: null }).meta, "removedAuto");
   assert.equal(discardedView({ discardReason: "wrong_profile", sentAt: SENT, discardedByBdId: "bd1" }).meta, "removedBy");
+});
+
+test("sent, reminder approved: brand badge, view it or cancel the send, whether or not its due day arrived", () => {
+  for (const due of ["2026-10-15T13:00:00Z", "2026-10-12T13:00:00Z", "2026-10-17T13:00:00Z"]) {
+    const c = mapMemberCard(facts({ state: "sent", reminderDueAt: new Date(due), reminderApproved: true }), NOW);
+    assert.deepEqual([c.kind, c.tone], ["reminderApproved", "brand"], due);
+    assert.deepEqual(c.actions, [
+      { id: "viewReminder", style: "ghost" },
+      { id: "cancelReminder", style: "secondary" },
+    ], due);
+  }
+});
+
+test("an unapproved due reminder is still 'Recordatorio hoy' and an approved one never offers approve", () => {
+  const due = new Date("2026-10-15T13:00:00Z");
+  assert.equal(mapMemberCard(facts({ state: "sent", reminderDueAt: due, reminderApproved: false }), NOW).kind, "reminderToday");
+  assert.ok(!mapMemberCard(facts({ state: "sent", reminderDueAt: due, reminderApproved: true }), NOW).actions.some((a) => a.id === "approve"));
 });

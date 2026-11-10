@@ -79,6 +79,8 @@ const ALL_KINDS: DetailMember[] = [
   member(9, { state: "discarded", discardedAt: hours(24), discardReason: "opt_out" }),
   // A moment the BD chose (not the cadence of the approval): the "Programado" card.
   member(10, { state: "approved", draft: draft({ approvedAt: hours(2), scheduledFor: new Date("2026-10-20T14:00:00Z") }) }),
+  // An approved reminder: the member stays "sent" and only the step 2 draft carries the approval.
+  member(11, { state: "sent", sentAt: hours(170), reminderDueAt: new Date("2026-10-15T13:00:00Z"), reminderDraft: draft({ approvedAt: hours(1), scheduledFor: new Date("2026-10-16T13:00:00Z") }) }),
 ];
 
 const detail = (members: DetailMember[]): SequenceDetail => ({ id: "s", name: "Synthetic sequence", ownerBdId: "o", ownerName: "Owner", fromAddress: "from@example.test", schedule: DEFAULT_SCHEDULE, dailySendCap: 5, sentToday: 0, members });
@@ -157,4 +159,13 @@ test("a refused approval sets the message and toasts it BEFORE refreshing", () =
   assert.ok(setAt > 0, "the refusal must put its reason in sendError");
   assert.ok(toastAt > 0, "the refusal must ALSO toast: sendError alone dies with the popover");
   assert.ok(refreshAt > setAt && refreshAt > toastAt, "router.refresh() must come after both, or the message is lost");
+});
+
+test("an approved reminder's cancel is disabled inside the claim window and enabled outside it", () => {
+  const withSend = (ms: number) => member(12, { state: "sent", sentAt: hours(170), reminderDueAt: new Date(NOW.getTime() - 3_600_000), reminderDraft: draft({ approvedAt: hours(1), scheduledFor: new Date(NOW.getTime() + ms) }) });
+  const cancel = (html: string) => html.match(new RegExp(`<button[^>]*>${es.sequences.actions.cancelReminder}</button>`))?.[0] ?? "";
+  const inside = cancel(render([withSend(60_000)]));
+  const outside = cancel(render([withSend(10 * 60_000)]));
+  assert.ok(inside.includes("disabled") && inside.includes(es.sequences.lockedTitle), inside);
+  assert.ok(outside.length > 0 && !outside.includes("disabled"), outside);
 });

@@ -16,11 +16,11 @@ import { miamiCalendarDate } from "./miamiTime";
 import { canTransition, type MemberState } from "./memberState";
 import { DRAFT_HOLD_REASONS, type HoldReason } from "./preSendChecks";
 
-export type CardKind = "draft" | "noDraft" | "approved" | "scheduled" | "sent" | "reminderToday" | "noReply" | "replied" | "discarded";
+export type CardKind = "draft" | "noDraft" | "approved" | "scheduled" | "sent" | "reminderToday" | "reminderApproved" | "noReply" | "replied" | "discarded";
 export type CardTone = "info" | "brand" | "contacted" | "warn" | "replied" | "discarded" | "neutral";
 export type CardActionId =
   | "generate" | "reviewDraft" | "approve" | "viewEmail" | "cancel" | "viewSent" | "advanceReminder" | "reviewReminder"
-  | "viewDraft" | "viewReminder" | "change" | "sendNow" | "cancelSchedule" | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
+  | "viewDraft" | "viewReminder" | "cancelReminder" | "change" | "sendNow" | "cancelSchedule" | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
 export type CardAction = { id: CardActionId; style: "primary" | "secondary" | "ghost" };
 
 export type CardFacts = {
@@ -31,6 +31,12 @@ export type CardFacts = {
   reminderDueAt: Date | null;
   florida: boolean;
   discardReason: string | null;
+  /**
+   * Sent only: the step 2 draft carries an approval. Approving a reminder moves NO member state, so this is the only
+   * fact that repaints the card. Required on purpose: a call site that omits it renders an approved reminder as
+   * unapproved — the very bug this field was added to fix — and optional would let that pass the typecheck.
+   */
+  reminderApproved: boolean;
   /** Approved only: the BD chose the moment ("scheduled") or it follows the cadence (approvedMoment.ts). Unknown reads as the cadence. */
   approvedMode?: "cadence" | "scheduled";
 };
@@ -52,7 +58,7 @@ function reminderDue(f: CardFacts, now: Date): boolean {
 }
 
 /** The same ids, read-only: where a write path says "Revisar" a foreign Sequence says "Ver", and nothing that writes survives. */
-const READ_ONLY_ACTIONS: Partial<Record<CardActionId, CardActionId>> = { reviewDraft: "viewDraft", reviewReminder: "viewReminder", viewEmail: "viewEmail", viewSent: "viewSent", openConversation: "openConversation" };
+const READ_ONLY_ACTIONS: Partial<Record<CardActionId, CardActionId>> = { reviewDraft: "viewDraft", reviewReminder: "viewReminder", viewReminder: "viewReminder", viewEmail: "viewEmail", viewSent: "viewSent", openConversation: "openConversation" };
 
 function readOnlyView(card: CardView): CardView {
   const actions = card.actions.flatMap((a) => (READ_ONLY_ACTIONS[a.id] ? [{ ...a, id: READ_ONLY_ACTIONS[a.id]! }] : []));
@@ -81,6 +87,8 @@ function mapOwnCard(f: CardFacts, now: Date): CardView {
         actions: [act("viewEmail", "ghost"), act("change", "secondary"), act("sendNow", "secondary"), act(f.approvedMode === "scheduled" ? "cancelSchedule" : "cancel", "ghost")],
       };
     case "sent":
+      // An approved reminder reads as approved whether or not its due day arrived; it must never offer "Aprobar" again.
+      if (f.reminderApproved) return { ...base, kind: "reminderApproved", tone: "brand", actions: [act("viewReminder", "ghost"), act("cancelReminder", "secondary")] };
       return reminderDue(f, now)
         ? { ...base, kind: "reminderToday", tone: "warn", actions: [act("reviewReminder", "secondary"), act("approve", "primary")] }
         : { ...base, kind: "sent", tone: "contacted", actions: [act("viewSent", "ghost"), act("advanceReminder", "secondary")] };

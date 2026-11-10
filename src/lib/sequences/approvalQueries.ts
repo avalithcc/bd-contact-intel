@@ -35,7 +35,7 @@ export type ApprovalRejection = {
   reason: "not_found" | "not_approvable" | "no_draft" | "unreviewed" | "reply_prefix_subject" | ComplianceRefusal | SendMomentRefusal;
 };
 /** `too_many`: the request named more members than the page can ever offer (SEQUENCE_DETAIL_MEMBER_LIMIT). Refused before any lock. */
-export type ApproveResult = { ok: true; approved: string[] } | { ok: false; error: "rejected"; rejected: ApprovalRejection[] } | { ok: false; error: "too_many"; limit: number };
+export type ApproveResult = { ok: true; approved: string[]; scheduledFor?: Date } | { ok: false; error: "rejected"; rejected: ApprovalRejection[] } | { ok: false; error: "too_many"; limit: number };
 
 /**
  * `stale`: the version the dialog rendered is not the stored one (regenerated or edited since), so the mark was refused and
@@ -141,13 +141,15 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
     }
     if (rejected.length) return { ok: false, error: "rejected", rejected } as const;
 
+    let single: Date | undefined;
     for (const m of members) {
       const scheduledFor = step === 1 ? moments.get(m.id)! : reminderReleaseAt(m.reminderDueAt!, now, parseSchedule(m.schedule));
+      if (step === 2) single = scheduledFor ?? undefined;
       await tx.update(sequenceDraft).set({ approvedAt: now, approvedByBdId: bdId, scheduledFor }).where(eq(sequenceDraft.id, drafts.get(m.id)!.id));
       if (step === 1) await tx.update(sequenceMember).set({ state: "approved" }).where(eq(sequenceMember.id, m.id));
       await tx.insert(auditLog).values(sequenceAuditRow("approve", { actorBdId: bdId, personId: m.personId, memberId: m.id, sequenceId: m.sequenceId, step, at: now }));
     }
-    return { ok: true, approved: ids } as const;
+    return { ok: true, approved: ids, ...(ids.length === 1 && single ? { scheduledFor: single } : {}) } as const;
   });
 }
 

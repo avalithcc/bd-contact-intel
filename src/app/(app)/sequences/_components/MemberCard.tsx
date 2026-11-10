@@ -13,6 +13,7 @@ import { memberDraftMismatch } from "@/lib/sequences/audienceCard";
 import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { approvedMoment, type ApprovedMoment } from "@/lib/sequences/approvedMoment";
+import { reminderMoment, type ReminderMoment } from "@/lib/sequences/reminderMoment";
 import type { GenerationLock } from "@/lib/sequences/generationLock";
 import { discardedView, mapMemberCard, type CardActionId, type CardKind, type CardView } from "@/lib/sequences/memberCard";
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
@@ -33,7 +34,7 @@ import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendC
 export const showsReviewFlag = (kind: CardKind) => kind === "draft";
 
 /** The meta line as parts, joined by " · ". The state table decides WHICH kind; this only words it from the facts. */
-function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels, ownView: boolean, moment: ApprovedMoment | null): ReactNode[] {
+function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels, ownView: boolean, moment: ApprovedMoment | null, reminderAt: ReminderMoment | null): ReactNode[] {
   const ago = (d: Date) => agoText(d, now, l);
   const parts: ReactNode[] = [];
   if (kind === "draft") {
@@ -74,7 +75,18 @@ function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels
     }
   } else {
     if (m.sentAt) parts.push(fill(l.emailSent, { ago: ago(m.sentAt) }));
-    if (kind === "replied") {
+    if (kind === "reminderApproved") {
+      parts.push(l.noReply);
+      if (reminderAt?.phase === "overdue") {
+        parts.push(l.metaWaiting);
+      } else if (reminderAt) {
+        const w = miamiWhen(reminderAt.at, now);
+        const day = w.day === "today" ? l.whenToday : w.day === "tomorrow" ? l.whenTomorrow : l.whenOn;
+        parts.push(<>{l.releases} {day} <strong>{w.ddmm} {l.atTime} {w.hhmm}</strong> {l.reviewMiami}</>);
+        parts.push(fill(l.metaCadenceArg, { time: clockLabel(reminderAt.at, "argentina") }));
+      }
+      if (m.reminderDraft?.approvedAt) parts.push(fill(ownView ? l.approvedBy : l.approvedByOther, { ago: ago(m.reminderDraft.approvedAt) }));
+    } else if (kind === "replied") {
       if (m.repliedAt) parts.push(<strong>{fill(l.repliedAgo, { ago: ago(m.repliedAt) })}</strong>);
       parts.push(l.sequenceStopped);
     } else if (kind === "noReply") {
@@ -91,7 +103,7 @@ function metaParts(m: DetailMember, kind: CardKind, now: Date, l: SequenceLabels
   return parts;
 }
 
-function Actions({ card, m, l, onAction, generation, send, now, moment, audienceHeld, blockedTitle }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generation: GenerationLock; send: SequenceSendContext; now: Date; moment: ApprovedMoment | null; audienceHeld: boolean; blockedTitle?: string }) {
+function Actions({ card, m, l, onAction, generation, send, now, moment, reminderAt, audienceHeld, blockedTitle }: { card: CardView; m: DetailMember; l: SequenceLabels; onAction: OnAction; generation: GenerationLock; send: SequenceSendContext; now: Date; moment: ApprovedMoment | null; reminderAt: ReminderMoment | null; audienceHeld: boolean; blockedTitle?: string }) {
   const contactHref = `/contacts/${m.personId}`;
   const run = (type: CardActionId) => () => void onAction({ type, memberId: m.memberId } as Parameters<OnAction>[0]);
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
@@ -145,6 +157,11 @@ function Actions({ card, m, l, onAction, generation, send, now, moment, audience
         }
         if (a.id === "sendNow") return <SendNowButton key={a.id} labels={send.labels} label={l.actions.sendNow} className={`btn btn-${a.style} btn-sm`} disabled={send.busy || locked} title={locked ? l.lockedTitle : undefined} onSend={() => onAction({ type: "reschedule", memberId: m.memberId, when: { kind: "now" } })} />;
         if (a.id === "cancel" || a.id === "cancelSchedule") return <button key={a.id} type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--color-danger-text)" }} disabled={locked} title={locked ? l.lockedTitle : undefined} onClick={run("cancel")}>{l.actions[a.id]}</button>;
+        // Its own branch: the shared cancel button dispatches step 1's `cancel`. Inside the runner's claim window the send cannot be stopped.
+        if (a.id === "cancelReminder") {
+          const reminderLocked = reminderAt?.phase === "locked";
+          return <button key={a.id} type="button" className="btn btn-secondary btn-sm" disabled={reminderLocked} title={reminderLocked ? l.lockedTitle : undefined} onClick={run("cancelReminder")}>{l.actions.cancelReminder}</button>;
+        }
         const isReview = a.id === "reviewDraft" || a.id === "reviewReminder" || a.id === "approve";
         return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} onClick={run(a.id)} {...(isReview ? reviewLock : {})}>{l.actions[a.id]}</button>;
       })}
@@ -171,11 +188,12 @@ export type CardSelection = { selected: boolean; onToggle: () => void };
 
 export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generation, send }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generation: GenerationLock; send: SequenceSendContext }) {
   const moment = m.state === "approved" && m.draft ? approvedMoment(m.draft, send.schedule, now) : null;
-  const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, approvedMode: moment?.mode }, now, readOnly);
+  const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, approvedMode: moment?.mode, reminderApproved: m.reminderDraft?.approvedAt != null }, now, readOnly);
   const discarded = card.kind === "discarded" ? discardedView(m) : null;
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   const title = m.jobTitle?.trim() || l.noTitle;
-  const parts = metaParts(m, card.kind, now, l, ownView, moment);
+  const reminderAt = card.kind === "reminderApproved" && m.reminderDraft ? reminderMoment(m.reminderDraft, now) : null;
+  const parts = metaParts(m, card.kind, now, l, ownView, moment, reminderAt);
   if (card.holdReason) parts.push(<strong>{l.holdPrefix} {l.holdReasons[card.holdReason]}</strong>);
   const chips = card.kind === "draft" || card.kind === "approved" || card.kind === "scheduled"
     ? [m.openIt > 0 && fill(m.openIt === 1 ? l.chipPostingsOne : l.chipPostingsMany, { n: m.openIt }), m.leadership && l.chipLeadership, m.florida && l.chipMiami].filter((c): c is string => !!c)
@@ -214,7 +232,7 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
           {mismatch && <LanguageMismatchAlert m={m} mismatch={mismatch} name={name} l={l} ownView={ownView} busy={send.busy} locked={generation.active} lockTitle={generationLockTitle} onRegenerate={readOnly ? undefined : () => void onAction({ type: "regenerate", memberId: m.memberId })} onKeep={readOnly ? undefined : () => void onAction({ type: "keepLanguage", memberId: m.memberId })} />}
           {chips.length > 0 && <div className="row wrap row-xs">{chips.map((c) => <span key={c} className="chip">{c}</span>)}</div>}
         </div>
-        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} audienceHeld={audienceHeld} blockedTitle={mismatchVars ? fill(l.languageMismatch.approveTitle, mismatchVars) : undefined} />
+        <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} reminderAt={reminderAt} audienceHeld={audienceHeld} blockedTitle={mismatchVars ? fill(l.languageMismatch.approveTitle, mismatchVars) : undefined} />
       </div>
       {!readOnly && showOptOutPrompt(card.kind, optOutPhrase) && (
         <div className="card-body">
