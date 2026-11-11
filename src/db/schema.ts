@@ -1029,6 +1029,12 @@ export const auditLog = pgTable(
     // NOT block anyone, production re-provisions it on first visit. metadata
     // carries the auth user id and the banned_until read back from auth.users
     // as proof. Reversible with ban_duration 'none') |
+    // 'bd_mailbox_disconnected' (scripts/disconnect-bd-mailbox.ts revoked a
+    // departing BD's Gmail grant AT GOOGLE and cleared the stored refresh
+    // token — which /account/email's own "Desconectar" does NOT do, it only
+    // flips status. metadata.googleGrantRevoked says whether Google confirmed
+    // it; false means the token could not be decrypted and the grant must be
+    // removed by hand from the mailbox owner's Google account) |
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
     // recomputed person owners under the last-worked rule; also run nightly by
     // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
