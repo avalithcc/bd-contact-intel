@@ -1035,6 +1035,15 @@ export const auditLog = pgTable(
     // flips status. metadata.googleGrantRevoked says whether Google confirmed
     // it; false means the token could not be decrypted and the grant must be
     // removed by hand from the mailbox owner's Google account) |
+    // 'bd_ownership_released' (scripts/release-bd-ownership.ts set a departing
+    // BD's person.owner_bd_id and company.owner_bd_id to NULL so their book of
+    // business has NO owner instead of one who cannot sign in. Every released
+    // person also gets a person_property_history row (property 'ownerBdId',
+    // source 'edit'): without that marker the 03:00 owner recompute hands them
+    // straight back, since the departing BD is the BD who worked them last.
+    // Tasks, the legacy contact/lead tables, the follow-up queue and all
+    // history stay pointing at the BD on purpose — see the script header for
+    // the reason per column. Reversible: old_value holds each previous owner) |
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
     // recomputed person owners under the last-worked rule; also run nightly by
     // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
