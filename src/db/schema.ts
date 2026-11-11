@@ -1023,6 +1023,12 @@ export const auditLog = pgTable(
     // 'bd_deleted' (scripts/delete-unused-bd.ts retired a bd account nothing
     // referenced, Auth user first; target_bd_id would be nulled by that very
     // delete, so the id, email, name and the nulled references are in metadata) |
+    // 'bd_access_revoked' (scripts/revoke-bd-access.ts blocked a departing BD's
+    // sign-in by banning their Supabase Auth user; the bd row and every row
+    // referencing it are left untouched ON PURPOSE — deleting the bd row does
+    // NOT block anyone, production re-provisions it on first visit. metadata
+    // carries the auth user id and the banned_until read back from auth.users
+    // as proof. Reversible with ban_duration 'none') |
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
     // recomputed person owners under the last-worked rule; also run nightly by
     // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
