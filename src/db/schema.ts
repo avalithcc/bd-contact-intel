@@ -1044,6 +1044,14 @@ export const auditLog = pgTable(
     // Tasks, the legacy contact/lead tables, the follow-up queue and all
     // history stay pointing at the BD on purpose — see the script header for
     // the reason per column. Reversible: old_value holds each previous owner) |
+    // 'bd_open_tasks_reassigned' (scripts/reassign-bd-open-tasks.ts handed a
+    // departing BD's OPEN tasks to another BD. Only status 'open' moves: on a
+    // finished task the assignee is the record of WHO DID THE WORK, so done
+    // and cancelled rows still point at the departing BD on purpose. Tasks are
+    // handed over rather than released because the product never produces a
+    // null assignee (a blank means "assign it to me") and /tasks has no
+    // unassigned filter. Each moved task also gets the same 'task_updated'
+    // activity row the Editar tarea dialog writes, naming the actor) |
     // 'backfill_owner_last_worked' (scripts/backfill-owner-last-worked.ts
     // recomputed person owners under the last-worked rule; also run nightly by
     // /api/owners/recompute, told apart by metadata.trigger 'cron' | 'manual')
