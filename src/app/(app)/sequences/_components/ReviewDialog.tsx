@@ -37,6 +37,8 @@ type Props = {
   busy?: boolean;
   /** A draft is being generated elsewhere on the screen: a second generation would collide with it (generationLock.ts). */
   regenerateLocked?: boolean;
+  /** A generation is in flight for THIS member: the regenerate buttons show a spinner instead of only going disabled. */
+  generating?: boolean;
   error?: string | null;
   /** The server refused the review mark: the text shown here is not the stored one. The draft stays unreviewed. */
   stale?: boolean;
@@ -47,7 +49,7 @@ type Props = {
 /** A reload whose refetch never answers frees the button after this long. */
 const RELOAD_TIMEOUT_MS = 10_000;
 
-export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, regenerateLocked = false, error = null, stale = false, send }: Props) {
+export function ReviewDialog({ open, onClose, member: m, step, fromAddress, schedule, signals, now, labels: l, ownView, readOnly = false, ownerName = "", onAction, busy = false, regenerateLocked = false, generating = false, error = null, stale = false, send }: Props) {
   const formId = useId();
   const view = m ? reviewView(m, step, schedule, now, readOnly) : null;
   const memberId = m?.memberId;
@@ -102,7 +104,18 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   // Always asks the server without a confirmation: it refuses to overwrite an edit and the container then confirms with the BD.
   const footerButton = (id: ReviewFooterId) =>
     id === "regenerate" ? (
-      <button key={id} type="button" className="btn btn-ghost left" disabled={busy || regenerateLocked} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}><GenerateIcon className="icon" />{l.reviewRegenerate}</button>
+      // The spinner is the point: this used to only go disabled, and the dialog read as frozen while the model ran.
+      <button key={id} type="button" className="btn btn-ghost left" disabled={busy || regenerateLocked} aria-busy={generating ? "true" : undefined} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}>
+        {generating ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}
+        {generating ? l.generating : l.reviewRegenerate}
+      </button>
+    ) : id === "regenerateSubject" ? (
+      // Offered HERE because this is where a BD reads the subject and decides it is weak. It was first shipped only in
+      // the card's "⋯" menu, and the owner looked for it in this dialog, which is the obvious place to want it.
+      <button key={id} type="button" className="btn btn-ghost left" disabled={busy || regenerateLocked} aria-busy={generating ? "true" : undefined} onClick={() => onAction({ type: "regenerateSubject", memberId: m.memberId })}>
+        {generating ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}
+        {generating ? l.generating : l.reviewRegenerateSubject}
+      </button>
     ) : id === "approve" && step === 1 ? (
       <SendSplitButton
         key={id}

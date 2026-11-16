@@ -3887,6 +3887,7 @@ export const en = {
     reviewMiami: "(Miami)",
     reviewReminderOn: "Reminder on",
     reviewRegenerate: "Regenerate",
+    reviewRegenerateSubject: "Regenerate the subject only",
     regenConfirmTitle: "Regenerate and lose your version?",
     regenConfirmTitleOther: "Regenerate and lose the edited version?",
     regenConfirmLead: "You edited this draft {ago} ago. Regenerating",

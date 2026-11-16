@@ -15,7 +15,7 @@ import type { MemberState } from "./memberState";
 import { reminderDueAt, step1DueAt, type Schedule } from "./schedule";
 
 export type ReviewKind = "draft" | "approved" | "reminder" | "sent" | "stopped";
-export type ReviewFooterId = "regenerate" | "save" | "approve";
+export type ReviewFooterId = "regenerate" | "regenerateSubject" | "save" | "approve";
 export type ReviewCadence = { step1: { kind: "sent" | "scheduled" | "ifApprovedNow"; at: Date }; reminderAt: Date };
 /** `cadence` is null for `stopped`: there is no send to describe, and projecting one would invent a future that is not coming. */
 export type ReviewView = { kind: ReviewKind; readOnly: boolean; footer: ReviewFooterId[]; marksReviewed: boolean; edited: boolean; editedAt: Date | null; draft: DetailDraft; cadence: ReviewCadence | null };
@@ -45,7 +45,10 @@ export function reviewView(m: DetailMember, step: 1 | 2, schedule: Schedule, now
   const kind = kindOf(m, step, draft);
   // A foreign Sequence (an admin reading) is read-only whatever the state: no footer action, and opening it is not a review.
   const readOnly = viewerReadOnly || kind === "sent" || kind === "stopped";
-  const footer: ReviewFooterId[] = readOnly ? [] : kind === "approved" ? ["regenerate", "save"] : ["regenerate", "save", "approve"];
+  // "Regenerar solo el asunto" is step 1 only: regenerateDraftSubject writes the step 1 draft, and a reminder continues
+  // an existing thread, where the subject is the thread's and not ours to rewrite.
+  const subjectOnly: ReviewFooterId[] = step === 1 ? ["regenerateSubject"] : [];
+  const footer: ReviewFooterId[] = readOnly ? [] : kind === "approved" ? ["regenerate", ...subjectOnly, "save"] : ["regenerate", ...subjectOnly, "save", "approve"];
   const edited = draft.edited;
   return { kind, readOnly, footer, edited, editedAt: draft.editedAt, marksReviewed: !viewerReadOnly && (kind === "draft" || kind === "reminder") && draft.reviewedAt === null, draft, cadence: kind === "stopped" ? null : cadenceOf(m, kind, draft, step, schedule, now) };
 }
