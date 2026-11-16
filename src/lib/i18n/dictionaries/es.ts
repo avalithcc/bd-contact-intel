@@ -2623,6 +2623,8 @@ export const es: typeof en = {
     queueSkipped: "Omitidos",
     queueAssigned: "Asignados",
     queueAdherence: "Adherencia",
+    queueExcludedRoleGroups: "Roles excluidos",
+    queueExcludedRoleGroupsNone: "—",
     queueEmpty: "La cola de seguimientos todavía no tiene historial en el período seleccionado.",
     queueRecentFoot: "La cola de seguimientos se lanzó hace poco — con menos de un período completo de historial, esta tarjeta todavía tiene poca base para comparar.",
     total: "Total",

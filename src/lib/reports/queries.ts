@@ -403,7 +403,12 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
       coalesce(rpt_queue_pivot.pbc_worked, 0) as queue_worked,
       coalesce(rpt_queue_pivot.pbc_postponed, 0) as queue_postponed,
       coalesce(rpt_queue_pivot.pbc_skipped, 0) as queue_skipped,
-      coalesce(rpt_queue_pivot.pbc_still_pending, 0) as queue_still_pending
+      coalesce(rpt_queue_pivot.pbc_still_pending, 0) as queue_still_pending,
+      -- admin-role-group-visibility: read-only, so the adherence % can be read at all. A BD who excludes role groups
+      -- works a DIFFERENT queue, not the same queue harder, so the percentage beside this is not comparable without
+      -- it. Free here: the bd table already drives this select, so it adds no join and no round trip.
+      -- (No backticks in this comment: it lives inside a JS template literal, where a backtick ends the string.)
+      bd.follow_up_excluded_role_groups as excluded_role_groups
     from ${bd}
     left join rpt_activity_pivot on rpt_activity_pivot.pbc_bd_id = bd.id
     left join rpt_tasks_pivot on rpt_tasks_pivot.pbc_bd_id = bd.id
@@ -452,6 +457,8 @@ export interface ReportPerBdRow {
   queuePostponed: number;
   queueSkipped: number;
   queueStillPending: number;
+  /** The role groups this BD keeps out of their own follow-up queue (follow-up-role-groups). Read-only for admins. */
+  excludedRoleGroups: string[];
 }
 
 export interface WonCompaniesDrilldownParams {

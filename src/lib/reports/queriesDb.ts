@@ -130,6 +130,7 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     queue_postponed: number;
     queue_skipped: number;
     queue_still_pending: number;
+    excluded_role_groups: string[] | null;
   }>(buildReportPerBdQuery(params));
   return rows.map((r) => ({
     bdId: r.bd_id,
@@ -143,6 +144,9 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     emailsSent: Number(r.emails_sent),
     repliesReceived: Number(r.replies_received),
     tasksCompleted: Number(r.tasks_completed),
+    // The column is NOT NULL with a '{}' default, but the driver can still hand back null for a row that predates
+    // nothing here — coalesce in JS rather than trust it, so a missing value renders as "no exclusions", never a crash.
+    excludedRoleGroups: r.excluded_role_groups ?? [],
     queueWorked: Number(r.queue_worked),
     queuePostponed: Number(r.queue_postponed),
     queueSkipped: Number(r.queue_skipped),
