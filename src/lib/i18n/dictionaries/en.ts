@@ -2635,6 +2635,8 @@ export const en = {
     queueSkipped: "Skipped",
     queueAssigned: "Assigned",
     queueAdherence: "Adherence",
+    queueExcludedRoleGroups: "Excluded roles",
+    queueExcludedRoleGroupsNone: "—",
     queueEmpty: "The follow-up queue has no history yet for the selected period.",
     queueRecentFoot: "The follow-up queue launched recently — with less than a full period of history, this card still has little to compare against.",
     total: "Total",

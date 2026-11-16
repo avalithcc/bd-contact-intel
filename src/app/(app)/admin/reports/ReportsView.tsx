@@ -6,6 +6,7 @@ import { buildSourceConversionRows, type SourceBucket } from "@/lib/reports/sour
 import { buildDiscardReasonRows, discardReasonLabel, totalDiscardCount } from "@/lib/reports/discardReasons";
 import { buildPipelineRows } from "@/lib/reports/pipeline";
 import { buildQueueAdherenceRow } from "@/lib/reports/queueAdherence";
+import { excludedRoleGroupsCell } from "@/lib/reports/excludedRoleGroupsCell";
 import type { ReportAggregatesResult, ReportPerBdRow } from "@/lib/reports/queries";
 import { stageBadgeClass, stageLabelOf } from "@/lib/companies/listMappers";
 import { InfoIcon } from "@/components/icons";
@@ -197,6 +198,8 @@ export function ReportsView({
 
   const perBdRows = perBd.map((row) => ({
     ...row,
+    // Overrides the raw `string[]` from the query with the rendered cell (labels, overflow, hover title).
+    excludedRoleGroups: excludedRoleGroupsCell(row.excludedRoleGroups, es.roleGroups),
     queue: buildQueueAdherenceRow({
       worked: row.queueWorked,
       postponed: row.queuePostponed,
@@ -536,6 +539,7 @@ export function ReportsView({
                   <th className="right">{dict.queueSkipped}</th>
                   <th className="right">{dict.queueAssigned}</th>
                   <th>{dict.queueAdherence}</th>
+                  <th>{dict.queueExcludedRoleGroups}</th>
                 </tr>
               </thead>
               <tbody>
@@ -561,6 +565,24 @@ export function ReportsView({
                         <span className="mono small">{r.queue.adherencePct}%</span>
                       </div>
                     </td>
+                    {/* admin-role-group-visibility: read-only. Sits next to the adherence % because that number is not
+                        comparable between BDs without it — see excludedRoleGroupsCell.ts. */}
+                    <td>
+                      {r.excludedRoleGroups.empty ? (
+                        <span className="soft">{dict.queueExcludedRoleGroupsNone}</span>
+                      ) : (
+                        <span className="row wrap" style={{ gap: ".35rem" }} title={r.excludedRoleGroups.title}>
+                          {r.excludedRoleGroups.shown.map((label) => (
+                            <span className="badge badge-outline no-dot" key={label}>
+                              {label}
+                            </span>
+                          ))}
+                          {r.excludedRoleGroups.overflow > 0 && (
+                            <span className="meta">+{r.excludedRoleGroups.overflow}</span>
+                          )}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 <tr>
@@ -572,6 +594,8 @@ export function ReportsView({
                   <td>
                     <span className="mono strong">{queueTotal.adherencePct}%</span>
                   </td>
+                  {/* No total: summing exclusions across BDs would mean nothing (mockup README, decision 3). */}
+                  <td className="soft">{dict.queueExcludedRoleGroupsNone}</td>
                 </tr>
               </tbody>
             </table>
