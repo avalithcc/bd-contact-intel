@@ -2,6 +2,7 @@ import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { OpenPosting } from "@/lib/hiring/queries";
 import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
 import type { OutreachChannel } from "@/lib/outreach/channel";
+import { SUBJECT_MAX_CHARS, SUBJECT_TARGET_MIN_CHARS, bannedVocabularyPromptLine } from "@/lib/outreach/subjectRules";
 
 // Cap on how many open-role titles get fed into the prompt — a company with
 // hundreds of postings would otherwise blow past a reasonable prompt size
@@ -322,10 +323,12 @@ function referenceStyleFor(isEmail: boolean, language: MessageLanguage, signatur
 // paragraph of prose are followed noticeably worse than nine separated ones, and the subject is the whole point here.
 const SUBJECT_RULE = [
   'The "subject" decides whether the email is opened. It is about the RECIPIENT\'S company and situation, never about Avalith or what Avalith sells:',
-  "Length: 35-50 characters, never over 60.",
+  `Length: ${SUBJECT_TARGET_MIN_CHARS}-50 characters, never over ${SUBJECT_MAX_CHARS}. Over ${SUBJECT_MAX_CHARS} is rejected and regenerated.`,
   "Name the recipient's company or their concrete situation drawn from the hiring data, optionally plus a short hook of three to six words hinting why you are writing.",
   "NEVER name Avalith, and never name the sender, in the subject.",
-  'Never use vendor vocabulary: "capacidad senior", "staff augmentation", "squads", "nearshore", "soluciones", "oportunidad", "propuesta", "servicios", or their English equivalents ("senior capacity", "solutions", "opportunity", "proposal", "services").',
+  // Generated from SUBJECT_BANNED_PHRASES so the list the model is told and the list enforced after generation cannot
+  // drift. They were separate before, and the enforcement half simply did not exist.
+  bannedVocabularyPromptLine(),
   'It is not a sentence describing an offer: no "X para tu equipo", no "X para <company>".',
   "If no hiring data is available, use the recipient's company name and the contact's own area. If the company name is also not on file, write from the contact's role and area alone — never fall back to Avalith's name.",
   "Sentence case: no title case, no emoji, no ALL CAPS, no exclamation marks. Correct accents and spelling (\"ingeniería\", not \"ingenieria\").",
@@ -405,7 +408,9 @@ You write ${isReminder ? "short, peer-to-peer follow-up emails that continue an 
 2. Language and tone: ${languageInstruction(channel, language)}
 3. ${goalRule}
 4. Open with the company's real hiring pain, derived ONLY from the open postings data given below (top areas being hired for, and where — LATAM, US, or elsewhere). If no posting data is given, skip this and speak generally instead. One concrete hook, not a list.
-5. Explain briefly, in one line, how Avalith helps: Staff Augmentation or a Dedicated Team, engineers in US-aligned timezones, senior-only. Use ONLY the facts listed under "Avalith — company facts" below — never invent a client, a number, or a capability not listed there.
+5. Explain briefly, in one line, how Avalith helps: Staff Augmentation or a Dedicated Team, senior-only. Use ONLY the facts listed under "Avalith — company facts" below — never invent a client, a number, or a capability not listed there.
+   - The US-aligned timezone fact is a selling point ONLY to a company that hires in the US. Mention it when the postings data shows US hiring, exactly as rule 8 treats the Miami office. If the postings data shows only LATAM hiring, or there is NO postings data at all, do NOT mention timezones: to a company already in this region it says nothing, and we do not know what it would be aligned to.
+   - With no postings data, lead instead with what holds regardless: senior engineers embedded within days. The LATAM offices and the regional clients in the facts list are available if one genuinely fits; never stretch for them.
 6. Position Avalith as a COMPLEMENT to their hiring, never as competing with their recruiting team: something that helps "while those roles get filled", or to take on a specific workstream with a dedicated squad. Never suggest replacing their hiring process.
 7. If the postings data shows the company does NOT hire in LATAM, do not pitch "placement" — pitch staff augmentation or a dedicated team instead (the value is senior engineering capacity, not candidate placement).
 8. Only mention the Madrid office if the postings data explicitly says the company hires in Spain. Only mention the Miami office if it is relevant (e.g. the company hires in Florida/Miami, or in the US generally).
