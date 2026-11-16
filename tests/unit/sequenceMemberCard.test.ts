@@ -18,14 +18,16 @@ const facts = (over: Partial<CardFacts>): CardFacts => ({
 });
 const ids = (c: ReturnType<typeof mapMemberCard>) => c.actions.map((a) => a.id);
 
-test("drafted: info badge, Florida outline, review + approve, and the three-item menu", () => {
+test("drafted: info badge, Florida outline, review + approve, and both regenerate options in the menu", () => {
   const c = mapMemberCard(facts({ state: "drafted", florida: true }), NOW);
   assert.deepEqual([c.kind, c.tone, c.florida], ["draft", "info", true]);
   assert.deepEqual(c.actions, [
     { id: "reviewDraft", style: "secondary" },
     { id: "approve", style: "primary" },
   ]);
-  assert.deepEqual(c.menu, ["regenerate", "openContact", "remove"]);
+  // "Regenerar solo el asunto" sits next to the full regenerate: a BD fixing a weak subject should not have to reroll
+  // a body they already read. Order matters — the narrower action is offered second, after the familiar one.
+  assert.deepEqual(c.menu, ["regenerate", "regenerateSubject", "openContact", "remove"]);
 });
 
 test("the Florida outline is a drafted-only badge, as in the mockup", () => {

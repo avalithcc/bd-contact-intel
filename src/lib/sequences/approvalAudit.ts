@@ -10,6 +10,9 @@ export const SEQUENCE_AUDIT_ACTIONS = {
   discard: "sequence_member_discard",
   readmit: "sequence_member_readmit",
   regenerate: "sequence_member_regenerate",
+  // "Regenerar solo el asunto": the body is left exactly as it stands. Kept distinct from `regenerate` so the log can
+  // say which of the two withdrew an approval — they have the same consequence but are not the same act.
+  regenerate_subject: "sequence_member_regenerate_subject",
   // A BD pressed "No contactar": the address is suppressed and this membership was discarded with reason opt_out.
   opt_out: "sequence_member_opt_out",
 } as const;

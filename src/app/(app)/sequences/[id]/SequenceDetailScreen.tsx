@@ -24,6 +24,7 @@ import {
   approveBulk,
   approveMember,
   cancelApproval,
+  regenerateSequenceSubject,
   chooseDraftLanguage,
   keepDraftLanguage,
   savePreferredDraftLanguage,
@@ -283,6 +284,18 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       case "remove": return setRemoveIds([a.memberId]);
       case "optOut": return setOptOutId(a.memberId);
       case "regenerate": return askLanguage(a.memberId, "regenerate");
+      // No language step: the body stays as it is, so the language of the email is already settled and asking again
+      // would offer a choice that cannot be honoured without rewriting the body this action promises to leave alone.
+      // It calls the model, so it takes the same generation lock as a full regenerate: without it two generations could
+      // run on one card at once, which is exactly what that lock exists to prevent.
+      case "regenerateSubject":
+        return void guarded(() => whileGenerating(a.memberId, () => regenerateSequenceSubject(detail.id, a.memberId))).then((r) => {
+          if (!r) return;
+          if (r.ok) showToast(l.toastSubjectRegenerated, "success");
+          else if (r.error === "edited") showToast(l.toastSubjectEdited, "error");
+          else fail();
+          router.refresh();
+        });
       case "chooseLanguage": return askLanguage(a.memberId, member(a.memberId)?.draft ? "regenerate" : "generate");
       case "keepLanguage": return void keepLanguage(a.memberId);
       case "resetLanguage": return void guarded(() => clearDraftLanguage(a.memberId)).then((r) => { if (!r) return; if (r.ok) showToast(l.languageChoice.toastReset, "success"); else fail(); router.refresh(); });

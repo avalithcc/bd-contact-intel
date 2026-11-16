@@ -15,6 +15,10 @@ for (const verb of ["approve", "cancel", "discard", "readmit", "regenerate"] as 
   });
 }
 
-test("the six actions map to distinct audit actions", () => {
-  assert.equal(new Set(Object.values(SEQUENCE_AUDIT_ACTIONS)).size, 6);
+test("every audit verb maps to its own action string, so no two acts are logged as the same thing", () => {
+  const verbs = Object.keys(SEQUENCE_AUDIT_ACTIONS);
+  assert.equal(new Set(Object.values(SEQUENCE_AUDIT_ACTIONS)).size, verbs.length);
+  // Named rather than counted: a count only catches a DUPLICATE when someone also adds a verb, and the pair that
+  // matters here is regenerate / regenerate_subject — same consequence, different act, and they must stay distinct.
+  assert.notEqual(SEQUENCE_AUDIT_ACTIONS.regenerate, SEQUENCE_AUDIT_ACTIONS.regenerate_subject);
 });

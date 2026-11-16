@@ -1094,7 +1094,8 @@ export const auditLog = pgTable(
     // 'drafted'; metadata lists the sequence id, added person ids and the
     // rejected ones with their reasons. Never written on a no-op run)
     // 'sequence_member_approve' | 'sequence_member_cancel' | 'sequence_member_discard' |
-    // 'sequence_member_readmit' | 'sequence_member_regenerate' (the approval-side
+    // 'sequence_member_readmit' | 'sequence_member_regenerate' |
+    // 'sequence_member_regenerate_subject' (the approval-side
     // actions on a Sequence member; person_id is the member's Contact, metadata
     // carries memberId, sequenceId and the step)
     // 'view_sequence' (an admin opened another BD's Sequence and its draft bodies;

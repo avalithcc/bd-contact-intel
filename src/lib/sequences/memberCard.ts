@@ -20,7 +20,7 @@ export type CardKind = "draft" | "noDraft" | "approved" | "scheduled" | "sent" |
 export type CardTone = "info" | "brand" | "contacted" | "warn" | "replied" | "discarded" | "neutral";
 export type CardActionId =
   | "generate" | "reviewDraft" | "approve" | "viewEmail" | "cancel" | "viewSent" | "advanceReminder" | "reviewReminder"
-  | "viewDraft" | "viewReminder" | "cancelReminder" | "change" | "sendNow" | "cancelSchedule" | "openConversation" | "readmit" | "regenerate" | "openContact" | "remove" | "optOut";
+  | "viewDraft" | "viewReminder" | "cancelReminder" | "change" | "sendNow" | "cancelSchedule" | "openConversation" | "readmit" | "regenerate" | "regenerateSubject" | "openContact" | "remove" | "optOut";
 export type CardAction = { id: CardActionId; style: "primary" | "secondary" | "ghost" };
 
 export type CardFacts = {
@@ -77,7 +77,7 @@ function mapOwnCard(f: CardFacts, now: Date): CardView {
     case "drafted":
       if (!f.hasDraft) return { ...base, kind: "noDraft", tone: "neutral", actions: [act("generate", "primary")], menu: ["openContact", "remove"] };
       // A draft card hides only the holds about the DRAFT (it is being fixed: DRAFT_HOLD_REASONS; the audience alert covers the no-audience case). A send-side hold stays visible.
-      return { ...base, holdReason: f.holdReason && DRAFT_HOLD_REASONS.includes(f.holdReason) ? null : f.holdReason, kind: "draft", tone: "info", florida: f.florida, actions: [act("reviewDraft", "secondary"), act("approve", "primary")], menu: ["regenerate", "openContact", "remove"] };
+      return { ...base, holdReason: f.holdReason && DRAFT_HOLD_REASONS.includes(f.holdReason) ? null : f.holdReason, kind: "draft", tone: "info", florida: f.florida, actions: [act("reviewDraft", "secondary"), act("approve", "primary")], menu: ["regenerate", "regenerateSubject", "openContact", "remove"] };
     case "approved":
       // "Cambiar" and "Enviar ahora" are on both approved cards (send-now-or-schedule); only the cancel wording differs.
       return {

@@ -19,7 +19,7 @@ import {
   type BuildOutreachMessagePromptInput,
 } from "@/lib/outreach/messagePrompt";
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
-import { parseEmailModelOutput, capBody, MAX_BODY_CHARS, type ParsedEmailMessage } from "@/lib/outreach/emailOutputParsing";
+import { parseEmailModelOutput, parseSubjectModelOutput, capBody, MAX_BODY_CHARS, type ParsedEmailMessage } from "@/lib/outreach/emailOutputParsing";
 import { describeViolations, validateSubject } from "@/lib/outreach/subjectRules";
 import { formatEmailDraft } from "@/lib/outreach/emailDraftFormat";
 import type { OutreachChannel } from "@/lib/outreach/channel";
@@ -114,6 +114,60 @@ async function retryUntilSubjectPasses(
     );
   }
   return current;
+}
+
+export type GenerateSubjectResult = { ok: true; subject: string } | { ok: false; errorKey: "generationFailed" | "invalidModelOutput" | "gatewayNotConfigured" };
+
+/**
+ * Rewrites ONLY the subject of an email whose body is already written ("Regenerar solo el asunto").
+ *
+ * The body goes INTO the prompt (see `subjectOnly` in messagePrompt.ts) so the new subject matches the email that will
+ * actually be sent. It runs the same validate-and-retry as a full generation, because a subject regenerated on demand
+ * is exactly where a BD will notice the vendor vocabulary this rule exists to keep out.
+ */
+export async function runGenerateOutreachSubject(
+  input: BuildOutreachMessagePromptInput & { subjectOnly: { existingBody: string } },
+  generate: typeof generateText = generateText,
+): Promise<GenerateSubjectResult> {
+  const { system, prompt } = buildOutreachMessagePrompt(input);
+
+  async function attempt(extra: string): Promise<string | null> {
+    const { text, finishReason } = await generate({
+      model: OUTREACH_MODEL,
+      system,
+      prompt: `${prompt}${extra}`,
+      maxOutputTokens: MAX_OUTPUT_TOKENS.email,
+    });
+    if (finishReason === "length") return null;
+    return parseSubjectModelOutput(text);
+  }
+
+  try {
+    let subject = await attempt("");
+    if (!subject) return { ok: false, errorKey: "invalidModelOutput" };
+
+    for (let i = 0; i < SUBJECT_RETRY_ATTEMPTS; i++) {
+      const violations = validateSubject(subject, { senderName: input.senderName });
+      if (violations.length === 0) return { ok: true, subject };
+      const next = await attempt(
+        `\n\nYour previous attempt used the subject "${subject}", which was REJECTED because ${describeViolations(violations)}. Write a different subject that obeys every subject rule.`,
+      );
+      if (!next) break;
+      subject = next;
+    }
+
+    const remaining = validateSubject(subject, { senderName: input.senderName });
+    if (remaining.length > 0) {
+      console.error(`[outreach] regenerated subject still breaks the rule: ${JSON.stringify({ subject, violations: remaining })}`);
+    }
+    return { ok: true, subject };
+  } catch (error) {
+    console.error("runGenerateOutreachSubject failed", error);
+    if (GatewayError.isInstance(error) && (error.statusCode === 401 || error.statusCode === 403)) {
+      return { ok: false, errorKey: "gatewayNotConfigured" };
+    }
+    return { ok: false, errorKey: "generationFailed" };
+  }
 }
 
 export async function runGenerateOutreachMessage(

@@ -53,6 +53,27 @@ export function capBody(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) : text;
 }
 
+/**
+ * The subject-only reply (`subjectOnly` in buildOutreachMessagePrompt): `{"subject": "..."}` with no body.
+ *
+ * A model asked for one field still sometimes returns both, so a "body" here is accepted and ignored rather than
+ * treated as a parse failure — the caller is keeping the body it already has either way.
+ */
+export function parseSubjectModelOutput(rawText: string): string | null {
+  const candidate = stripCodeFence(rawText);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return null;
+  const { subject } = parsed as Record<string, unknown>;
+  if (typeof subject !== "string") return null;
+  const capped = capSubject(subject);
+  return capped || null;
+}
+
 export function parseEmailModelOutput(rawText: string): ParsedEmailMessage | null {
   const candidate = stripCodeFence(rawText);
 
