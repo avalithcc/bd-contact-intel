@@ -2141,6 +2141,21 @@ export const en = {
     dropCancel: "Cancel",
     dropClose: "Close",
     dropError: "Could not drop it. Try again.",
+    rolesTrigger: "Roles to follow",
+    rolesHeading: "Which roles enter your daily queue",
+    rolesIntro:
+      "Your queue takes up to 10 contacts per day. Roles you untick here never take one of those 10 slots. The number on the right is your own contacts currently due for follow-up in that group.",
+    rolesGuideLink: "See the roles guide",
+    rolesReset: "Reset",
+    rolesSave: "Save",
+    rolesSaving: "Saving…",
+    rolesSaveError: "Could not save. Try again; at least one role must stay included.",
+    rolesChipKey: "No follow-up:",
+    rolesChipRemoveAria: (label: string) => `Include ${label} again`,
+    rolesLeftOutMeta: (n: number) => `${n} due contacts are left out of the rotation`,
+    rolesNoteTitle: "Applies from tomorrow.",
+    rolesNoteBody:
+      "Saving changes who enters your queue from the next daily build. Contacts already in today's queue stay until you work them, drop them or they expire — nothing disappears from the screen when you save.",
   },
 
   companiesPage: {

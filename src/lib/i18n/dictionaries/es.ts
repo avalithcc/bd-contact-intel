@@ -2125,6 +2125,21 @@ export const es: typeof en = {
     dropCancel: "Cancelar",
     dropClose: "Cerrar",
     dropError: "No se pudo dar de baja. Probá de nuevo.",
+    rolesTrigger: "Roles a seguir",
+    rolesHeading: "Qué roles entran en tu cola diaria",
+    rolesIntro:
+      "Tu cola toma hasta 10 contactos por día. Los roles que destildes acá no ocupan ninguno de esos 10 lugares. El número de la derecha son tus propios contactos vencidos para seguimiento en ese grupo.",
+    rolesGuideLink: "Ver guía de roles",
+    rolesReset: "Restablecer",
+    rolesSave: "Guardar",
+    rolesSaving: "Guardando…",
+    rolesSaveError: "No se pudo guardar. Probá de nuevo; tiene que quedar al menos un rol incluido.",
+    rolesChipKey: "Sin seguimiento:",
+    rolesChipRemoveAria: (label: string) => `Volver a incluir ${label}`,
+    rolesLeftOutMeta: (n: number) => `${n} contactos vencidos quedan fuera de la rotación`,
+    rolesNoteTitle: "Aplica desde mañana.",
+    rolesNoteBody:
+      "Guardar cambia quién entra en tu cola a partir del próximo armado diario. Los contactos que ya están en la cola de hoy se quedan hasta que los trabajes, los descartes o venzan — nada desaparece de la pantalla al guardar.",
   },
 
   companiesPage: {
