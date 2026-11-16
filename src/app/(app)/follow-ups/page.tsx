@@ -10,7 +10,9 @@ import { InfoIcon } from "@/components/icons";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
+import { roleGroupPanelLabels, roleGroupPanelRows } from "@/lib/followUp/roleGroupPanelProps";
 import { PostponeMenu } from "./PostponeMenu";
+import { ExcludedRoleGroupChips, RoleGroupsPanel, type RoleGroupRow, type RoleGroupsLabels } from "./RoleGroupsPanel";
 import { DropFollowUpButton, type DropFollowUpLabels } from "./DropFollowUpButton";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +45,14 @@ export default async function FollowUpsPage() {
 
   const now = new Date();
   const rows = await getFollowUpQueuePage(me.id, now);
+  // follow-up-role-groups: the deny-list is already on `me` (getCurrentBd selects every bd column), so this costs no read. The per-group
+  // counts are NOT read here: the panel fetches them when opened (see actions.ts).
+  const excludedGroups = me.followUpExcludedRoleGroups;
+  // Both objects cross into client components, so they are built by the shared producers in roleGroupPanelProps.ts,
+  // whose types declare every entry as `string`. A dictionary FUNCTION here is what took the page down once; now it
+  // is a compile error rather than a runtime one, and a test checks these same producers for both locales.
+  const roleRows: RoleGroupRow[] = roleGroupPanelRows(dict.roleGroups);
+  const roleLabels: RoleGroupsLabels = roleGroupPanelLabels(l);
   // follow-up-expiry: "Hoy" is the cap-bound queue (days 0-2 in it); "Vencidos" (days 3-9) sit above it, outside the cap, and
   // day 10+ is hidden even if the nightly job has not dropped it yet.
   const { today: items, overdue } = classifyQueueItems(rows, argentinaCalendarDate(now));
@@ -251,7 +261,24 @@ export default async function FollowUpsPage() {
           </h1>
           <p className="meta">{l.subtitle}</p>
         </div>
+        <div className="actions">
+          <RoleGroupsPanel key={excludedGroups.join(",")} rows={roleRows} excluded={excludedGroups} labels={roleLabels} />
+        </div>
       </div>
+
+      {excludedGroups.length > 0 && (
+        <>
+          <div className="toolbar">
+            <ExcludedRoleGroupChips rows={roleRows} excluded={excludedGroups} labels={roleLabels} />
+          </div>
+          <div className="alert alert-warn mb-lg" role="note">
+            <InfoIcon className="icon" />
+            <div>
+              <span className="title">{l.rolesNoteTitle}</span> {l.rolesNoteBody}
+            </div>
+          </div>
+        </>
+      )}
 
       {overdue.length > 0 && (
         <section aria-labelledby="vencidos-title" className="mb-lg">

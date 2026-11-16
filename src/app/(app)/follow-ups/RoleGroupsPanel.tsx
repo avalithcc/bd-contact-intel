@@ -4,33 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/ToastProvider";
 import { ChevronDownIcon, CloseIcon, UsersIcon } from "@/components/icons";
+import { fillTemplate } from "@/lib/i18n/template";
 import { roleGroupLeftOutCount } from "@/lib/followUp/roleGroupPreference";
+import type { RoleGroupRow, RoleGroupsLabels } from "@/lib/followUp/roleGroupPanelProps";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import { getFollowUpRoleGroupCountsAction, saveFollowUpRoleGroupsAction } from "./actions";
 
-export interface RoleGroupRow {
-  key: string;
-  label: string;
-  priorityClass: string;
-  priorityLabel: string;
-}
-
-export interface RoleGroupsLabels {
-  trigger: string;
-  heading: string;
-  intro: string;
-  guideLink: string;
-  reset: string;
-  save: string;
-  saving: string;
-  saveError: string;
-  chipKey: string;
-  chipRemoveAria: (label: string) => string;
-  /** Success toast after a save: the change applies from the next daily build, so nothing visibly moves today. */
-  savedToast: string;
-  leftOutMeta: (n: number) => string;
-  countsLoading: string;
-}
+// Re-exported so the page can keep importing the panel's prop types from the panel itself.
+export type { RoleGroupRow, RoleGroupsLabels };
 
 /**
  * "Roles a seguir" (follow-up-role-groups mockup): which role groups may take one of the 10 daily slots. Saving changes who ENTERS the
@@ -95,7 +76,9 @@ export function RoleGroupsPanel({ rows, excluded, labels }: { rows: RoleGroupRow
         ))}
         {counts && excluded.length > 0 && (
           <p className="meta" style={{ padding: "var(--space-sm) var(--space-sm) 0" }}>
-            {labels.leftOutMeta(roleGroupLeftOutCount(counts as Record<RoleGroupKey, number>, excluded))}
+            {fillTemplate(labels.leftOutMeta, {
+              n: String(roleGroupLeftOutCount(counts as Record<RoleGroupKey, number>, excluded)),
+            })}
           </p>
         )}
         <div className="menu-sep" />
@@ -149,7 +132,7 @@ export function ExcludedRoleGroupChips({
         .map((r) => (
           <span className="chip" key={r.key}>
             <span className="k">{labels.chipKey}</span> {r.label}
-            <button type="button" className="chip-remove" aria-label={labels.chipRemoveAria(r.label)} disabled={busy} onClick={() => remove(r.key)}>
+            <button type="button" className="chip-remove" aria-label={fillTemplate(labels.chipRemoveAria, { label: r.label })} disabled={busy} onClick={() => remove(r.key)}>
               <CloseIcon className="icon" />
             </button>
           </span>
