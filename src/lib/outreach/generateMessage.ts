@@ -19,7 +19,8 @@ import {
   type BuildOutreachMessagePromptInput,
 } from "@/lib/outreach/messagePrompt";
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
-import { parseEmailModelOutput, capBody, MAX_BODY_CHARS } from "@/lib/outreach/emailOutputParsing";
+import { parseEmailModelOutput, capBody, MAX_BODY_CHARS, type ParsedEmailMessage } from "@/lib/outreach/emailOutputParsing";
+import { describeViolations, validateSubject } from "@/lib/outreach/subjectRules";
 import { formatEmailDraft } from "@/lib/outreach/emailDraftFormat";
 import type { OutreachChannel } from "@/lib/outreach/channel";
 
@@ -61,6 +62,60 @@ export type GenerateOutreachMessageResult =
       errorKey: "notFound" | "gatewayNotConfigured" | "generationFailed" | "invalidModelOutput";
     };
 
+/**
+ * How many extra generations a rejected subject is worth. Capped because every attempt is a paid call.
+ *
+ * Read this before trusting it: measured against production on 2026-11-16, 22 of 28 live subjects (78.6%) broke the
+ * rule. If retries were independent draws from that distribution, two of them would still leave ~49% broken — so the
+ * retry is a NET, not the cure. The cure is meant to be the rewritten rule 5 (which no longer pushes vendor framing at
+ * a model that has no hiring data to work from) plus the fact that each retry is told exactly what it broke, which
+ * makes the draws anything but independent. How much that helps is NOT yet known.
+ *
+ * `scripts/measure/subject-rule-violations.ts` answers it against live data, and answering it is the point: the last
+ * attempt at this problem shipped unmeasured and was still failing weeks later. Re-run it before concluding anything.
+ */
+export const SUBJECT_RETRY_ATTEMPTS = 2;
+
+/**
+ * Regenerates while the subject breaks the rule, telling the model exactly what it broke each time.
+ *
+ * When every attempt fails, the LAST one is returned rather than failing the draft: a BD with a flawed subject they can
+ * edit is better off than a BD with no draft. The give-up is logged with the subject and the violations, because the
+ * previous attempt to fix this shipped with no way to tell whether it had worked — and it had not, for weeks, silently.
+ * `scripts/measure/subject-rule-violations.ts` reads the same rule against live data to answer that question.
+ */
+async function retryUntilSubjectPasses(
+  first: ParsedEmailMessage,
+  ctx: { system: string; prompt: string; input: BuildOutreachMessagePromptInput; generate: typeof generateText },
+): Promise<ParsedEmailMessage> {
+  let current = first;
+
+  for (let attempt = 1; attempt <= SUBJECT_RETRY_ATTEMPTS; attempt++) {
+    const violations = validateSubject(current.subject, { senderName: ctx.input.senderName });
+    if (violations.length === 0) return current;
+
+    const { text, finishReason } = await ctx.generate({
+      model: OUTREACH_MODEL,
+      system: ctx.system,
+      prompt: `${ctx.prompt}\n\nYour previous attempt used the subject "${current.subject}", which was REJECTED because ${describeViolations(violations)}. Write a different subject that obeys every subject rule. Keep the body's substance; only the subject must change.`,
+      maxOutputTokens: MAX_OUTPUT_TOKENS.email,
+    });
+
+    if (finishReason === "length") break;
+    const reparsed = parseEmailModelOutput(text);
+    if (!reparsed) break;
+    current = reparsed;
+  }
+
+  const remaining = validateSubject(current.subject, { senderName: ctx.input.senderName });
+  if (remaining.length > 0) {
+    console.error(
+      `[outreach] subject still breaks the rule after ${SUBJECT_RETRY_ATTEMPTS} retries: ${JSON.stringify({ subject: current.subject, violations: remaining })}`,
+    );
+  }
+  return current;
+}
+
 export async function runGenerateOutreachMessage(
   input: BuildOutreachMessagePromptInput,
   historyCount: number,
@@ -83,12 +138,16 @@ export async function runGenerateOutreachMessage(
     if (input.channel === "email") {
       const parsed = parseEmailModelOutput(text);
       if (!parsed) return { ok: false, errorKey: "invalidModelOutput" };
+
+      // The subject rule is checked, not merely requested. See subjectRules.ts for why: it was stated in the prompt for
+      // weeks while 10 of the last 25 live subjects broke it. A violation costs a retry that NAMES what was broken.
+      const accepted = await retryUntilSubjectPasses(parsed, { system, prompt, input, generate });
       return {
         ok: true,
         channel: "email",
-        message: formatEmailDraft(parsed.subject, parsed.body),
-        subject: parsed.subject,
-        body: parsed.body,
+        message: formatEmailDraft(accepted.subject, accepted.body),
+        subject: accepted.subject,
+        body: accepted.body,
         historyCount,
         signals,
       };
