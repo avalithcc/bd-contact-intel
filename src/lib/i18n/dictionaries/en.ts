@@ -2153,6 +2153,8 @@ export const en = {
     rolesChipKey: "No follow-up:",
     rolesChipRemoveAria: (label: string) => `Include ${label} again`,
     rolesLeftOutMeta: (n: number) => `${n} due contacts are left out of the rotation`,
+    rolesSavedToast: "Saved. Applies from tomorrow: contacts already in today's queue stay until you work them, drop them or they expire.",
+    rolesCountsLoading: "Counting due contacts…",
     rolesNoteTitle: "Applies from tomorrow.",
     rolesNoteBody:
       "Saving changes who enters your queue from the next daily build. Contacts already in today's queue stay until you work them, drop them or they expire — nothing disappears from the screen when you save.",
