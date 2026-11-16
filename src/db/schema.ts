@@ -48,6 +48,11 @@ export const bd = pgTable("bd", {
   // Whether the Gmail reminder cron may email this BD (drizzle/0048). Data only, no UI yet. The migration switched it off
   // for the two e2e test accounts by email; the launch-readiness seed does the same on a fresh scratch database.
   emailRemindersEnabled: boolean("email_reminders_enabled").notNull().default(true),
+  // RoleGroupKeys this BD does NOT want entering their daily follow-up queue (drizzle/0065). Empty = every group enters, the pre-change
+  // behavior, so nothing changes for a BD until they opt in. A deny-list on purpose: a group added later enters by default. It decides
+  // who ENTERS the next daily build only (candidateQuery.ts); rows already in the queue stay until worked, dropped or expired. Written
+  // by the BD themself from /follow-ups (roleGroupPreference.ts validates every key); no audit_log row, it is a view preference.
+  followUpExcludedRoleGroups: text("follow_up_excluded_role_groups").array().notNull().default(sql`'{}'::text[]`),
 });
 
 // A contact, private to exactly one BD.

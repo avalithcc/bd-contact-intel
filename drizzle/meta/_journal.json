@@ -456,6 +456,13 @@
       "when": 1795033200000,
       "tag": "0064_sequence_draft_language",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1795119600000,
+      "tag": "0065_bd_follow_up_excluded_role_groups",
+      "breakpoints": true
     }
   ]
 }
