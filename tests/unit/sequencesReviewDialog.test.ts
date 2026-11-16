@@ -24,10 +24,20 @@ const member = (over: Partial<DetailMember> = {}): DetailMember => ({
 });
 const view = (m: DetailMember, step: 1 | 2 = 1) => reviewView(m, step, DEFAULT_SCHEDULE, NOW);
 
-test("a drafted member is editable with all three footer actions, and an unopened draft asks to be marked reviewed", () => {
+test("a drafted member is editable with every footer action, and an unopened draft asks to be marked reviewed", () => {
   const v = view(member())!;
-  assert.deepEqual([v.kind, v.readOnly, v.footer, v.marksReviewed], ["draft", false, ["regenerate", "save", "approve"], true]);
+  assert.deepEqual([v.kind, v.readOnly, v.footer, v.marksReviewed], ["draft", false, ["regenerate", "regenerateSubject", "save", "approve"], true]);
   assert.equal(view(member({ draft: draft({ reviewedAt: hours(1) }) }))!.marksReviewed, false, "reopening never rewrites the flag");
+});
+
+/**
+ * The dialog is where a BD reads the subject and decides it is weak, so it is where "regenerate only the subject"
+ * belongs. It first shipped in the card's "..." menu alone and the owner went looking for it here.
+ */
+test("the subject-only regenerate is offered on step 1 and never on a reminder", () => {
+  assert.ok(view(member())!.footer.includes("regenerateSubject"), "step 1 offers it");
+  const reminder = view(member({ state: "sent", sentAt: hours(96), reminderDraft: draft() }), 2);
+  assert.ok(reminder === null || !reminder.footer.includes("regenerateSubject"), "a reminder's subject belongs to the thread");
 });
 
 test("sent, replied and no_reply are read-only with no footer action and never mark reviewed", () => {
@@ -39,7 +49,7 @@ test("sent, replied and no_reply are read-only with no footer action and never m
 
 test("an approved draft is editable but cannot be approved again", () => {
   const v = view(member({ state: "approved", draft: draft({ approvedAt: hours(2), scheduledFor: new Date("2026-10-16T13:00:00Z") }) }))!;
-  assert.deepEqual([v.kind, v.readOnly, v.footer, v.cadence?.step1.kind], ["approved", false, ["regenerate", "save"], "scheduled"]);
+  assert.deepEqual([v.kind, v.readOnly, v.footer, v.cadence?.step1.kind], ["approved", false, ["regenerate", "regenerateSubject", "save"], "scheduled"]);
 });
 
 test("the reminder reads the step 2 draft and is a separate variant", () => {

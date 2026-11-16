@@ -165,6 +165,16 @@ function Actions({ card, m, l, onAction, generation, send, now, moment, reminder
         const isReview = a.id === "reviewDraft" || a.id === "reviewReminder" || a.id === "approve";
         return <button key={a.id} type="button" className={`btn btn-${a.style} btn-sm`} onClick={run(a.id)} {...(isReview ? reviewLock : {})}>{l.actions[a.id]}</button>;
       })}
+      {/* generationLock.ts promises "this card is the one being generated: it shows the spinner", but only the "Generar"
+          button ever honoured it. A regenerate started from the menu below closes that menu, leaving a card where every
+          control is disabled and nothing says why — reported as the screen freezing. This is that promise, kept for
+          whichever action started the generation. */}
+      {gen.busyHere && !card.actions.some((a) => a.id === "generate") && (
+        <span className="row" role="status" style={{ gap: "var(--space-2xs)" }}>
+          <span className="spinner-standalone" aria-hidden="true" />
+          <span className="meta">{l.generating}</span>
+        </span>
+      )}
       {card.menu.length > 0 && (
         <DropdownMenu trigger={<MoreIcon className="icon" />} triggerClassName="btn btn-ghost btn-sm btn-icon" ariaLabel={l.moreActions}>
           {card.menu.map((id) => (
@@ -173,7 +183,7 @@ function Actions({ card, m, l, onAction, generation, send, now, moment, reminder
               {id === "openContact" ? (
                 <Link role="menuitem" className="menu-item" href={contactHref}>{l.actions[id]}</Link>
               ) : (
-                <button type="button" role="menuitem" className="menu-item" onClick={run(id)} disabled={id === "regenerate" && gen.regenerateDisabled} title={id === "regenerate" ? waitTitle ?? reviewLock.title : undefined}>{l.actions[id]}</button>
+                <button type="button" role="menuitem" className="menu-item" onClick={run(id)} disabled={(id === "regenerate" || id === "regenerateSubject") && gen.regenerateDisabled} title={id === "regenerate" || id === "regenerateSubject" ? waitTitle ?? reviewLock.title : undefined}>{l.actions[id]}</button>
               )}
             </Fragment>
           ))}

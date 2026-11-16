@@ -35,6 +35,9 @@ export type ReviewAction =
   | { type: "keepLanguage"; memberId: string; step: 1 | 2 }
   /** `confirmedEdits` (member id -> the `editedAt` the BD was shown) is set only after the BD confirmed losing exactly that text; the server refuses to overwrite an edit otherwise. */
   | { type: "regenerate"; memberId: string; step: 1 | 2; confirmedEdits?: Record<string, number> }
+  /** "Regenerar solo el asunto": step 1 only, so no `step` to pass — a reminder continues an existing thread, whose
+   * subject is the thread's rather than ours to rewrite. */
+  | { type: "regenerateSubject"; memberId: string }
   | { type: "save"; memberId: string; step: 1 | 2; subject: string; body: string }
   /** `when` is the split-button choice; absent for the reminder (step 2), which has no choice. */
   | { type: "approve"; memberId: string; step: 1 | 2; subject: string; body: string; when?: SendChoice };

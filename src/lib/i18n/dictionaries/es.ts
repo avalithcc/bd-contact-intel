@@ -3897,6 +3897,7 @@ export const es: typeof en = {
     reviewMiami: "(Miami)",
     reviewReminderOn: "Recordatorio el",
     reviewRegenerate: "Regenerar",
+    reviewRegenerateSubject: "Regenerar solo el asunto",
     // Confirmation shown only when the draft was hand-edited: regenerating overwrites it and nothing keeps the old text.
     regenConfirmTitle: "¿Regenerar y perder tu versión?",
     regenConfirmTitleOther: "¿Regenerar y perder la versión editada?",

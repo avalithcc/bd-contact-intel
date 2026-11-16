@@ -338,6 +338,8 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     if (readOnly) return;
     const m = member(a.memberId);
     if (!m) return;
+    // Same path as the card menu's entry, so the two cannot drift: one action, one set of guards, one toast.
+    if (a.type === "regenerateSubject") return void onAction(a);
     if (a.type === "markReviewed") {
       // The dialog reports once per open. Refetch on success, or the bar's "N de M revisados" and the approve gate stay stale.
       const r = await markDraftReviewed(a.memberId, a.step, a.version).catch(() => null);
@@ -433,7 +435,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
         lock={lock} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
         bulk={readOnly ? undefined : (g) => <BulkBar lock={g} selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} mismatched={mismatchedNames(detail.members)} />}
       />
-      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={lock.active} error={error} stale={review !== null && staleKey === reviewKey(review.memberId, review.step)} send={{ ...send, error }} />
+      <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={lock.active} generating={reviewed !== null && lock.card(reviewed.memberId).busyHere} error={error} stale={review !== null && staleKey === reviewKey(review.memberId, review.step)} send={{ ...send, error }} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />
       <OptOutDialog open={optOutId !== null} email={optOutMember?.email ?? null} ownLiveCount={optOutLive} labels={l} onClose={closeDialogs} onConfirm={onOptOut} busy={busy} error={error} />
       {regen && (
