@@ -37,6 +37,13 @@ export function SequenceCreateForm({ contacts, hasMore, loadPage, industryCounts
   const { step1, step2 } = DEFAULT_SCHEDULE;
   const capHelp = fill(l.newCapHelp, { default: DAILY_SEND_CAP_DEFAULT, max: DAILY_SEND_CAP_CEILING });
   const submitLabel = v.submit === "none" ? l.newSubmitNone : fill(v.submit === "one" ? l.newSubmitOne : l.newSubmit, { n: selection.size });
+  // Reuses each field's own wording rather than inventing a second phrasing for the same problem.
+  const blockedReason =
+    v.firstInvalid === "name"
+      ? l.newNameError
+      : v.firstInvalid === "cap"
+        ? fill(v.cap.error === "ceiling" ? l.newCapCeiling : l.newCapInvalid, { max: DAILY_SEND_CAP_CEILING })
+        : null;
   return (
     <>
       <div className="page-header"><div className="titles"><div className="eyebrow">{l.eyebrow}</div><h1>{l.newTitle}<span className="dot">.</span></h1>
@@ -44,7 +51,17 @@ export function SequenceCreateForm({ contacts, hasMore, loadPage, industryCounts
       <form noValidate onSubmit={(e) => {
         e.preventDefault();
         setAttempted(true);
-        if (v.valid && !busy) onSubmit({ name: name.trim(), dailySendCap: v.cap.value as number, personIds: [...selection.keys()] });
+        if (v.valid && !busy) {
+          onSubmit({ name: name.trim(), dailySendCap: v.cap.value as number, personIds: [...selection.keys()] });
+          return;
+        }
+        // The invalid field is a screen and a half above this button, past the whole contact picker, so revealing the
+        // error there alone reads as a dead button. Take the BD to it; `blockedReason` below repeats it where they are.
+        if (!busy && v.firstInvalid) {
+          const el = document.getElementById(`${id}-${v.firstInvalid}`);
+          el?.scrollIntoView({ block: "center", behavior: "smooth" });
+          el?.focus({ preventScroll: true });
+        }
       }}>
         <div className="card mb-lg"><div className="card-header"><h3>{l.newSettings}</h3></div>
           <div className="card-body stack">
@@ -87,6 +104,9 @@ export function SequenceCreateForm({ contacts, hasMore, loadPage, industryCounts
           </div>
         </div>
         <div className="form-actions">
+          {/* The same reason as the field's own error, repeated here: this button is far below the Ajustes card, and a
+              BD who presses it must learn why it did nothing without having to go looking for the message. */}
+          {attempted && blockedReason && <span className="error-text" role="alert">{blockedReason}</span>}
           {error && <span className="error-text" role="alert">{error}</span>}
           <Link className="btn btn-ghost" href="/sequences">{l.newCancel}</Link>
           <button type="submit" className="btn btn-primary" disabled={v.blocked || busy}>{submitLabel}</button>

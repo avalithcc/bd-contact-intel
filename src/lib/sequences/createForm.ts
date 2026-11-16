@@ -20,5 +20,29 @@ export function createFormView(i: { name: string; cap: string; selectedCount: nu
   const cap = capState(i.cap);
   const nameMissing = i.name.trim() === "";
   const blocked = i.selectedCount === 0 || !i.hasAccount;
-  return { nameMissing, cap, submit: (i.selectedCount === 0 ? "none" : i.selectedCount === 1 ? "one" : "many") as "none" | "one" | "many", blocked, valid: !blocked && !nameMissing && cap.error === null };
+  return {
+    nameMissing,
+    cap,
+    submit: (i.selectedCount === 0 ? "none" : i.selectedCount === 1 ? "one" : "many") as "none" | "one" | "many",
+    blocked,
+    valid: !blocked && !nameMissing && cap.error === null,
+    firstInvalid: firstInvalidField({ nameMissing, capError: cap.error }),
+  };
+}
+
+export type CreateFormField = "name" | "cap";
+
+/**
+ * Which field a failed submit must take the BD to, in the order the form draws them.
+ *
+ * This exists because the "enabled button that reveals the error" design above only works if the BD can SEE the error.
+ * The submit button sits below the whole contact picker, so the Ajustes card holding both of these fields is roughly a
+ * screen and a half above it: on 2026-11-16 a BD selected 5 contacts, pressed the button and reported that nothing
+ * happened at all — the name was empty and the error rendered far off-screen. The form now scrolls to and focuses this
+ * field, and repeats the same message beside the button.
+ */
+export function firstInvalidField(i: { nameMissing: boolean; capError: CapState["error"] }): CreateFormField | null {
+  if (i.nameMissing) return "name";
+  if (i.capError !== null) return "cap";
+  return null;
 }
