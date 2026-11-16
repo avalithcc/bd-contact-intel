@@ -47,8 +47,8 @@
  * orchestrator's read-only "how many would enter today's queue, per BD"
  * check).
  */
-import { sql } from "drizzle-orm";
-import { activity, company, followUpQueueItem, person, personBdConnection } from "@/db/schema";
+import { sql, type SQL } from "drizzle-orm";
+import { activity, bd, company, followUpQueueItem, person, personBdConnection } from "@/db/schema";
 import type { CallOutcomeCode } from "@/lib/contacts/call";
 import { NO_PROGRESS_ACTIVITY_TYPES } from "@/lib/activity/noProgressActivity";
 import { effectiveActivityAtSql } from "@/lib/contacts/effectiveActivityTime";
@@ -115,6 +115,7 @@ export function fuqCandidatesCte({ includeCycles = true }: CandidateOptions = {}
         person.id as fuq_person_id,
         person.owner_bd_id as fuq_owner_bd_id,
         person.status as fuq_status,
+        person.role_group as fuq_role_group,
         company.display_name as fuq_company_name,
         greatest(
           coalesce(fuq_activity.fuq_activity_at, timestamptz '-infinity'),
@@ -186,6 +187,26 @@ function fuqOrderBy() {
 }
 
 /**
+ * The BD's role-group deny-list (bd.follow_up_excluded_role_groups, drizzle/0065), as a correlated NOT EXISTS read in the SAME
+ * statement (one round trip, no separate fetch). It decides who ENTERS the next daily build ONLY: it is deliberately NOT in
+ * `openCycleRowSql` (openCycle.ts), the page read, the badge or the expiry job, because rows already materialized stay until
+ * worked, dropped or expired; putting it there would evict in-flight rows with no activity row and no audit trail.
+ *
+ * NULL `role_group` is NEVER excluded. `NULL = any(...)` is NULL, so the inner select finds no row and NOT EXISTS is true. This
+ * agrees with Contactos: its role filter is `role_group = 'x'` (a NULL never matches `no_position`) and its default hide keeps NULL
+ * visible (roleVisibility.ts). NULL means "not classified yet"; `no_position` ("Sin cargo") is a stored classification of a blank
+ * title. An empty array makes `= any` false for every row, which is exactly the pre-change behavior.
+ * `bdRef` is a uuid expression: the bound `bdId` for one BD, or `fuq_owner_bd_id` when spanning every BD.
+ */
+function fuqRoleGroupAllowedSql(bdRef: SQL) {
+  return sql`not exists (
+          select 1 from ${bd}
+          where bd.id = ${bdRef}
+            and fuq_role_group = any(bd.follow_up_excluded_role_groups)
+        )`;
+}
+
+/**
  * One BD's top-`cap` due contacts, ready to insert into
  * `follow_up_queue_item` — `ON CONFLICT (bd_id, queue_date, person_id) DO
  * NOTHING` is the idempotent-insert half of the race guard (the primary
@@ -220,6 +241,7 @@ export function buildFollowUpInsertQuery(bdId: string, queueDate: string, cap: n
         row_number() over (order by ${fuqOrderBy()}) as fuq_position
       from fuq_due
       where fuq_owner_bd_id = ${bdId}::uuid
+        and ${fuqRoleGroupAllowedSql(sql`${bdId}::uuid`)}
         and not exists (
           select 1 from ${followUpQueueItem} fuq_prior
           where fuq_prior.bd_id = ${bdId}::uuid
@@ -285,7 +307,27 @@ export function buildFollowUpVerificationQuery(cap: number = FOLLOW_UP_DAILY_CAP
     select fuq_owner_bd_id as owner_bd_id, count(*)::int as eligible_count,
       least(count(*), ${cap})::int as queue_count
     from fuq_due
+    where ${fuqRoleGroupAllowedSql(sql`fuq_owner_bd_id`)}
     group by fuq_owner_bd_id
     order by queue_count desc, eligible_count desc
+  `;
+}
+
+/** Output column names of `buildFollowUpRoleGroupCountsQuery`, shared with its row mapper (roleGroupPreference.ts). */
+export const ROLE_GROUP_COUNT_COLUMNS = { group: "rg_group", count: "rg_due_count" } as const;
+
+/**
+ * Panel counts: one BD's own contacts due today per role group. Reads the SAME `fuq_due` as the selection, so the thresholds are
+ * never copied; it is deliberately BEFORE the deny-list, so an excluded group still shows how many it keeps out. A NULL
+ * `role_group` comes back as its own NULL group row (the mapper ignores it: it is in no group and is never excluded).
+ * Zero-filled per group by `roleGroupCountsFromRows`.
+ */
+export function buildFollowUpRoleGroupCountsQuery(bdId: string) {
+  return sql`
+    with ${fuqCandidatesCte()}
+    select fuq_role_group as ${sql.raw(ROLE_GROUP_COUNT_COLUMNS.group)}, count(*)::int as ${sql.raw(ROLE_GROUP_COUNT_COLUMNS.count)}
+    from fuq_due
+    where fuq_owner_bd_id = ${bdId}::uuid
+    group by fuq_role_group
   `;
 }
