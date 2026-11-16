@@ -22,7 +22,7 @@ test("cap: the default is valid, above 8 warns, above 15 and non-integers are re
 
 test("form view: needs a name, a valid cap, an account and at least one contact; the label follows the selection count", () => {
   const ok = { name: " Salud ", cap: "5", selectedCount: 6, hasAccount: true };
-  assert.deepEqual(createFormView(ok), { nameMissing: false, cap: capState("5"), submit: "many", blocked: false, valid: true });
+  assert.deepEqual(createFormView(ok), { nameMissing: false, cap: capState("5"), submit: "many", blocked: false, valid: true, firstInvalid: null });
   assert.equal(createFormView({ ...ok, selectedCount: 1 }).submit, "one");
   const none = createFormView({ ...ok, selectedCount: 0 });
   assert.deepEqual([none.submit, none.blocked, none.valid], ["none", true, false]);
