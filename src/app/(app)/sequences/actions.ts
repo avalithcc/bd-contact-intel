@@ -30,6 +30,8 @@ import {
   memberDraftSignals,
   regenerateReminderDraft,
   regenerateDrafts,
+  regenerateDraftSubject,
+  type RegenerateSubjectResult,
   saveDraftEdit,
   setMemberDraftLanguage,
   setMemberPreferredLanguage,
@@ -147,6 +149,17 @@ export async function clearDraftLanguage(memberId: string): Promise<SetLanguageR
 export async function regenerateSequenceDrafts(sequenceId: string, memberIds: string[], confirmedEdits: Record<string, number> = {}): Promise<ClientDraftBatchResult> {
   const me = await getCurrentBd();
   return withoutReasons(await regenerateDrafts(me.id, sequenceId, memberIds, {}, validConfirmations(confirmedEdits)));
+}
+
+/**
+ * "Regenerar solo el asunto": rewrites one member's subject and leaves the body untouched.
+ *
+ * Separate from `regenerateSequenceDrafts` on purpose — rerolling a whole email to fix a subject throws away a body
+ * the BD may already have read and wanted. It still clears review and approval, because the draft changed.
+ */
+export async function regenerateSequenceSubject(sequenceId: string, memberId: string, confirmedEdits: Record<string, number> = {}): Promise<RegenerateSubjectResult> {
+  const me = await getCurrentBd();
+  return regenerateDraftSubject(me.id, sequenceId, memberId, {}, validConfirmations(confirmedEdits));
 }
 
 /** "Regenerar" in the reminder dialog (step 2 only): replaces that one draft, clears its review and approval. */

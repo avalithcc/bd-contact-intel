@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { auditLog, personBdConnection, sequence, sequenceDraft, sequenceMember, signal } from "@/db/schema";
 import { getCompanyPostingsForKey } from "@/lib/hiring/queries";
 import { getSiteUrl } from "@/lib/config/siteUrl";
-import { runGenerateOutreachMessage } from "@/lib/outreach/generateMessage";
+import { runGenerateOutreachMessage, runGenerateOutreachSubject } from "@/lib/outreach/generateMessage";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import { sequenceAuditRow } from "./approvalAudit";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
@@ -46,10 +46,12 @@ const REMINDER_ELIGIBLE: readonly string[] = REGENERABLE_STATES[2];
 
 export interface DraftDeps {
   generate: typeof runGenerateOutreachMessage;
+  /** Subject-only regeneration (regenerateDraftSubject); injected the same way `generate` is, so tests never call a model. */
+  generateSubject: typeof runGenerateOutreachSubject;
   issueToken: typeof issueUnsubscribeToken;
   siteUrl: string;
 }
-const liveDeps = (): DraftDeps => ({ generate: runGenerateOutreachMessage, issueToken: issueUnsubscribeToken, siteUrl: getSiteUrl() });
+const liveDeps = (): DraftDeps => ({ generate: runGenerateOutreachMessage, generateSubject: runGenerateOutreachSubject, issueToken: issueUnsubscribeToken, siteUrl: getSiteUrl() });
 
 type Mode = "missing" | "regenerate";
 type Row = Record<string, unknown>;
@@ -243,6 +245,88 @@ export const regenerateReminderDraft = (bdId: string, sequenceId: string, member
  */
 export const generateReminderDraft = (bdId: string, sequenceId: string, memberId: string, deps: Partial<DraftDeps> = {}, mode: Mode = "missing", confirmed: EditConfirmations = {}) =>
   draftMember(bdId, sequenceId, memberId, mode, { ...liveDeps(), ...deps }, [], REMINDER_STEP, { confirmed, skippedEdited: [] }) as Promise<"generated" | "skipped">;
+
+export type RegenerateSubjectResult =
+  | { ok: true; subject: string }
+  | { ok: false; error: "not_found" | "not_editable" | "no_draft" | "edited" | "generation_failed" };
+
+/**
+ * "Regenerar solo el asunto": rewrites one member's subject and leaves the body exactly as it stands.
+ *
+ * Asked for because subjects read abstract while the bodies were worth keeping, so rerolling the whole email to fix a
+ * subject threw away work the BD had already reviewed. The body is handed to the generator (see `subjectOnly` in
+ * messagePrompt.ts) so the new subject matches the email that will actually be sent.
+ *
+ * It clears review and approval exactly as a full regenerate does: whoever approved this draft approved a specific
+ * subject with that body, and a bulk approval is only trustworthy if every draft in it was approved as it now reads.
+ * A hand-edited draft is protected by the same confirmation as a full regenerate — the BD's own words are never
+ * overwritten because they asked for a different subject.
+ */
+export async function regenerateDraftSubject(
+  bdId: string,
+  sequenceId: string,
+  memberId: string,
+  overrides: Partial<DraftDeps> = {},
+  confirmed: EditConfirmations = {},
+): Promise<RegenerateSubjectResult> {
+  const facts = await loadFacts(bdId, memberId, sequenceId);
+  if (!facts) return { ok: false, error: "not_found" };
+  if (!EDITABLE.includes(facts.state)) return { ok: false, error: "not_editable" };
+  if (!facts.hasDraft) return { ok: false, error: "no_draft" };
+  if (blocksEditedOverwrite("regenerate", confirmed[memberId] ?? null, facts.draftEditedAt)) {
+    return { ok: false, error: "edited" };
+  }
+
+  const [existing] = await db
+    .select({ body: sequenceDraft.body })
+    .from(sequenceDraft)
+    .where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, STEP)));
+  if (!existing) return { ok: false, error: "no_draft" };
+
+  const { r, audience, overrides: languageOverrides } = facts;
+  const compliance = audience && resolveDraftCompliance(audience, languageOverrides);
+  const base =
+    audience &&
+    compliance &&
+    buildSequenceDraftInput(
+      { ...(await loadPromptArgs(bdId, r)), ...senderIdentity((r.sender_name as string) ?? "", compliance.language) },
+      audience,
+      "first",
+      languageOverrides,
+      signatureWillFollow(r.signature_html as string | null),
+    );
+  if (!base) return { ok: false, error: "not_editable" };
+
+  const generate = overrides.generateSubject ?? runGenerateOutreachSubject;
+  const generated = await generate({ ...base, subjectOnly: { existingBody: existing.body } });
+  if (!generated.ok) return { ok: false, error: "generation_failed" };
+
+  return db.transaction(async (tx) => {
+    const [m] = await tx.select({ state: sequenceMember.state }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");
+    if (!m || !EDITABLE.includes(m.state)) return { ok: false, error: "not_editable" } as const;
+    // saveDraftEdit locks the same member row, so an edit saved between the check above and here is seen.
+    const [current] = await tx
+      .select({ editedAt: sequenceDraft.editedAt })
+      .from(sequenceDraft)
+      .where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, STEP)));
+    if (blocksEditedOverwrite("regenerate", confirmed[memberId] ?? null, current?.editedAt ?? null)) {
+      return { ok: false, error: "edited" } as const;
+    }
+    await tx
+      .update(sequenceDraft)
+      // The body is deliberately absent from this SET: it is the one thing this action promises not to touch.
+      .set({ subject: generated.subject, generatedAt: new Date(), editedAt: null, editedByBdId: null, reviewedAt: null, reviewedByBdId: null, approvedAt: null, approvedByBdId: null, scheduledFor: null })
+      .where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, STEP)));
+    await tx.insert(auditLog).values(sequenceAuditRow("regenerate_subject", { actorBdId: bdId, personId: r.person_id as string, memberId, sequenceId, step: STEP }));
+    // Everything below mirrors a full regenerate, and must. Clearing the draft's approval while leaving the MEMBER in
+    // "approved" would mark a member approved against a draft nobody approved — and the bulk-approval gate is only
+    // worth anything if that can never happen. The draft holds (wrong_language, missing_footer, unmapped_market) are
+    // moot once the approval is withdrawn; a send-side hold is left alone.
+    if (m.state === "approved") assertTransition("approved", "drafted", "regenerate");
+    await tx.update(sequenceMember).set({ state: "drafted" as MemberState, ...clearDraftHold() }).where(eq(sequenceMember.id, memberId));
+    return { ok: true, subject: generated.subject } as const;
+  });
+}
 
 export type SetLanguageResult = { ok: true } | { ok: false; error: "not_found" | "not_editable" | "held" };
 type LanguageRefusal = Extract<SetLanguageResult, { ok: false }>;
