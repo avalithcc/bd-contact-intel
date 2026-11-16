@@ -3,16 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/ToastProvider";
-import { ChevronDownIcon, CloseIcon } from "@/components/icons";
-import { saveFollowUpRoleGroupsAction } from "./actions";
+import { ChevronDownIcon, CloseIcon, UsersIcon } from "@/components/icons";
+import { roleGroupLeftOutCount } from "@/lib/followUp/roleGroupPreference";
+import type { RoleGroupKey } from "@/lib/roleGroups";
+import { getFollowUpRoleGroupCountsAction, saveFollowUpRoleGroupsAction } from "./actions";
 
 export interface RoleGroupRow {
   key: string;
   label: string;
   priorityClass: string;
   priorityLabel: string;
-  /** The BD's own contacts due for follow-up in this group today. */
-  count: number;
 }
 
 export interface RoleGroupsLabels {
@@ -26,6 +26,10 @@ export interface RoleGroupsLabels {
   saveError: string;
   chipKey: string;
   chipRemoveAria: (label: string) => string;
+  /** Success toast after a save: the change applies from the next daily build, so nothing visibly moves today. */
+  savedToast: string;
+  leftOutMeta: (n: number) => string;
+  countsLoading: string;
 }
 
 /**
@@ -38,7 +42,16 @@ export function RoleGroupsPanel({ rows, excluded, labels }: { rows: RoleGroupRow
   const { showToast } = useToast();
   const [draft, setDraft] = useState<string[]>(excluded);
   const [busy, setBusy] = useState(false);
+  // Per-group due counts, fetched once per OPEN (the aggregate is too costly for every page load). Decoration only: null while loading
+  // or if the read failed, and nothing below gates on it.
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
   const included = rows.length - draft.length;
+
+  function onToggleOpen(e: React.SyntheticEvent<HTMLDetailsElement>) {
+    if (!e.currentTarget.open) return;
+    setCounts(null);
+    getFollowUpRoleGroupCountsAction().then(setCounts, () => setCounts(null));
+  }
 
   function toggle(key: string, checked: boolean) {
     setDraft((d) => (checked ? d.filter((k) => k !== key) : d.includes(key) ? d : [...d, key]));
@@ -48,7 +61,7 @@ export function RoleGroupsPanel({ rows, excluded, labels }: { rows: RoleGroupRow
     setBusy(true);
     try {
       const res = await saveFollowUpRoleGroupsAction(next);
-      if (!res.ok) showToast(labels.saveError, "error");
+      showToast(res.ok ? labels.savedToast : labels.saveError, res.ok ? "success" : "error");
     } catch {
       showToast(labels.saveError, "error");
     } finally {
@@ -57,8 +70,9 @@ export function RoleGroupsPanel({ rows, excluded, labels }: { rows: RoleGroupRow
   }
 
   return (
-    <details className="dropdown">
+    <details className="dropdown" onToggle={onToggleOpen}>
       <summary className="btn btn-secondary">
+        <UsersIcon className="icon" />
         {labels.trigger}
         {excluded.length > 0 && <span className="badge badge-neutral no-dot">{excluded.length}</span>}
         <ChevronDownIcon className="icon" />
@@ -75,10 +89,15 @@ export function RoleGroupsPanel({ rows, excluded, labels }: { rows: RoleGroupRow
             <span className="grow">{r.label}</span>
             <span className={r.priorityClass}>{r.priorityLabel}</span>
             <span className="meta" style={{ marginLeft: "var(--space-sm)", minWidth: "2.5rem", textAlign: "right" }}>
-              {r.count}
+              {counts ? (counts[r.key as RoleGroupKey] ?? 0) : <span className="skeleton" role="status" style={{ display: "inline-block", width: "1.5rem" }} aria-label={labels.countsLoading} />}
             </span>
           </label>
         ))}
+        {counts && excluded.length > 0 && (
+          <p className="meta" style={{ padding: "var(--space-sm) var(--space-sm) 0" }}>
+            {labels.leftOutMeta(roleGroupLeftOutCount(counts as Record<RoleGroupKey, number>, excluded))}
+          </p>
+        )}
         <div className="menu-sep" />
         <div className="row between menu-footer">
           <Link className="btn btn-ghost btn-sm" href="/playbook">
@@ -106,7 +125,7 @@ export function ExcludedRoleGroupChips({
 }: {
   rows: RoleGroupRow[];
   excluded: string[];
-  labels: Pick<RoleGroupsLabels, "chipKey" | "chipRemoveAria" | "saveError">;
+  labels: Pick<RoleGroupsLabels, "chipKey" | "chipRemoveAria" | "saveError" | "savedToast">;
 }) {
   const { showToast } = useToast();
   const [busy, setBusy] = useState(false);
@@ -115,7 +134,7 @@ export function ExcludedRoleGroupChips({
     setBusy(true);
     try {
       const res = await saveFollowUpRoleGroupsAction(excluded.filter((k) => k !== key));
-      if (!res.ok) showToast(labels.saveError, "error");
+      showToast(res.ok ? labels.savedToast : labels.saveError, res.ok ? "success" : "error");
     } catch {
       showToast(labels.saveError, "error");
     } finally {

@@ -2137,6 +2137,8 @@ export const es: typeof en = {
     rolesChipKey: "Sin seguimiento:",
     rolesChipRemoveAria: (label: string) => `Volver a incluir ${label}`,
     rolesLeftOutMeta: (n: number) => `${n} contactos vencidos quedan fuera de la rotación`,
+    rolesSavedToast: "Guardado. Aplica desde mañana: los contactos que ya están en tu cola de hoy se quedan hasta que los trabajes, los descartes o venzan.",
+    rolesCountsLoading: "Calculando vencidos…",
     rolesNoteTitle: "Aplica desde mañana.",
     rolesNoteBody:
       "Guardar cambia quién entra en tu cola a partir del próximo armado diario. Los contactos que ya están en la cola de hoy se quedan hasta que los trabajes, los descartes o venzan — nada desaparece de la pantalla al guardar.",

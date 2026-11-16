@@ -7,7 +7,7 @@ import { dropFollowUp } from "@/lib/followUp/dropQueries";
 import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 import { isUuid } from "@/lib/uuid";
 import { parseExcludedRoleGroups } from "@/lib/followUp/roleGroupPreference";
-import { saveOwnExcludedRoleGroups } from "@/lib/followUp/roleGroupPreferenceDb";
+import { getFollowUpRoleGroupCounts, saveOwnExcludedRoleGroups } from "@/lib/followUp/roleGroupPreferenceDb";
 import { postponeFollowUpItem, skipFollowUpItem } from "@/lib/followUp/queueQueries";
 
 /**
@@ -60,4 +60,14 @@ export async function saveFollowUpRoleGroupsAction(excluded: string[]): Promise<
   await saveOwnExcludedRoleGroups(me.id, parsed.groups);
   revalidatePath("/follow-ups");
   return { ok: true };
+}
+
+/**
+ * Per-group due counts for the "Roles a seguir" panel, fetched when the panel is OPENED instead of on every page load: the aggregate
+ * measured 73-99 ms against production (a fixed floor from the activity / person_bd_connection scans), for a number read rarely.
+ * Always the signed-in BD's own contacts; read-only.
+ */
+export async function getFollowUpRoleGroupCountsAction(): Promise<Record<string, number>> {
+  const me = await getCurrentBd();
+  return getFollowUpRoleGroupCounts(me.id);
 }

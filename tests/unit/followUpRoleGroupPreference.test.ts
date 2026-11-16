@@ -12,7 +12,8 @@ import {
   ROLE_GROUP_COUNT_COLUMNS,
 } from "@/lib/followUp/candidateQuery";
 import { openCycleRowSql } from "@/lib/followUp/openCycle";
-import { parseExcludedRoleGroups, roleGroupCountsFromRows } from "@/lib/followUp/roleGroupPreference";
+import { readFileSync } from "node:fs";
+import { parseExcludedRoleGroups, roleGroupCountsFromRows, roleGroupLeftOutCount } from "@/lib/followUp/roleGroupPreference";
 import { ROLE_GROUPS } from "@/lib/roleGroups";
 
 const dialect = new PgDialect();
@@ -105,4 +106,24 @@ test("parseExcludedRoleGroups: called twice with the same input gives the same r
   const snapshot = [...input];
   assert.deepEqual(parseExcludedRoleGroups(input), parseExcludedRoleGroups(input));
   assert.deepEqual(input, snapshot);
+});
+
+test("roleGroupLeftOutCount: sums the due counts of the saved excluded groups only", () => {
+  const counts = roleGroupCountsFromRows([
+    { [ROLE_GROUP_COUNT_COLUMNS.group]: "developers", [ROLE_GROUP_COUNT_COLUMNS.count]: 23 },
+    { [ROLE_GROUP_COUNT_COLUMNS.group]: "sales_bd", [ROLE_GROUP_COUNT_COLUMNS.count]: 12 },
+    { [ROLE_GROUP_COUNT_COLUMNS.group]: "product", [ROLE_GROUP_COUNT_COLUMNS.count]: 5 },
+  ]);
+  assert.equal(roleGroupLeftOutCount(counts, ["developers", "sales_bd"]), 35);
+  assert.equal(roleGroupLeftOutCount(counts, []), 0);
+});
+
+test("/follow-ups page source does not call the counts read, so the aggregate is not paid on page load", () => {
+  const page = readFileSync("src/app/(app)/follow-ups/page.tsx", "utf8");
+  assert.doesNotMatch(page, /getFollowUpRoleGroupCounts|buildFollowUpRoleGroupCountsQuery/);
+});
+
+test("the lazy counts action reads the counts for the signed-in BD's own id", () => {
+  const actions = readFileSync("src/app/(app)/follow-ups/actions.ts", "utf8");
+  assert.match(actions, /getFollowUpRoleGroupCountsAction[\s\S]*getFollowUpRoleGroupCounts\(me\.id\)/);
 });

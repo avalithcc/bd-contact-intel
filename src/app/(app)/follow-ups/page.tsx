@@ -10,7 +10,6 @@ import { InfoIcon } from "@/components/icons";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
-import { getFollowUpRoleGroupCounts } from "@/lib/followUp/roleGroupPreferenceDb";
 import { ROLE_GROUPS } from "@/lib/roleGroups";
 import { PRIORITY_BADGE_CLASS, ROLE_GROUP_PLAYBOOK } from "@/lib/roleGroupPlaybook";
 import { PostponeMenu } from "./PostponeMenu";
@@ -47,18 +46,15 @@ export default async function FollowUpsPage() {
 
   const now = new Date();
   const rows = await getFollowUpQueuePage(me.id, now);
-  // follow-up-role-groups: one aggregate read (the same due set the selection uses) feeds the panel's per-group counts. The BD's own
-  // deny-list is already on `me` (getCurrentBd selects every bd column), so it costs no read.
-  const roleCounts = await getFollowUpRoleGroupCounts(me.id);
+  // follow-up-role-groups: the deny-list is already on `me` (getCurrentBd selects every bd column), so this costs no read. The per-group
+  // counts are NOT read here: the panel fetches them when opened (see actions.ts).
   const excludedGroups = me.followUpExcludedRoleGroups;
   const roleRows: RoleGroupRow[] = ROLE_GROUPS.map(({ key }) => ({
     key,
     label: dict.roleGroups[key],
     priorityClass: PRIORITY_BADGE_CLASS[ROLE_GROUP_PLAYBOOK[key].priority],
     priorityLabel: ROLE_GROUP_PLAYBOOK[key].priorityLabel,
-    count: roleCounts[key],
   }));
-  const leftOutCount = roleRows.filter((r) => excludedGroups.includes(r.key)).reduce((sum, r) => sum + r.count, 0);
   const roleLabels: RoleGroupsLabels = {
     trigger: l.rolesTrigger,
     heading: l.rolesHeading,
@@ -70,6 +66,9 @@ export default async function FollowUpsPage() {
     saveError: l.rolesSaveError,
     chipKey: l.rolesChipKey,
     chipRemoveAria: l.rolesChipRemoveAria,
+    savedToast: l.rolesSavedToast,
+    leftOutMeta: l.rolesLeftOutMeta,
+    countsLoading: l.rolesCountsLoading,
   };
   // follow-up-expiry: "Hoy" is the cap-bound queue (days 0-2 in it); "Vencidos" (days 3-9) sit above it, outside the cap, and
   // day 10+ is hidden even if the nightly job has not dropped it yet.
@@ -288,8 +287,6 @@ export default async function FollowUpsPage() {
         <>
           <div className="toolbar">
             <ExcludedRoleGroupChips rows={roleRows} excluded={excludedGroups} labels={roleLabels} />
-            <span className="spacer" />
-            <span className="meta">{l.rolesLeftOutMeta(leftOutCount)}</span>
           </div>
           <div className="alert alert-warn mb-lg" role="note">
             <InfoIcon className="icon" />

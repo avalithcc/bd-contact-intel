@@ -24,6 +24,11 @@ export function parseExcludedRoleGroups(input: unknown): ParseExcludedRoleGroups
   return { ok: true, groups: ROLE_GROUPS.map((g) => g.key).filter((k) => chosen.has(k)) };
 }
 
+/** Due contacts the saved deny-list keeps out of the rotation: the sum of the excluded groups' counts. */
+export function roleGroupLeftOutCount(counts: Record<RoleGroupKey, number>, excluded: readonly string[]): number {
+  return excluded.reduce((sum, key) => sum + (counts[key as RoleGroupKey] ?? 0), 0);
+}
+
 type CountRow = { [ROLE_GROUP_COUNT_COLUMNS.group]: string | null; [ROLE_GROUP_COUNT_COLUMNS.count]: number | string };
 
 /** Every group, zero when the query returned no row for it; counts normalized to numbers (raw `sql` aggregates can arrive as strings). */
