@@ -6,6 +6,8 @@ import { parseDropInput } from "@/lib/followUp/cycle";
 import { dropFollowUp } from "@/lib/followUp/dropQueries";
 import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 import { isUuid } from "@/lib/uuid";
+import { parseExcludedRoleGroups } from "@/lib/followUp/roleGroupPreference";
+import { saveOwnExcludedRoleGroups } from "@/lib/followUp/roleGroupPreferenceDb";
 import { postponeFollowUpItem, skipFollowUpItem } from "@/lib/followUp/queueQueries";
 
 /**
@@ -40,6 +42,22 @@ export async function dropFollowUpAction(itemId: string, reason: string, detail:
   if (!input.ok) return input;
   // `today` makes the server enforce "only a Vencido (day 3-9 in the queue) can be dropped", whatever the client sends.
   await dropFollowUp({ itemId, bdId: me.id, reason: input.reason, detail: input.detail, today: argentinaCalendarDate(new Date()) });
+  revalidatePath("/follow-ups");
+  return { ok: true };
+}
+
+export type SaveRoleGroupsResult = { ok: true } | { ok: false; error: "invalid" | "unknown_group" | "all_excluded" };
+
+/**
+ * "Roles a seguir" (follow-up-role-groups). Saves the signed-in BD's OWN deny-list after validating every key against
+ * `RoleGroupKey` on the server (an unknown key or an all-excluded list is rejected, whatever the client sent). It changes who
+ * ENTERS the next daily build only; nothing already in the queue moves, and no audit_log row is written (a view preference).
+ */
+export async function saveFollowUpRoleGroupsAction(excluded: string[]): Promise<SaveRoleGroupsResult> {
+  const me = await getCurrentBd();
+  const parsed = parseExcludedRoleGroups(excluded);
+  if (!parsed.ok) return parsed;
+  await saveOwnExcludedRoleGroups(me.id, parsed.groups);
   revalidatePath("/follow-ups");
   return { ok: true };
 }
