@@ -40,11 +40,11 @@ export type ApproveResult = { ok: true; approved: string[]; scheduledFor?: Date 
 /**
  * `stale`: the version the dialog rendered is not the stored one (regenerated or edited since), so the mark was refused and
  * the draft stays unreviewed. A draft that is already reviewed is `ok` whatever the version: nothing is written, so there is
- * no wrong reading to record (and the dialog's once-per-open report stays idempotent).
+ * no wrong reading to record (and a repeated report from the dialog's button stays idempotent).
  */
 export type MarkReviewedResult = { ok: true } | { ok: false; error: "not_found" | "stale" };
 
-/** Called when the review dialog opens. Passive listing never calls it. Keeps the first review time. `version` is draftVersion() of the text the dialog showed. */
+/** Called by the review dialog's "Revisado" button, never by opening it and never by a passive listing. Keeps the first review time. `version` is draftVersion() of the text the dialog showed. */
 export async function markDraftReviewed(bdId: string, memberId: string, version: string, step: ApprovalStep = 1): Promise<MarkReviewedResult> {
   const [row] = await db
     .select({ id: sequenceDraft.id, reviewedAt: sequenceDraft.reviewedAt })

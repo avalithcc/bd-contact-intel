@@ -26,7 +26,7 @@ const view = (m: DetailMember, step: 1 | 2 = 1) => reviewView(m, step, DEFAULT_S
 
 test("a drafted member is editable with every footer action, and an unopened draft asks to be marked reviewed", () => {
   const v = view(member())!;
-  assert.deepEqual([v.kind, v.readOnly, v.footer, v.marksReviewed], ["draft", false, ["regenerate", "regenerateSubject", "save", "approve"], true]);
+  assert.deepEqual([v.kind, v.readOnly, v.footer, v.marksReviewed], ["draft", false, ["regenerate", "regenerateSubject", "save", "reviewed", "approve"], true]);
   assert.equal(view(member({ draft: draft({ reviewedAt: hours(1) }) }))!.marksReviewed, false, "reopening never rewrites the flag");
 });
 
@@ -38,6 +38,15 @@ test("the subject-only regenerate is offered on step 1 and never on a reminder",
   assert.ok(view(member())!.footer.includes("regenerateSubject"), "step 1 offers it");
   const reminder = view(member({ state: "sent", sentAt: hours(96), reminderDraft: draft() }), 2);
   assert.ok(reminder === null || !reminder.footer.includes("regenerateSubject"), "a reminder's subject belongs to the thread");
+});
+
+test("\"Revisado\" is in the footer between save and approve only while the draft is unmarked and editable", () => {
+  const f = view(member())!.footer;
+  assert.ok(f.indexOf("save") < f.indexOf("reviewed") && f.indexOf("reviewed") < f.indexOf("approve"));
+  assert.equal(f.filter((id) => id === "regenerate" || id === "regenerateSubject").length, 2, "the left group is unchanged");
+  assert.ok(!view(member({ draft: draft({ reviewedAt: hours(1) }) }))!.footer.includes("reviewed"), "already marked: not offered again");
+  assert.ok(!reviewView(member(), 1, DEFAULT_SCHEDULE, NOW, true)!.footer.includes("reviewed"), "a foreign Sequence is read-only");
+  assert.ok(!view(member({ state: "approved", draft: draft({ approvedAt: hours(1) }) }))!.footer.includes("reviewed"), "an approved draft is not a review");
 });
 
 test("sent, replied and no_reply are read-only with no footer action and never mark reviewed", () => {
@@ -55,7 +64,7 @@ test("an approved draft is editable but cannot be approved again", () => {
 test("the reminder reads the step 2 draft and is a separate variant", () => {
   const sent = member({ state: "sent", sentAt: hours(170), reminderDraft: draft({ subject: "Reminder 1" }) });
   const v = view(sent, 2)!;
-  assert.deepEqual([v.kind, v.draft.subject, v.footer, v.cadence?.step1.kind], ["reminder", "Reminder 1", ["regenerate", "save", "approve"], "sent"]);
+  assert.deepEqual([v.kind, v.draft.subject, v.footer, v.cadence?.step1.kind], ["reminder", "Reminder 1", ["regenerate", "save", "reviewed", "approve"], "sent"]);
   assert.equal(view(member({ state: "sent", sentAt: hours(170) }), 2), null, "no reminder draft, nothing to open");
 });
 
@@ -162,4 +171,45 @@ test("a refused review mark shows the stale warning with the button for the curr
     assert.ok(!off.includes(es.sequences.reviewStaleNotice));
     assert.ok(!off.includes(es.sequences.reviewStaleReload));
   }
+});
+
+// --- the footer names the act, and the act cannot discard work ---------------------------------------------------
+
+/**
+ * Both strings below are what the BD reads to know how the gate is satisfied. They used to say "open", which stopped
+ * being true the moment opening no longer marked anything: the bar sent the BD to click something that unlocked
+ * nothing, and the button it pointed at stayed grey with no explanation.
+ */
+test("the gate's copy names reviewing, never opening, in both locales", () => {
+  for (const [locale, d] of [["es", es], ["en", en]] as const) {
+    assert.doesNotMatch(d.sequences.bulkMissingPending, /abrir|to open/i, `${locale}: the bar must not say "open"`);
+    assert.doesNotMatch(d.sequences.reviewErrors.unreviewed, /^Abrí |^Open every/i, `${locale}: the refusal must not say "open"`);
+    assert.ok(d.sequences.reviewMarkReviewed.length > 0 && d.sequences.reviewMarkReviewedDirty.length > 0, `${locale}: both button strings exist`);
+  }
+});
+
+/**
+ * The dialog's form is UNCONTROLLED, so marking reports the STORED text. Clicking "Revisado" with unsaved edits in the
+ * box marked the stored version and closed the dialog, discarding the typed text in silence — and left the draft
+ * marked, so a bulk approval would then send the text the BD believed they had replaced. The button is disabled while
+ * the form is dirty, and its title says why. A clean form renders it enabled, asserted below; the dirty case is
+ * a client state change that static rendering cannot drive, so its contract is pinned through the title string.
+ */
+test("the unsaved-edits title explains that marking reports the stored text, not what is being typed", () => {
+  assert.match(es.sequences.reviewMarkReviewedDirty, /sin guardar/i);
+  assert.match(es.sequences.reviewMarkReviewedDirty, /guardad/i, "and it says to save first");
+  assert.match(en.sequences.reviewMarkReviewedDirty, /unsaved/i);
+  assert.match(en.sequences.reviewMarkReviewedDirty, /save/i);
+});
+
+test("saving no longer tells the BD to reopen the draft: reopening never marked anything", () => {
+  assert.doesNotMatch(es.sequences.toastSaved, /abrirlo de nuevo/i);
+  assert.doesNotMatch(en.sequences.toastSaved, /open it again/i);
+});
+
+test("a clean form renders the Revisado button enabled, carrying the help title and not the unsaved-edits one", () => {
+  const html = render(member({ draft: draft({ reviewedAt: null }) }));
+  assert.ok(html.includes(es.sequences.reviewMarkReviewed), "the button is there to satisfy the gate");
+  assert.ok(html.includes(es.sequences.reviewMarkReviewedHelp), "and explains what it unlocks");
+  assert.ok(!html.includes(es.sequences.reviewMarkReviewedDirty), "a clean form is never the unsaved-edits case");
 });

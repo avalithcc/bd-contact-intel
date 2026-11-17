@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useReducer, type FormEvent } from "react";
+import { useEffect, useId, useReducer, useState, type FormEvent } from "react";
 import { Dialog } from "@/components/Dialog";
 import { EyeIcon, GenerateIcon, InfoIcon, WarningIcon } from "@/components/icons";
 import { SendSplitButton } from "@/components/send/SendSplitButton";
@@ -53,7 +53,6 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   const formId = useId();
   const view = m ? reviewView(m, step, schedule, now, readOnly) : null;
   const memberId = m?.memberId;
-  const marks = open && view?.marksReviewed === true;
   const [reload, dispatch] = useReducer(reloadReducer, INITIAL_RELOAD);
   const { reads, pending } = reload;
   const version = view ? draftVersion(view.draft.generatedAt, view.draft.editedAt) : null;
@@ -64,13 +63,19 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
     const t = setTimeout(() => dispatch({ type: "timeout" }), RELOAD_TIMEOUT_MS);
     return () => clearTimeout(t);
   }, [pending]);
-  // Opening is the review: report it once per open (and once per explicit reload), never from a passive listing or a
-  // background refresh. The version sent is the one of the render the form was mounted with, which is what the person read.
-  useEffect(() => {
-    if (marks && memberId && version) onAction({ type: "markReviewed", memberId, step, version });
-    // The intent is per open; a new onAction identity must not re-report it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [marks, memberId, step, reads]);
+  // "Revisado" is an explicit act: opening, closing, Esc and the backdrop mark nothing. The version it sends is the one of
+  // the render the form was MOUNTED with (re-taken per open, per member/step and per reload), which is the text the person
+  // read: a background refresh that moves the stored text on must make the server refuse with "stale", not be sent along.
+  const mountKey = `${memberId}-${step}-${reads}`;
+  const [mounted, setMounted] = useState<{ key: string; version: string } | null>(null);
+  if (!open && mounted) setMounted(null);
+  else if (open && version && mounted?.key !== mountKey) setMounted({ key: mountKey, version });
+  // Unsaved edits block the mark. The form is UNCONTROLLED, so marking reports the STORED text: clicking "Revisado"
+  // with typed text in the box marked the stored version and closed, throwing the edits away in silence AND leaving
+  // the draft marked - so a bulk approval would then send the text the BD thought they had replaced. Keyed to
+  // mountKey, so a reload, a member switch or a reopen starts clean without a reset effect.
+  const [dirtyKey, setDirtyKey] = useState<string | null>(null);
+  const dirty = dirtyKey === mountKey;
   if (!m || !view) return null;
 
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
@@ -116,6 +121,9 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         {generating ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}
         {generating ? l.generating : l.reviewRegenerateSubject}
       </button>
+    ) : id === "reviewed" ? (
+      // The container closes the dialog when the server accepts the mark; a refusal ("stale") keeps it open with the notice.
+      <button key={id} type="button" className="btn btn-secondary" disabled={busy || !mounted || dirty} title={dirty ? l.reviewMarkReviewedDirty : l.reviewMarkReviewedHelp} onClick={() => { if (mounted && !dirty) return onAction({ type: "markReviewed", memberId: m.memberId, step, version: mounted.version }); }}>{l.reviewMarkReviewed}</button>
     ) : id === "approve" && step === 1 ? (
       <SendSplitButton
         key={id}
@@ -140,6 +148,9 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
    * gets its own auto margin and is pushed past the modal's edge, and the footer does not wrap. That is exactly what
    * happened when "Regenerar solo el asunto" made this footer go from three buttons to four.
    *
+   * "Revisado" goes in the right group, between save and approve: a second `.left` is the trap above. The footer wraps
+   * (`.dialog-footer` is `flex-wrap: wrap`), so five controls in a 720px dialog drop to a second line instead of overflowing.
+   *
    * So the two regenerates share a single `.left` group, which is what that class was drawn for.
    */
   const footerRow = () => {
@@ -159,7 +170,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         // The help line lives IN the footer so it cannot scroll away from the disabled button it explains.
         <div className="stack-sm" style={{ width: "100%" }}><p className="help" id={helpId}>{l.languageMismatch.dialogApproveHelp}</p><div className="row wrap" style={{ justifyContent: "flex-end", gap: "var(--space-sm)" }}>{footerRow()}</div></div>
       ) : footerRow()}>
-      <form id={formId} className="stack" onSubmit={submit} key={`${m.memberId}-${step}-${reads}`}>
+      <form id={formId} className="stack" onSubmit={submit} onInput={() => setDirtyKey(mountKey)} key={`${m.memberId}-${step}-${reads}`}>
         {(stale || pending !== null) && (
           <div className="alert alert-warn" role="alert">
             <WarningIcon className="icon" />

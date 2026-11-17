@@ -95,7 +95,7 @@ after(async () => {
   await db.delete(bd).where(inArray(bd.id, [bdId, otherBdId]));
 });
 
-test("opening the dialog marks the draft reviewed and stays marked; an unopened draft is untouched", async () => {
+test("markDraftReviewed marks the draft and it stays marked; a draft nobody marked is untouched", async () => {
   const { markDraftReviewed } = await import("@/lib/sequences/approvalQueries");
   const opened = await mkMember("open");
   const passive = await mkMember("passive");

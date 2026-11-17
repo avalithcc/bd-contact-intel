@@ -41,20 +41,20 @@ const barOf = (html: string) => html.slice(html.indexOf('class="bulk-bar"'), htm
 
 test("the review-gate reason travels inside the sticky bar, not after it", () => {
   const html = render(rows(true, false, false, false));
-  const reason = "<strong>Faltan 3 borradores</strong> por abrir. Aprobar a ciegas en bloque es exactamente lo que este bloqueo evita.";
+  const reason = "<strong>Faltan 3 borradores</strong> por revisar. Aprobar a ciegas en bloque es exactamente lo que este bloqueo evita.";
   assert.ok(barOf(html).includes(reason), html);
   assert.equal(html.split(reason).length - 1, 1);
   assert.ok(!html.slice(html.indexOf("</div>")).includes("Faltan"), "nothing left behind outside the bar");
 });
 
-test("the disabled button names how many drafts are still unopened on hover", () => {
-  assert.match(render(rows(true, false, false, false)), /title="Faltan 3 borradores por abrir"/);
-  assert.match(render(rows(true, true, false)), /title="Falta 1 borrador por abrir"/);
+test("the disabled button names how many drafts are still unreviewed on hover", () => {
+  assert.match(render(rows(true, false, false, false)), /title="Faltan 3 borradores por revisar"/);
+  assert.match(render(rows(true, true, false)), /title="Falta 1 borrador por revisar"/);
 });
 
 test("an enabled button has no gate title and no reason", () => {
   const html = render(rows(true, true));
-  assert.ok(!html.includes("por abrir") && !html.includes("title="));
+  assert.ok(!html.includes("por revisar") && !html.includes("title="));
 });
 
 test("the bar renders the complete state with the approve button enabled and no blocked help", () => {
@@ -75,13 +75,13 @@ test("a selected draft in another language blocks the bulk: the bold reason name
   assert.match(html, /title="1 de los seleccionados está en otro idioma: Ana Gómez\. Sacalo de la selección o corregilo para aprobar\."/, "the title is the plain sentence");
   assert.match(html, /aria-label="Acciones masivas, hay borradores en otro idioma"/);
   assert.match(html, /<button[^>]*class="btn btn-primary btn-sm"[^>]*disabled=""/);
-  assert.ok(!html.includes("por abrir"), "every draft was opened: the review reason must not appear");
+  assert.ok(!html.includes("por revisar"), "every draft was marked reviewed: the review reason must not appear");
   assert.ok(!html.includes("Quedó afuera"), "a selected mismatched draft is blocked, not left out");
 });
 
 test("the review gate is untouched when a language block joins it: both reasons show, and the review reason is not replaced", () => {
   const html = render([{ id: "m1", reviewed: false }, { id: "m2", reviewed: true, wrongLanguage: true }, { id: "m3", reviewed: true, wrongLanguage: true }], { m2: "Ana", m3: "Beto" });
-  assert.ok(barOf(html).includes("<strong>Falta 1 borrador</strong> por abrir."));
+  assert.ok(barOf(html).includes("<strong>Falta 1 borrador</strong> por revisar."));
   assert.ok(barOf(html).includes("<strong>2 de los seleccionados están en otro idioma</strong>: Ana, Beto."));
   assert.equal(barOf(html).split(es.sequences.bulkBlockedWhy).length - 1, 1, "the gate sentence is said once when both reasons show");
 });

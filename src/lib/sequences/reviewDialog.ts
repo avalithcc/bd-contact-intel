@@ -5,7 +5,8 @@
  *
  *  - Read-only once the email went out (`sent`/`replied`/`no_reply` for step 1) or the sequence stopped for the member.
  *  - An approved draft is editable, but only to cancel the send: "Aprobar" is not offered on what is already approved.
- *  - Only a draft nobody opened yet reports "mark reviewed", so reopening never rewrites the flag.
+ *  - Only a draft nobody marked yet offers "Revisado" (`marksReviewed`). Opening the dialog is NOT a review: the mark is
+ *    an explicit click, so a BD who only looked at a draft has not unlocked bulk approval for it.
  *  - `edited`/`editedAt` say the draft is the BD's own text. They only word the notice: whether "Regenerar" needs a
  *    confirmation is decided by the SERVER (regenerateDrafts reports the edits it refused to overwrite), never here.
  *  - The dialog never says WHO approved or edited: the read does not carry it (see MemberCard's ownView note).
@@ -15,7 +16,7 @@ import type { MemberState } from "./memberState";
 import { reminderDueAt, step1DueAt, type Schedule } from "./schedule";
 
 export type ReviewKind = "draft" | "approved" | "reminder" | "sent" | "stopped";
-export type ReviewFooterId = "regenerate" | "regenerateSubject" | "save" | "approve";
+export type ReviewFooterId = "regenerate" | "regenerateSubject" | "save" | "reviewed" | "approve";
 export type ReviewCadence = { step1: { kind: "sent" | "scheduled" | "ifApprovedNow"; at: Date }; reminderAt: Date };
 /** `cadence` is null for `stopped`: there is no send to describe, and projecting one would invent a future that is not coming. */
 export type ReviewView = { kind: ReviewKind; readOnly: boolean; footer: ReviewFooterId[]; marksReviewed: boolean; edited: boolean; editedAt: Date | null; draft: DetailDraft; cadence: ReviewCadence | null };
@@ -48,7 +49,9 @@ export function reviewView(m: DetailMember, step: 1 | 2, schedule: Schedule, now
   // "Regenerar solo el asunto" is step 1 only: regenerateDraftSubject writes the step 1 draft, and a reminder continues
   // an existing thread, where the subject is the thread's and not ours to rewrite.
   const subjectOnly: ReviewFooterId[] = step === 1 ? ["regenerateSubject"] : [];
-  const footer: ReviewFooterId[] = readOnly ? [] : kind === "approved" ? ["regenerate", ...subjectOnly, "save"] : ["regenerate", ...subjectOnly, "save", "approve"];
+  const marksReviewed = !viewerReadOnly && (kind === "draft" || kind === "reminder") && draft.reviewedAt === null;
+  // "Revisado" sits between save and approve; it is the right-hand group's, never a second `.left` (see ReviewDialog footerRow).
+  const footer: ReviewFooterId[] = readOnly ? [] : kind === "approved" ? ["regenerate", ...subjectOnly, "save"] : ["regenerate", ...subjectOnly, "save", ...(marksReviewed ? ["reviewed" as const] : []), "approve"];
   const edited = draft.edited;
-  return { kind, readOnly, footer, edited, editedAt: draft.editedAt, marksReviewed: !viewerReadOnly && (kind === "draft" || kind === "reminder") && draft.reviewedAt === null, draft, cadence: kind === "stopped" ? null : cadenceOf(m, kind, draft, step, schedule, now) };
+  return { kind, readOnly, footer, edited, editedAt: draft.editedAt, marksReviewed, draft, cadence: kind === "stopped" ? null : cadenceOf(m, kind, draft, step, schedule, now) };
 }
