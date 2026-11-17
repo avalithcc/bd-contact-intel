@@ -2,6 +2,7 @@ import { GenerateIcon, WarningIcon } from "@/components/icons";
 import { memberLanguage, preferredStamp } from "@/lib/sequences/audienceCard";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { fillStrong } from "@/lib/sequences/fillStrong";
+import type { DraftDrift } from "@/lib/sequences/audienceCard";
 import type { LanguageMismatch } from "@/lib/sequences/languageMismatch";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import { AudienceWhy } from "./AudienceBlock";
@@ -25,7 +26,7 @@ function Reason({ m, name, l }: { m: DetailMember; name: string; l: SequenceLabe
  * language of today chosen, or keep it, which records the draft's language as this member's one-off choice. `onRegenerate` / `onKeep`
  * are absent for a read-only viewer: the alert still says why the draft cannot be approved. `explain` adds what each button does (the review dialog).
  */
-export function LanguageMismatchAlert({ m, mismatch, name, l, ownView, explain = false, busy = false, locked = false, lockTitle, onRegenerate, onKeep }: { m: DetailMember; mismatch: LanguageMismatch; name: string; l: SequenceLabels; ownView: boolean; explain?: boolean; busy?: boolean; locked?: boolean; lockTitle?: string; onRegenerate?: () => void; onKeep?: () => void }) {
+export function LanguageMismatchAlert({ m, mismatch, name, l, ownView, explain = false, drift, busy = false, locked = false, lockTitle, onRegenerate, onKeep }: { m: DetailMember; mismatch: LanguageMismatch; name: string; l: SequenceLabels; ownView: boolean; explain?: boolean; drift?: DraftDrift; busy?: boolean; locked?: boolean; lockTitle?: string; onRegenerate?: () => void; onKeep?: () => void }) {
   const t = l.languageMismatch;
   const vars = { draft: languageWord(mismatch.draft, l), now: languageWord(mismatch.now, l) };
   const reason = <Reason m={m} name={name} l={l} />;
@@ -37,7 +38,7 @@ export function LanguageMismatchAlert({ m, mismatch, name, l, ownView, explain =
     return (
       <div className="alert alert-warn" role="note" style={{ padding: "var(--space-sm) var(--space-md)" }}>
         <WarningIcon className="icon" />
-        <div className="grow"><strong>{fill(t.lead, vars)}</strong> ({reason}). {t.blocked}{edited}</div>
+        <div className="grow"><strong>{fill(t.lead, vars)}</strong> ({reason}). {t.blocked}{edited}{drift && <><br />{fill(t.staleNote, { ...vars, address: drift.address === "mdp" ? l.audience.addrMdp : l.audience.addrMiami })}</>}</div>
         {(regenerate || keep) && <div className="row" style={{ gap: ".25rem", flex: "none" }}>{regenerate}{keep}</div>}
       </div>
     );

@@ -3728,6 +3728,18 @@ export const es: typeof en = {
       zoneUs: "zona EE. UU.",
       postingsNote: "Ni {name} ni la empresa tienen país cargado. No viene de un país: viene de dónde busca gente la empresa",
       byPhone: "por el código de país del teléfono",
+      // Country line and language control (audience-controls-alignment). Plain strings with {placeholders}: filled on the client.
+      countryLabel: "País:",
+      countryNone: "no definido",
+      countryEditAria: "Editar el país de {name}",
+      countryInputAria: "País de {name}",
+      countrySave: "Guardar",
+      countryCancel: "Cancelar",
+      countrySaveFailed: "No se pudo guardar el país. Probá de nuevo.",
+      companyCountryOpenAria: "Abrir la ficha de {company}",
+      languageGroupAria: "Idioma del borrador",
+      languageEsOption: "Español",
+      languageEnOption: "Inglés",
       fix: "corregir",
       fixMenuLabel: "Corregir",
       fixAria: "Corregir: {name}",
@@ -3792,10 +3804,6 @@ export const es: typeof en = {
       chosenBy: "idioma elegido por",
       chosenOn: "el {when}. Sin esa elección sería {resolved}.",
       addressNote: "Dirección:",
-      menuTrigger: "idioma",
-      menuLabel: "Idioma",
-      menuAria: "Idioma: {name}",
-      menuChange: "Cambiar el idioma",
       menuReset: "Volver al idioma resuelto ({resolved})",
       toastReset: "Volvió al idioma resuelto.",
       // "Guardar como idioma preferido" checkbox (preferredCheckbox in languageChoice.ts).
@@ -3809,6 +3817,8 @@ export const es: typeof en = {
     // Borrador escrito en otro idioma que el de hoy (languageMismatch.ts). Salidas: regenerar (abre el diálogo de idioma) o mantener (guarda la elección de una persona).
     languageMismatch: {
       badge: "Otro idioma",
+      // Only what is stored (the draft's language) and what is computed now (language and address). The old address is not recorded, so it is never claimed.
+      staleNote: "El borrador no cambió: sigue en {draft}. Con lo que hay cargado hoy correspondería {now} y la dirección de {address}. Regeneralo solo si querés que use lo nuevo.",
       badgeTitle: "El borrador está en {draft}; hoy le escribiríamos en {now}",
       lead: "El borrador está en {draft}, pero ahora le escribiríamos en {now}",
       blocked: "El correo no se puede aprobar así.",

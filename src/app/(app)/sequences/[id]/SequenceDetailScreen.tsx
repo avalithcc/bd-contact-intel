@@ -17,6 +17,7 @@ import { choiceToStore } from "@/lib/sequences/languageChoice";
 import type { AudienceLanguage } from "@/lib/sequences/complianceAudience";
 import { generationLock } from "@/lib/sequences/generationLock";
 import { isReadOnlyAction, isReadOnlyView } from "@/lib/sequences/readOnly";
+import { updateContactPropertyAction } from "@/app/(app)/contacts/actions";
 import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/viewText";
 import {
   addMembers as _unused,
@@ -298,6 +299,9 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
         });
       case "chooseLanguage": return askLanguage(a.memberId, member(a.memberId)?.draft ? "regenerate" : "generate");
       case "keepLanguage": return void keepLanguage(a.memberId);
+      case "setPersonCountry":
+        return guarded(() => updateContactPropertyAction(a.personId, "country", a.country)).then((r) => { if (!r?.ok) return false; router.refresh(); return true; });
+      case "setLanguage": return void guarded(() => chooseDraftLanguage(a.memberId, a.language)).then((r) => { if (!r) return; if (!r.ok) fail(l.languageChoice.saveFailed); router.refresh(); });
       case "resetLanguage": return void guarded(() => clearDraftLanguage(a.memberId)).then((r) => { if (!r) return; if (r.ok) showToast(l.languageChoice.toastReset, "success"); else fail(); router.refresh(); });
       case "approveWith": return approveWith([a.memberId], a.when, false);
       case "reschedule": return reschedule(a.memberId, a.when);

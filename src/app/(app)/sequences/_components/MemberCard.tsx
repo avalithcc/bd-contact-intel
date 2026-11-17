@@ -9,7 +9,7 @@ import { SendNowButton } from "@/components/send/SendNowButton";
 import { SendSplitButton } from "@/components/send/SendSplitButton";
 import { resolveRecipientZone, zoneClock } from "@/lib/sendSchedule/zones";
 import { slotOf } from "@/lib/sendSchedule/time";
-import { memberDraftMismatch } from "@/lib/sequences/audienceCard";
+import { countryLine, draftDrift } from "@/lib/sequences/audienceCard";
 import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { approvedMoment, type ApprovedMoment } from "@/lib/sequences/approvedMoment";
@@ -20,6 +20,7 @@ import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/v
 import { clockLabel, whenLabel } from "@/lib/scheduledEmail/view";
 import type { OnAction } from "./actions";
 import { AudienceBlock } from "./AudienceBlock";
+import { CountryLine } from "./CountryLine";
 import { LanguageMismatchAlert, languageWord } from "./LanguageMismatch";
 import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
 
@@ -212,12 +213,12 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
   const showAudience = card.kind === "noDraft" || card.kind === "draft";
   const audienceHeld = showAudience && m.audience != null && m.audience.audience === null;
   // A draft written in another language than today's cannot be approved or selected; the alert below it says why and offers the two exits.
-  const mismatch = card.kind === "draft" ? memberDraftMismatch(m) : null;
+  const mismatch = card.kind === "draft" ? draftDrift(m) : null;
   const mismatchVars = mismatch ? { draft: languageWord(mismatch.draft, l), now: languageWord(mismatch.now, l) } : null;
   const generationLockTitle = generation.active ? fill(l.generateWaitTitle, { name: generation.generatingName ?? "" }) : undefined;
   return (
     <div className="card">
-      <div className="card-body row row-lg" style={{ flexWrap: "wrap" }}>
+      <div className="card-body row row-lg" style={{ flexWrap: "wrap", alignItems: "flex-start" }}>
         {selection && card.kind === "draft" && <input type="checkbox" checked={selection.selected} onChange={selection.onToggle} disabled={mismatch !== null && !selection.selected} title={mismatchVars ? fill(l.languageMismatch.selectTitle, mismatchVars) : undefined} aria-label={fill(l.selectMember, { name })} />}
         <Avatar id={m.personId} initials={initialsFromName(name)} />
         <div className="stack-sm" style={{ flex: "1 1 320px", minWidth: 0 }}>
@@ -238,8 +239,9 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
             {m.company && <> {l.headlineAt} {m.companyKey ? <Link href={`/companies/${encodeURIComponent(m.companyKey)}`}>{m.company}</Link> : m.company}</>}
           </p>
           <div className="meta">{parts.map((p, i) => <Fragment key={i}>{i > 0 && " · "}{p}</Fragment>)}</div>
+          {showAudience && <CountryLine view={countryLine(m)} memberId={m.memberId} personId={m.personId} name={m.firstName?.trim() || name} l={l} onAction={readOnly ? undefined : onAction} />}
           {showAudience && <AudienceBlock m={m} name={name} l={l} onAction={readOnly ? undefined : onAction} lockTitle={generationLockTitle} />}
-          {mismatch && <LanguageMismatchAlert m={m} mismatch={mismatch} name={name} l={l} ownView={ownView} busy={send.busy} locked={generation.active} lockTitle={generationLockTitle} onRegenerate={readOnly ? undefined : () => void onAction({ type: "regenerate", memberId: m.memberId })} onKeep={readOnly ? undefined : () => void onAction({ type: "keepLanguage", memberId: m.memberId })} />}
+          {mismatch && <LanguageMismatchAlert m={m} mismatch={mismatch} drift={mismatch ?? undefined} name={name} l={l} ownView={ownView} busy={send.busy} locked={generation.active} lockTitle={generationLockTitle} onRegenerate={readOnly ? undefined : () => void onAction({ type: "regenerate", memberId: m.memberId })} onKeep={readOnly ? undefined : () => void onAction({ type: "keepLanguage", memberId: m.memberId })} />}
           {chips.length > 0 && <div className="row wrap row-xs">{chips.map((c) => <span key={c} className="chip">{c}</span>)}</div>}
         </div>
         <Actions card={card} m={m} l={l} onAction={onAction} generation={generation} send={send} now={now} moment={moment} reminderAt={reminderAt} audienceHeld={audienceHeld} blockedTitle={mismatchVars ? fill(l.languageMismatch.approveTitle, mismatchVars) : undefined} />

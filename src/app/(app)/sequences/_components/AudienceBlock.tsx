@@ -2,7 +2,8 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { DropdownMenu } from "@/components/DropdownMenu";
 import { ChevronDownIcon, WarningIcon } from "@/components/icons";
-import { fixMenuItems, formatColleagueBreakdown, holdKind, memberLanguage, preferredStamp } from "@/lib/sequences/audienceCard";
+import { fixMenuItems, formatColleagueBreakdown, holdKind, languagePick, memberLanguage, preferredStamp } from "@/lib/sequences/audienceCard";
+import type { AudienceLanguage } from "@/lib/sequences/complianceAudience";
 import type { MemberAudience } from "@/lib/sequences/audienceView";
 import { countryNameEs, flagEmoji } from "@/lib/sequences/countryDisplay";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
@@ -52,19 +53,25 @@ export function AudienceWhy({ m, name, l }: { m: DetailMember; name: string; l: 
 }
 
 /**
- * The "idioma" menu of the card: change it (opens the dialog) or go back to what the system resolved (the preferred language when
- * there is one). When the preference decides, it also links to the record, where the preference lives. Absent for a read-only viewer.
+ * The language control of the card: a two-option `segmented` (es / en; pt never reaches a sequence, see AudienceLanguage), no popup.
+ * A click sets THIS member's choice, or clears it when the click names the language the system resolves anyway (languagePick), through
+ * the same chooseDraftLanguage / clearDraftLanguage writes as before. It never regenerates: an existing draft keeps its text and the
+ * mismatch alert says so. Disabled for a read-only viewer. The dialog asked at generate time is a separate, untouched question.
  */
-function LanguageMenu({ m, name, lockTitle, onAction, l }: { m: DetailMember; name: string; lockTitle?: string; onAction: OnAction; l: SequenceLabels }) {
-  const lc = l.languageChoice;
-  const resolved = memberLanguage(m)!.baseline === "es" ? l.audience.langEs : l.audience.langEn;
+function LanguageSegmented({ m, name, current, lockTitle, onAction, l }: { m: DetailMember; name: string; current: AudienceLanguage; lockTitle?: string; onAction?: OnAction; l: SequenceLabels }) {
+  const t = l.audience;
+  const options: [AudienceLanguage, string][] = [["es", t.languageEsOption], ["en", t.languageEnOption]];
   return (
-    <DropdownMenu trigger={<>{lc.menuTrigger}<ChevronDownIcon className="icon" /></>} triggerClassName="btn btn-ghost btn-sm" ariaLabel={fill(lc.menuAria, { name })}>
-      <div className="menu-label">{lc.menuLabel}</div>
-      <button type="button" role="menuitem" className="menu-item" disabled={lockTitle !== undefined} title={lockTitle} onClick={() => void onAction({ type: "chooseLanguage", memberId: m.memberId })}>{lc.menuChange}</button>
-      {m.languageChoice && <button type="button" role="menuitem" className="menu-item" disabled={lockTitle !== undefined} title={lockTitle} onClick={() => void onAction({ type: "resetLanguage", memberId: m.memberId })}>{fill(lc.menuReset, { resolved })}</button>}
-      {memberLanguage(m)!.source === "preferred" && <Link role="menuitem" className="menu-item" href={`/contacts/${m.personId}`}>{l.audience.menuPreferredInRecord}</Link>}
-    </DropdownMenu>
+    <span className="segmented" role="group" aria-label={`${t.languageGroupAria}: ${name}`}>
+      {options.map(([language, label]) => (
+        <button key={language} type="button" className={language === current ? "on" : undefined} aria-pressed={language === current} disabled={!onAction || lockTitle !== undefined} title={lockTitle}
+          onClick={() => {
+            const pick = languagePick(m, language);
+            if (pick.kind === "set") void onAction?.({ type: "setLanguage", memberId: m.memberId, language: pick.language });
+            else if (pick.kind === "reset") void onAction?.({ type: "resetLanguage", memberId: m.memberId });
+          }}>{label}</button>
+      ))}
+    </span>
   );
 }
 
@@ -74,7 +81,8 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
   if (!a) return null;
   const t = l.audience;
   const first = m.firstName?.trim() || name;
-  const fix = a.reason === "person_country" && a.audience ? null : <FixMenu m={m} a={a} name={name} first={first} l={l} />;
+  // "corregir" survives only on a HOLD, where the roster and phone links have no other home; with an audience the country line replaces it.
+  const fix = a.audience ? null : <FixMenu m={m} a={a} name={name} first={first} l={l} />;
 
   if (!a.audience) {
     const kind = holdKind(a, m.company);
@@ -107,16 +115,14 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
     <div className="stack-sm" aria-label={t.label}>
       <div className="row wrap" style={{ gap: ".5rem" }}>
         <span aria-hidden="true">{source !== "audience" ? flagEmoji(language === "es" ? "AR" : "US") : a.iso ? flagEmoji(a.iso) : "🌐"}</span>
-        <strong>{word(language)}</strong>
+        <LanguageSegmented m={m} name={name} current={language} lockTitle={lockTitle} onAction={onAction} l={l} />
         {choice && <span className="badge badge-info">{lc.chosenBadge}</span>}
+        {choice && onAction && <button type="button" className="btn btn-ghost btn-sm" disabled={lockTitle !== undefined} title={lockTitle} onClick={() => void onAction({ type: "resetLanguage", memberId: m.memberId })}>{fill(lc.menuReset, { resolved: word(baseline) })}</button>}
         {source === "preferred" && <span className="badge badge-info">{lc.badgePreferred}</span>}
         <span className="meta">·</span>
         <strong>{a.audience.address === "mdp" ? t.addrMdp : t.addrMiami}</strong>
       </div>
-      <div className="row wrap" style={{ gap: ".5rem", justifyContent: "space-between" }}>
-        <div className="meta">↳ {choice ? <>{lc.chosenBy} <strong>{choice.byName ?? "?"}</strong> {fill(lc.chosenOn, { when: choice.at ? stampLabel(choice.at) : "", resolved: word(baseline) })}<br />{lc.addressNote} {why}</> : preferredNote || why}</div>
-        <div className="row" style={{ gap: ".25rem" }}>{onAction && <LanguageMenu m={m} name={name} lockTitle={lockTitle} onAction={onAction} l={l} />}{fix}</div>
-      </div>
+      <div className="meta">↳ {choice ? <>{lc.chosenBy} <strong>{choice.byName ?? "?"}</strong> {fill(lc.chosenOn, { when: choice.at ? stampLabel(choice.at) : "", resolved: word(baseline) })}<br />{lc.addressNote} {why}</> : preferredNote || why}</div>
       {company.trim() && a.colleaguesDisagree && a.reason === "company_country" && (
         <div className="alert alert-warn" style={{ padding: "var(--space-sm) var(--space-md)" }}>
           <div>{fill(t.companyDespiteSplit, { company, filed: a.evidence ?? "", breakdown: formatColleagueBreakdown(a.colleagueCountries, t.rosterListAnd) })}</div>
