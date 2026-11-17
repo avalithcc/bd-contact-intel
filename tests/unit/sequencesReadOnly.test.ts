@@ -11,7 +11,7 @@ import { en } from "@/lib/i18n/dictionaries/en";
 import { es } from "@/lib/i18n/dictionaries/es";
 
 const NOW = new Date("2026-10-15T14:00:00Z");
-const facts = (over: Partial<CardFacts>): CardFacts => ({ state: "drafted", hasDraft: true, holdReason: null, reminderDueAt: null, florida: false, discardReason: null, reminderApproved: false, ...over });
+const facts = (over: Partial<CardFacts>): CardFacts => ({ state: "drafted", hasDraft: true, holdReason: null, reminderDueAt: null, florida: false, discardReason: null, reminderApproved: false, hasReminderDraft: true, ...over });
 const ids = (c: ReturnType<typeof mapMemberCard>) => c.actions.map((a) => a.id);
 const WRITES = ["generate", "approve", "cancel", "cancelReminder", "advanceReminder", "readmit", "regenerate", "remove", "optOut", "reviewDraft", "reviewReminder"];
 

@@ -14,6 +14,7 @@ const facts = (over: Partial<CardFacts>): CardFacts => ({
   florida: false,
   discardReason: null,
   reminderApproved: false,
+  hasReminderDraft: true,
   ...over,
 });
 const ids = (c: ReturnType<typeof mapMemberCard>) => c.actions.map((a) => a.id);
@@ -201,4 +202,31 @@ test("an unapproved due reminder is still 'Recordatorio hoy' and an approved one
   const due = new Date("2026-10-15T13:00:00Z");
   assert.equal(mapMemberCard(facts({ state: "sent", reminderDueAt: due, reminderApproved: false }), NOW).kind, "reminderToday");
   assert.ok(!mapMemberCard(facts({ state: "sent", reminderDueAt: due, reminderApproved: true }), NOW).actions.some((a) => a.id === "approve"));
+});
+
+/**
+ * A member whose step 2 reminder was never written. The release runner generates it right after step 1 goes out and
+ * throws on failure; nothing retries, so the member sits in `sent` forever with no reminder. The card used to offer
+ * "Revisar recordatorio" and "Aprobar" the moment it fell due, without asking whether there was one — both buttons
+ * pointed at nothing, which is exactly what the owner reported seeing.
+ */
+test("a reminder that fell due but was never written offers to generate it, not to review nothing", () => {
+  const due = { state: "sent" as const, sentAt: NOW, reminderDueAt: new Date("2026-10-14T13:00:00Z") };
+  const missing = mapMemberCard(facts({ ...due, hasReminderDraft: false }), NOW);
+  assert.equal(missing.kind, "reminderMissing");
+  assert.deepEqual(ids(missing), ["generateReminder"], "and never review or approve");
+
+  const written = mapMemberCard(facts({ ...due, hasReminderDraft: true }), NOW);
+  assert.equal(written.kind, "reminderToday", "the ordinary case is untouched");
+  assert.deepEqual(ids(written), ["reviewReminder", "approve"]);
+});
+
+test("an APPROVED reminder still reads as approved, whatever the draft flag says", () => {
+  const due = { state: "sent" as const, sentAt: NOW, reminderDueAt: new Date("2026-10-14T13:00:00Z"), reminderApproved: true };
+  assert.equal(mapMemberCard(facts({ ...due, hasReminderDraft: true }), NOW).kind, "reminderApproved");
+});
+
+test("a reminder not yet due is unaffected by the draft flag: nothing to do either way", () => {
+  const notYet = { state: "sent" as const, sentAt: NOW, reminderDueAt: new Date("2026-10-20T13:00:00Z") };
+  assert.equal(mapMemberCard(facts({ ...notYet, hasReminderDraft: false }), NOW).kind, "sent");
 });
