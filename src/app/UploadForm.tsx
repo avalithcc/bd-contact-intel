@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { MESSAGES_IMPORT_BUCKET } from "@/lib/storage";
 import { t } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locales";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 export function UploadForm({ locale }: { locale: Locale }) {
   const dict = t(locale);
@@ -21,9 +22,9 @@ export function UploadForm({ locale }: { locale: Locale }) {
           <label htmlFor="file">{dict.upload.connectionsLabel}</label>
           <input id="file" name="file" type="file" accept=".csv" required />
         </div>
-        <button type="submit" disabled={pending}>
-          {pending ? dict.upload.importing : dict.upload.import}
-        </button>
+        <BusyButton pending={pending} pendingLabel={dict.upload.importing}>
+          {dict.upload.import}
+        </BusyButton>
       </div>
       {state?.ok && (
         <p className="muted mb-0">
@@ -111,9 +112,9 @@ export function UploadMessagesForm({ locale }: { locale: Locale }) {
           <label htmlFor="messagesFile">{dict.upload.messagesLabel}</label>
           <input id="messagesFile" name="file" type="file" accept=".csv" required />
         </div>
-        <button type="submit" disabled={pending}>
-          {pending ? dict.upload.importing : dict.upload.import}
-        </button>
+        <BusyButton pending={pending} pendingLabel={dict.upload.importing}>
+          {dict.upload.import}
+        </BusyButton>
       </div>
       {state?.ok && (
         <>

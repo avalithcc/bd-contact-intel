@@ -5,6 +5,7 @@ import { Dialog } from "@/components/Dialog";
 import { DAILY_SEND_CAP_CEILING } from "@/lib/sequences/capValidation";
 import { capState } from "@/lib/sequences/createForm";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 /**
  * "Editar secuencia": the name and the daily cap, the two settings updateSequenceSettings changes. The mockup links the
@@ -21,7 +22,7 @@ export function EditSequenceDialog({ open, name, cap, labels: l, onClose, onSave
   const nameMissing = draftName.trim() === "";
   return (
     <Dialog open={open} onClose={onClose} title={l.editTitle} closeDisabled={busy}
-      footer={<><button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>{l.editCancel}</button><button type="submit" form={id} className="btn btn-primary" disabled={busy}>{l.editSave}</button></>}>
+      footer={<><button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>{l.editCancel}</button><BusyButton pending={busy} pendingLabel={l.editSave} form={id} className="btn btn-primary">{l.editSave}</BusyButton></>}>
       <form id={id} className="stack" noValidate onSubmit={(e) => { e.preventDefault(); setAttempted(true); if (!nameMissing && capView.error === null) onSave({ name: draftName.trim(), dailySendCap: capView.value as number }); }}>
         <div className="field">
           <label className="label" htmlFor={`${id}-name`}>{l.newName}</label>

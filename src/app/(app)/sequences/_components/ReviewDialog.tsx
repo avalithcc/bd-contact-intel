@@ -16,6 +16,7 @@ import { agoText, fill, miamiWhen, type SequenceLabels } from "@/lib/sequences/v
 import type { OnReviewAction } from "./actions";
 import { LanguageMismatchAlert, languageWord } from "./LanguageMismatch";
 import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 type Props = {
   open: boolean;
@@ -76,6 +77,12 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   // mountKey, so a reload, a member switch or a reopen starts clean without a reset effect.
   const [dirtyKey, setDirtyKey] = useState<string | null>(null);
   const dirty = dirtyKey === mountKey;
+  // `busy` is ONE prop shared by save, approve and the mark, so it cannot say which of them is running: spinning all
+  // three would be a lie and spinning none left the dialog's most-clicked button with no feedback at all. Remember the
+  // control that was pressed and give the spinner only to that one. Cleared when the action settles (same
+  // derive-during-render shape as `mounted` above), so a refusal does not leave a button spinning forever.
+  const [pressed, setPressed] = useState<ReviewFooterId | null>(null);
+  if (!busy && pressed) setPressed(null);
   if (!m || !view) return null;
 
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
@@ -110,20 +117,20 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   const footerButton = (id: ReviewFooterId) =>
     id === "regenerate" ? (
       // The spinner is the point: this used to only go disabled, and the dialog read as frozen while the model ran.
-      <button key={id} type="button" className="btn btn-ghost" disabled={busy || regenerateLocked} aria-busy={generating ? "true" : undefined} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}>
-        {generating ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}
-        {generating ? l.generating : l.reviewRegenerate}
-      </button>
+      <BusyButton key={id} type="button" pending={generating} pendingLabel={l.generating} className="btn btn-ghost" disabled={busy || regenerateLocked} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}>
+        <GenerateIcon className="icon" />
+        {l.reviewRegenerate}
+      </BusyButton>
     ) : id === "regenerateSubject" ? (
       // Offered HERE because this is where a BD reads the subject and decides it is weak. It was first shipped only in
       // the card's "⋯" menu, and the owner looked for it in this dialog, which is the obvious place to want it.
-      <button key={id} type="button" className="btn btn-ghost" disabled={busy || regenerateLocked} aria-busy={generating ? "true" : undefined} onClick={() => onAction({ type: "regenerateSubject", memberId: m.memberId })}>
-        {generating ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}
-        {generating ? l.generating : l.reviewRegenerateSubject}
-      </button>
+      <BusyButton key={id} type="button" pending={generating} pendingLabel={l.generating} className="btn btn-ghost" disabled={busy || regenerateLocked} onClick={() => onAction({ type: "regenerateSubject", memberId: m.memberId })}>
+        <GenerateIcon className="icon" />
+        {l.reviewRegenerateSubject}
+      </BusyButton>
     ) : id === "reviewed" ? (
       // The container closes the dialog when the server accepts the mark; a refusal ("stale") keeps it open with the notice.
-      <button key={id} type="button" className="btn btn-secondary" disabled={busy || !mounted || dirty} title={dirty ? l.reviewMarkReviewedDirty : l.reviewMarkReviewedHelp} onClick={() => { if (mounted && !dirty) return onAction({ type: "markReviewed", memberId: m.memberId, step, version: mounted.version }); }}>{l.reviewMarkReviewed}</button>
+      <BusyButton key={id} type="button" pending={busy && pressed === id} pendingLabel={l.reviewMarkReviewed} className="btn btn-secondary" disabled={busy || !mounted || dirty} title={dirty ? l.reviewMarkReviewedDirty : l.reviewMarkReviewedHelp} onClick={() => { if (mounted && !dirty) { setPressed(id); onAction({ type: "markReviewed", memberId: m.memberId, step, version: mounted.version }); } }}>{l.reviewMarkReviewed}</BusyButton>
     ) : id === "approve" && step === 1 ? (
       <SendSplitButton
         key={id}
@@ -140,7 +147,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
         onSchedule={async (slot) => { await approveWith({ kind: "at", ...slot }); }}
       />
     ) : (
-      <button key={id} type="submit" form={formId} value={id} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy || (id === "approve" && mismatch !== null)} title={id === "approve" ? blockedTitle : undefined} aria-describedby={id === "approve" && mismatch ? helpId : undefined}>{id === "approve" ? l.reviewApprove : l.reviewSave}</button>
+      <BusyButton key={id} type="submit" form={formId} value={id} pending={busy && pressed === id} pendingLabel={id === "approve" ? l.reviewApprove : l.reviewSave} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy || (id === "approve" && mismatch !== null)} title={id === "approve" ? blockedTitle : undefined} ariaDescribedBy={id === "approve" && mismatch ? helpId : undefined} onClick={() => setPressed(id)}>{id === "approve" ? l.reviewApprove : l.reviewSave}</BusyButton>
     );
 
   /**

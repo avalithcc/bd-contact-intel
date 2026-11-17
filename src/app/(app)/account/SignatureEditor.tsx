@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ToastProvider";
 import { previewSignatureAction, saveSignatureAction } from "./signatureActions";
 import styles from "./page.module.css";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 export interface SignatureLabels {
   title: string;
@@ -143,9 +144,9 @@ export function SignatureEditor({ initialHtml, labels: l }: { initialHtml: strin
             {l.clear}
           </button>
         )}
-        <button type="submit" className="btn btn-primary" disabled={busy || !dirty}>
-          {busy ? l.saving : l.save}
-        </button>
+        <BusyButton pending={busy} pendingLabel={l.saving} className="btn btn-primary" disabled={!dirty}>
+          {l.save}
+        </BusyButton>
       </div>
     </form>
   );

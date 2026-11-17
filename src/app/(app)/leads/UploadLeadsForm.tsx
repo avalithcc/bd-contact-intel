@@ -5,6 +5,7 @@ import { importLeadsCsv, type ImportLeadsResult } from "./actions";
 import type { LeadsUploadLabels } from "@/lib/leads/labels";
 import type { ContactsImportLabels } from "@/lib/contacts/labels";
 import { ImportOutcome } from "@/app/(app)/contacts/import/ImportOutcome";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 /**
  * Import control for the event export files (see src/lib/leads/csv.ts for
@@ -87,9 +88,9 @@ export function UploadLeadsForm({
       </div>
 
       <div className="legacy-row">
-        <button type="submit" disabled={pending}>
-          {pending ? labels.importing : labels.import}
-        </button>
+        <BusyButton pending={pending} pendingLabel={labels.importing}>
+          {labels.import}
+        </BusyButton>
       </div>
 
       {state?.ok && (

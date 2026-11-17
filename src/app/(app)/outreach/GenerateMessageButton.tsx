@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import type { GenerateOutreachMessageResult } from "./actions";
 import type { GenerateMessageLabels } from "@/lib/outreach/messageLabels";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 /**
  * "Generate message" control for one contact — calls a server action bound
@@ -81,10 +82,9 @@ export function GenerateMessageButton({
     <div className="generate-message">
       <form action={submitWithLanguage} aria-busy={pending}>
         {pending ? (
-          <span className="generate-message-pending" role="status">
-            <span className="spinner" aria-hidden="true" />
-            {labels.generatingMessage}
-          </span>
+          <BusyButton pending type="button" className="secondary-btn" pendingLabel={labels.generatingMessage}>
+            {labels.generateMessage}
+          </BusyButton>
         ) : choosingLanguage ? (
           <span
             className="generate-message-language-choice"

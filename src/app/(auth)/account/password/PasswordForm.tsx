@@ -13,6 +13,7 @@ import {
   type PasswordChangeError,
   type PasswordChangeErrorField,
 } from "@/lib/auth/passwordPolicy";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 /**
  * "incorrect" is a runtime, server-verified outcome (signInWithPassword
@@ -262,9 +263,9 @@ export function PasswordForm({
           <Link href="/account" className="btn btn-secondary">
             {dict.account.cancel}
           </Link>
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? dict.common.ellipsis : dict.account.submit}
-          </button>
+          <BusyButton pending={busy} pendingLabel={dict.common.ellipsis} className="btn btn-primary">
+            {dict.account.submit}
+          </BusyButton>
         </div>
       </form>
     </main>
