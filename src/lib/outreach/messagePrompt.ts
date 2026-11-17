@@ -332,7 +332,12 @@ function referenceStyleFor(isEmail: boolean, language: MessageLanguage, signatur
 const SUBJECT_RULE = [
   'The "subject" decides whether the email is opened. It is about the RECIPIENT\'S company and situation, never about Avalith or what Avalith sells:',
   `Length: ${SUBJECT_TARGET_MIN_CHARS}-50 characters, never over ${SUBJECT_MAX_CHARS}. Over ${SUBJECT_MAX_CHARS} is rejected and regenerated.`,
-  "Name the recipient's company or their concrete situation drawn from the hiring data, optionally plus a short hook of three to six words hinting why you are writing.",
+  // Owner's decision 2026-11-17. The previous wording ("name the recipient's company or their situation") plus a
+  // headline-shaped example produced subjects like "Getnet abre backend y Salesforce en LATAM y España": a news
+  // bulletin ABOUT the reader, in the third person, which he found strange to receive. A fragment names the same
+  // facts without making the company act, and it is the one of the three shapes he picked.
+  "It is a NOUN FRAGMENT naming what they are hiring for, drawn from the hiring data: no verb with their company as its subject, no question, no sentence. Write \"Backend y Salesforce en LATAM y España\", never \"Getnet abre backend y Salesforce en LATAM\".",
+  "Never write the recipient's company as the subject of a verb: a headline about them reads as a newsletter, not as an email written to them. Naming the company is fine when it does not act (\"Flybondi: una pregunta sobre ingeniería\").",
   "NEVER name Avalith, and never name the sender, in the subject.",
   // Generated from SUBJECT_BANNED_PHRASES so the list the model is told and the list enforced after generation cannot
   // drift. They were separate before, and the enforcement half simply did not exist.
@@ -342,7 +347,11 @@ const SUBJECT_RULE = [
   "Sentence case: no title case, no emoji, no ALL CAPS, no exclamation marks. Correct accents and spelling (\"ingeniería\", not \"ingenieria\").",
   // Every example must itself obey the 35-50 rule above: the model copies shapes, so a 31-character example teaches
   // 31-character subjects whatever the rule says.
-  'Shape examples, for a company called Affirm (shape only, never reuse them verbatim): "Affirm suma backend en Card y Fraud", "Backend en Card y Fraud, sin pisar a RRHH", "Los roles de Identity y Payments: otra vía".',
+  // The model COPIES SHAPES, as the note above says, and the first example here used to be "Affirm suma backend en Card
+  // y Fraud" - company plus a conjugated verb. That single example taught every headline subject the owner complained
+  // about; the rule text was not the problem. Every example below is a fragment, and the bad shape is now named as bad.
+  'Shape examples, for a company called Affirm (shape only, never reuse them verbatim): "Backend en Card y Fraud, sin pisar a RRHH", "Los roles de Identity y Payments: otra vía", "Backend y Salesforce en LATAM y España".',
+  'NEVER this shape: "Affirm suma backend en Card y Fraud". The company acts, so it reads as news about them.',
 ].join("\n   - ");
 
 export function buildOutreachMessagePrompt(

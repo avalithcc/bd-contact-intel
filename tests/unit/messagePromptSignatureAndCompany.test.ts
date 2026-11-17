@@ -125,9 +125,22 @@ test("the subject rule bars Avalith, caps the length, and bans the vendor vocabu
   assert.match(subjectRule, /never fall back to Avalith's name/);
   // Every shape example must itself obey the 35-50 rule stated two lines above it: the model copies shapes, so an
   // out-of-band example teaches out-of-band subjects. One of the three shipped at 31 characters.
-  const examples = [...subjectRule.matchAll(/"([^"]+)"/g)].map((m) => m[1]!).filter((s) => /^(Affirm|Backend|Los roles)/.test(s));
+  // Deduped: the fragment rule and the shape-example line deliberately quote the same good subject, so the count is of
+  // DISTINCT good shapes being taught, not of occurrences.
+  const examples = [...new Set([...subjectRule.matchAll(/"([^"]+)"/g)].map((m) => m[1]!).filter((s) => /^(Backend|Los roles)/.test(s)))];
   assert.equal(examples.length, 3, "the three shape examples moved or were renamed");
   for (const e of examples) assert.ok(e.length >= 35 && e.length <= 50, `shape example out of its own 35-50 band (${e.length}): ${e}`);
+  // The shape that caused the complaint. The rule TEXT never asked for a headline; one example demonstrated one
+  // ("Affirm suma backend en Card y Fraud") and the model copied it, which is how "Getnet abre backend y Salesforce
+  // en LATAM y España" reached a real inbox. No good example may make the company act, and the bad one must stay
+  // named as bad: deleting it silently would let the shape drift back in.
+  for (const e of examples) assert.doesNotMatch(e, /^(Affirm|Getnet)\s+\w+/, `a shape example makes the company act: ${e}`);
+  // EVERY quoted subject in the rule is a shape the model may copy, the forbidden ones included: a 29-character
+  // "good" example teaches 29-character subjects however loudly the band is stated. I shipped exactly that here once.
+  const quoted = [...subjectRule.matchAll(/"([^"]+)"/g)].map((m) => m[1]!).filter((q) => /^(Backend|Los roles|Affirm|Getnet)/.test(q));
+  for (const q of quoted) assert.ok(q.length >= 35 && q.length <= 50, `a quoted subject in the rule is out of the 35-50 band (${q.length}): ${q}`);
+  assert.match(subjectRule, /NEVER this shape: "Affirm suma backend en Card y Fraud"/);
+  assert.match(subjectRule, /NOUN FRAGMENT/, "the subject must be stated as a fragment, not a sentence");
   // Mutation caught: restoring the one-clause subject rule, or dropping any listed word.
 });
 

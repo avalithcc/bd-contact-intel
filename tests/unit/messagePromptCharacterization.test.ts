@@ -2,9 +2,13 @@
  * Characterization test: pins, byte for byte, what buildOutreachMessagePrompt renders for the Spanish inputs the
  * live callers send (no `purpose`). The prompt is shared by five callers that generate the app's outreach
  * messages in production, and a regression there has no other test watching it. Goldens in
- * tests/unit/fixtures/messagePromptGolden/ were re-captured on 2026-10-28 for an intentional, owner-approved prompt
- * change (email sign-off removal when a signature follows, the new subject rule, company-name absence instead of
- * "unknown"). Do not regenerate them to make an unintended change pass: if this fails, the existing path moved.
+ * tests/unit/fixtures/messagePromptGolden/ were re-captured on 2026-11-17 for an intentional, owner-approved prompt
+ * change: the subject is now a NOUN FRAGMENT and the headline-shaped example was removed. The owner received
+ * "Getnet abre backend y Salesforce en LATAM y España" and found it strange to read - a news bulletin about him
+ * rather than a line written to him - and the first shape example was "Affirm suma backend en Card y Fraud", which
+ * taught exactly that. Previously re-captured 2026-10-28 (sign-off removal with a signature, the first subject rule,
+ * company-name absence instead of "unknown").
+ * Do not regenerate them to make an unintended change pass: if this fails, the existing path moved.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
