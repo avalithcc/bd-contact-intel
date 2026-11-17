@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useToast } from "@/components/ToastProvider";
 import type { ApproveResult } from "@/lib/sequences/approvalQueries";
+import { parseBannedVocabularyReason } from "@/lib/sequences/approvalChecks";
 import type { SequenceDetail } from "@/lib/sequences/detailQueries";
 import { approveStep, cardStep, gateRows, mismatchedNames, prunedSelection, readyMemberIds, refusalKey, reminderGateRows, runReviewIntent, selectionStep, summarizeRefusals } from "@/lib/sequences/detailFlow";
 import type { SkippedEdit } from "@/lib/sequences/draftCompose";
@@ -119,7 +120,12 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     }
   }
   const closeDialogs = () => { setReview(null); setRemoveIds(null); setOptOutId(null); setEditing(false); setRegen(null); setLang(null); setLangError(null); setError(null); setSendError(null); setStaleKey(null); };
-  const reasonText = (reason: string) => (l.reviewErrors as Record<string, string>)[reason] ?? l.reviewErrors.failed;
+  // A reason can carry a detail after a colon (banned_vocabulary:<terms>); the dictionary is keyed by what precedes it.
+  const reasonText = (reason: string) => {
+    const bannedTerms = parseBannedVocabularyReason(reason);
+    if (bannedTerms !== null) return fill(l.reviewErrors.banned_vocabulary, { term: bannedTerms });
+    return (l.reviewErrors as Record<string, string>)[reason] ?? l.reviewErrors.failed;
+  };
 
   /**
    * A bulk refusal names who was refused. One sentence per reason, joined by a space: the popover shows it in a plain

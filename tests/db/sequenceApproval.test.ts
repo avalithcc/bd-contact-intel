@@ -19,11 +19,11 @@ let sequenceId: string;
 const personIds: string[] = [];
 
 /** A body from the real footer producer, never a hand-typed footer. The default recipient (United States) resolves to "miami". */
-async function footedBody(address: "miami" | "mdp" = "miami") {
+async function footedBody(address: "miami" | "mdp" = "miami", message = "Hello there") {
   const { appendFooter } = await import("@/lib/sequences/complianceFooter");
   const { COMPLIANCE_CONFIG } = await import("@/lib/sequences/config");
   const { buildUnsubscribeUrl, generateUnsubscribeToken } = await import("@/lib/sequences/unsubscribeToken");
-  const r = appendFooter("Hello there", COMPLIANCE_CONFIG, address, "en", buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
+  const r = appendFooter(message, COMPLIANCE_CONFIG, address, "en", buildUnsubscribeUrl("https://crm.example.test", generateUnsubscribeToken()));
   assert.equal(r.status, "ok");
   return r.status === "ok" ? r.body : "";
 }
@@ -150,6 +150,43 @@ test("a step 1 subject starting with Re: is rejected at approval", async () => {
   const result = await approveMember(bdId, m.memberId);
   assert.ok(!result.ok && result.error === "rejected" && result.rejected[0].reason === "reply_prefix_subject");
   assert.equal((await stateOf(m.memberId)).state, "drafted");
+});
+
+test("a step 1 body with banned vendor vocabulary is refused at approval and names the term", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkMember("vocab1", { body: await footedBody("miami", "We offer staff augmentation for your team.") });
+  const result = await approveMember(bdId, m.memberId);
+  assert.ok(!result.ok && result.error === "rejected");
+  assert.equal(!result.ok && result.error === "rejected" && result.rejected[0].reason, "banned_vocabulary:staff augmentation");
+  assert.equal((await stateOf(m.memberId)).state, "drafted");
+  assert.equal((await draftOf(m.memberId)).approvedAt, null);
+});
+
+test("a step 2 reminder body with banned vendor vocabulary is refused at approval", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkSent("vocab2", { reminderBody: await footedBody("miami", "Following up on our nearshore squads.") });
+  const result = await approveMember(bdId, m.memberId, 2);
+  assert.ok(!result.ok && result.error === "rejected");
+  assert.equal(!result.ok && result.error === "rejected" && result.rejected[0].reason, "banned_vocabulary:squads, nearshore");
+  assert.equal((await draftOf(m.memberId, 2)).approvedAt, null);
+});
+
+test("a banned term that appears only in the compliance footer does not refuse the draft", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const { COMPLIANCE_CONFIG } = await import("@/lib/sequences/config");
+  const { bodyHasFooter } = await import("@/lib/sequences/complianceFooter");
+  // The real footer carries no banned term today; put one in the footer text the way a future address or opt-out wording could.
+  const body = (await footedBody("miami", "Hello there")).replace(/\n$/, "") + " services";
+  assert.ok(bodyHasFooter(body, COMPLIANCE_CONFIG, "miami"));
+  const m = await mkMember("vocab-footer", { body });
+  const result = await approveMember(bdId, m.memberId);
+  assert.ok(result.ok, JSON.stringify(result));
+});
+
+test("a clean body approves normally", async () => {
+  const { approveMember } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkMember("vocab-clean", { body: await footedBody("miami", "Vi que tienen búsquedas abiertas de backend.") });
+  assert.ok((await approveMember(bdId, m.memberId)).ok);
 });
 
 test("a member without a draft cannot be approved", async () => {

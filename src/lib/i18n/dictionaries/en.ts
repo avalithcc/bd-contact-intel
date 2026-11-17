@@ -493,6 +493,7 @@ export const en = {
         "The AI Gateway isn't configured yet — set AI_GATEWAY_API_KEY (or sign in with Vercel OIDC) and try again.",
       generationFailed: "Couldn't generate a message right now. Try again in a moment.",
       invalidModelOutput: "The generated draft came back in an unexpected format. Try again in a moment.",
+      bannedVocabulary: "The draft kept using vendor vocabulary we do not allow (for example \"staff augmentation\") after several attempts, so it was discarded. Try again.",
     },
     // Shown above the generated message when prior LinkedIn history was fed
     // into the prompt (see historyCount in
@@ -3981,6 +3982,7 @@ export const en = {
       unmapped_market: "We cannot place this contact in a country, or its country is under an embargo, so no email can carry a legal footer for it. Fix the contact's location before approving.",
       missing_footer: "The draft is missing the unsubscribe footer for this contact's region. Regenerate the draft to restore it before approving.",
       reply_prefix_subject: "A first email cannot start with \"Re:\" or \"Fwd:\" because it pretends to continue a conversation that never happened. Rewrite the subject.",
+      banned_vocabulary: "The email body uses vocabulary we do not allow: {term}. Remove or rewrite it before approving.",
       invalid_time: "That date or time is not valid.",
       past: "That time has already passed.",
       too_soon: "Pick a time at least 5 minutes ahead.",
