@@ -120,7 +120,12 @@ export function AudienceBlock({ m, name, l, onAction, lockTitle }: { m: DetailMe
         {choice && onAction && <button type="button" className="btn btn-ghost btn-sm" disabled={lockTitle !== undefined} title={lockTitle} onClick={() => void onAction({ type: "resetLanguage", memberId: m.memberId })}>{fill(lc.menuReset, { resolved: word(baseline) })}</button>}
         {source === "preferred" && <span className="badge badge-info">{lc.badgePreferred}</span>}
         <span className="meta">·</span>
-        <strong>{a.audience.address === "mdp" ? t.addrMdp : t.addrMiami}</strong>
+        {/* Labelled because unlabelled it reads as a fact about the CONTACT. The owner, who commissioned this screen,
+            saw "Chile ... Miami" and asked whether Miami was where she lives. It is ours: the postal address CAN-SPAM
+            puts in the footer. Reuses the dialog's own `addressLabel` ("Dirección legal") rather than inventing a
+            second word for one thing. */}
+        <span className="meta">{lc.addressLabel}:</span>
+        <strong title={lc.addressCardTitle}>{a.audience.address === "mdp" ? t.addrMdp : t.addrMiami}</strong>
       </div>
       <div className="meta">↳ {choice ? <>{lc.chosenBy} <strong>{choice.byName ?? "?"}</strong> {fill(lc.chosenOn, { when: choice.at ? stampLabel(choice.at) : "", resolved: word(baseline) })}<br />{lc.addressNote} {why}</> : preferredNote || why}</div>
       {company.trim() && a.colleaguesDisagree && a.reason === "company_country" && (
