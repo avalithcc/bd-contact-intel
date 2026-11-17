@@ -7,7 +7,9 @@ import { getCanonicalCompanyKeyForPerson } from "@/lib/companies/aliasResolution
 import { getCurrentBd } from "@/lib/queries";
 import { updateContactProperty, updateContactProperties } from "@/lib/contacts/propertyEditDb";
 import { isEditablePersonProperty, type LocationEditFields } from "@/lib/contacts/propertyEdit";
-import { assertContactEditableById } from "@/lib/contacts/queries";
+import { assertContactEditableById, loadEditableContact } from "@/lib/contacts/queries";
+import { followUpReturn, followUpReturnToWire, type FollowUpReturnWire } from "@/lib/followUp/returnDate";
+import { followUpOwnerOf } from "@/lib/followUp/ownerLookup";
 import { changeContactCompany } from "@/lib/contacts/companyChangeDb";
 import { searchContactCompanies } from "@/lib/contacts/companySearchDb";
 import { validateNewEmailInput } from "@/lib/contacts/newEmailInput";
@@ -431,6 +433,8 @@ export async function addContactSignalAction(personId: string, text: string): Pr
 }
 
 export type SendContactEmailResult = ContactActionResult;
+/** Success of a manual send, carrying when the contact returns to the sender's follow-up queue (a floor, not a promise). */
+export type SendContactEmailOutcome = { ok: true; followUp: FollowUpReturnWire } | Extract<ContactActionResult, { ok: false }>;
 
 /** "Correo" quick action (task 9.2) — same Gmail send path as leads; no AI draft here. */
 export async function sendContactEmailAction(
@@ -439,7 +443,7 @@ export async function sendContactEmailAction(
   subject: string,
   body: string,
   extras?: ComposeExtras,
-): Promise<SendContactEmailResult> {
+): Promise<SendContactEmailOutcome> {
   try {
     // A NEW email needs its own subject and body; a reply is exempt (its
     // subject comes from the thread, see sendThreadReplyAction). Returned as
@@ -447,7 +451,7 @@ export async function sendContactEmailAction(
     if (!isUuid(personId)) return { ok: false, reason: "not_found" };
     const input = validateNewEmailInput(subject, body);
     if (!input.ok) return { ok: false, reason: input.reason };
-    await assertContactEditableById(personId);
+    const contact = await loadEditableContact(personId);
     const me = await getCurrentBd();
     // BD with a signature sends HTML (body + signature); without one the
     // message is the same single-part plain text as before (composeEmailBody).
@@ -476,7 +480,10 @@ export async function sendContactEmailAction(
     // The other "Para" contacts are different people (and may sit in other companies), so each one resolves its own company.
     // Sequential on purpose: the pool is small and a compose has a handful of recipients.
     for (const other of extras?.recipientPersonIds ?? []) if (isUuid(other)) await revalidateContactSurfaces(other);
-    return { ok: true };
+    // The OWNER's deny list, never the sender's: the queue is built per owner (candidateQuery: `fuq_owner_bd_id = $bdId`)
+    // and 1 in 7 manual sends goes to someone else's contact. No lookup when the contact is mine, which is the common case.
+    const owner = await followUpOwnerOf(contact.ownerBdId, me);
+    return { ok: true, followUp: followUpReturnToWire(followUpReturn(new Date(), contact.roleGroup, owner, me.id)) };
   } catch (err) {
     return actionFailure(err);
   }

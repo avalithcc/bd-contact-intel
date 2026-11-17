@@ -1000,6 +1000,10 @@ export const en = {
     toastNoteSaved: "Note saved.",
     toastTaskCreated: "Task created.",
     toastEmailSent: "Email sent.",
+    toastEmailSentReturnsOwner: "Email sent. Back in {owner}'s follow-ups from {date}.",
+    toastEmailSentReturns: "Email sent. Back in your follow-ups from {date}.",
+    toastEmailSentExcludedOwner: "Email sent. {owner} excluded this role group from their follow-ups, so it will not come back to them.",
+    toastEmailSentExcluded: "Email sent. This role is excluded from your follow-ups.",
     toastEmailScheduled: "Email scheduled.",
     // --- scheduled-send slice 2 (envio-programado.html sections 2, 3, 4, 5) ---
     schedulePresetMonday: "Monday 9:00 in Miami",

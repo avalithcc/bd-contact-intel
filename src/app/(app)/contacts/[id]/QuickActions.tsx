@@ -20,6 +20,8 @@ import {
 import { scheduleContactEmailAction } from "../scheduleActions";
 import { SendSplitButton } from "@/components/send/SendSplitButton";
 import { fillTemplate } from "@/lib/i18n/template";
+import { followUpToast } from "@/lib/followUp/returnDate";
+import { miamiWhen } from "@/lib/sequences/viewText";
 import type { ContactSendContext } from "@/lib/sendSchedule/labels";
 import type { Slot } from "@/lib/sendSchedule/time";
 import { MANUAL_CALL_DIRECTION } from "@/lib/contacts/call";
@@ -196,7 +198,7 @@ export function QuickActions({
     if (result.ok) {
       draft.sent();
       closeQuickAction();
-      showToast(l.toastEmailSent);
+      showToast(followUpToast(result.followUp, l, (iso) => miamiWhen(new Date(iso), new Date()).ddmm));
       router.refresh();
     } else {
       const message = contactActionErrorMessage(l, result.reason);
