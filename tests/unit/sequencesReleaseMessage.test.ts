@@ -62,7 +62,7 @@ test("signature present: order is message, signature, footer, and the unsubscrib
     const iMessage = h.indexOf("Short &lt;note&gt; &amp; more.");
     const iSig = h.indexOf(sig);
     const iAddr = h.indexOf(COMPLIANCE_CONFIG[address]!.postalAddress);
-    const iOptOut = h.indexOf("use the link below");
+    const iOptOut = h.indexOf("use the link");
     const iLink = h.indexOf(`<a href="${URL_OK}"`);
     assert.ok(iMessage >= 0 && iSig > iMessage && iAddr > iSig && iOptOut > iAddr, `${address}: ${h}`);
     assert.ok(iLink > iOptOut, "the link is last");
@@ -154,7 +154,7 @@ test("two different tokens in one body: header, anchor and the real footer's tok
 
 test("a hand-edited footer marker still splits, so the signature stays ABOVE the footer", () => {
   const addr = COMPLIANCE_CONFIG.miami!.postalAddress;
-  const tail = `${addr}\n\n${OPT_OUT_TEXT.en}\n${URL_OK}`;
+  const tail = `${addr} · ${OPT_OUT_TEXT.en} ${URL_OK}`;
   for (const marker of ["-- \n", "--\n\n", "---\n", "--\r\n"]) {
     const stored = `Hello Jane,\n\nShort note.\n\n${marker}${tail}`;
     assert.ok(splitFooter(stored, COMPLIANCE_CONFIG), JSON.stringify(marker));
