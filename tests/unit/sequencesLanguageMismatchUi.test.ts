@@ -156,3 +156,44 @@ test("the hold line is shown on an approved card and never on an unapproved draf
   const drafted = card(member("es", { holdReason: "wrong_language" }));
   assert.ok(!drafted.includes(es.sequences.holdPrefix), drafted);
 });
+
+// --- audience-controls-alignment: card body, segmented language, country line, stale note ---------------------------------------
+
+test("the card body overrides .row's centring with align-items:flex-start so the action column sits at the top", () => {
+  assert.ok(card(member("es")).includes('style="flex-wrap:wrap;align-items:flex-start"'));
+});
+
+test("the language is a two-option segmented with the current one on, and no dropdown named corregir or idioma is left", () => {
+  const html = card(member("es"));
+  assert.ok(html.includes('<span class="segmented" role="group" aria-label="Idioma del borrador: Test1 Person"><button type="button" class="on" aria-pressed="true">Español</button><button type="button" aria-pressed="false">Inglés</button></span>'), html);
+  assert.ok(!html.includes(">corregir<") && !html.includes(">idioma<"), "the old triggers are gone");
+});
+
+test("the country line shows no definido when the person has none, and the pencil is the edit control", () => {
+  const html = card(member("es"));
+  assert.ok(html.includes('<span class="meta">País:</span><button type="button" class="btn btn-ghost btn-sm" aria-label="Editar el país de Test1"><span class="meta">no definido</span>'), html);
+});
+
+test("a read-only viewer sees the country as text, with no edit button", () => {
+  const html = card(member("es", { personCountry: "Chile" }), { readOnly: true });
+  assert.ok(html.includes("País:") && html.includes("Chile") && !html.includes("Editar el país"), html);
+});
+
+test("the stale note names the stored language, the language and address that apply now, and never claims the old address", () => {
+  const html = card(member("en"));
+  assert.ok(html.includes("El borrador no cambió: sigue en inglés. Con lo que hay cargado hoy correspondería español y la dirección de Mar del Plata. Regeneralo solo si querés que use lo nuevo."), html);
+  assert.ok(!/dirección (anterior|vieja)|sigue con/.test(html));
+});
+
+test("a draft whose language matches carries no stale note", () => {
+  assert.ok(!card(member("es")).includes("El borrador no cambió"));
+});
+
+test("the English dictionary words the same new keys as plain strings", () => {
+  for (const k of ["countryLabel", "countryNone", "countryEditAria", "countryInputAria", "countrySave", "countryCancel", "countrySaveFailed", "companyCountryOpenAria", "languageGroupAria", "languageEsOption", "languageEnOption"] as const) {
+    assert.equal(typeof en.sequences.audience[k], "string", k);
+    assert.equal(typeof es.sequences.audience[k], "string", k);
+  }
+  assert.equal(typeof en.sequences.languageMismatch.staleNote, "string");
+  assert.equal(typeof es.sequences.languageMismatch.staleNote, "string");
+});

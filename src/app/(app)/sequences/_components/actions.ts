@@ -1,3 +1,4 @@
+import type { AudienceLanguage } from "@/lib/sequences/complianceAudience";
 import type { CardActionId } from "@/lib/sequences/memberCard";
 import type { SendChoice } from "@/lib/sequences/sendMoment";
 
@@ -12,8 +13,12 @@ export type DetailAction =
   | { type: "approveWith"; memberId: string; when: SendChoice }
   /** "Cambiar" (a chosen time) or "Enviar ahora" on an approved card. */
   | { type: "reschedule"; memberId: string; when: SendChoice }
-  /** The card's "idioma" menu: open the language dialog for this member, or clear the stored choice. */
+  /** The card's language control: "chooseLanguage" opens the language dialog for this member, "resetLanguage" clears the stored choice. */
   | { type: "chooseLanguage" | "resetLanguage"; memberId: string }
+  /** The card's country line: save the PERSON's own country through the contact property edit. Answers `true` once saved. Never touches a draft. */
+  | { type: "setPersonCountry"; memberId: string; personId: string; country: string }
+  /** The segmented language control: record this language as the member's choice (no dialog, nothing is regenerated). */
+  | { type: "setLanguage"; memberId: string; language: AudienceLanguage }
   /** "Mantener en {idioma}" on a draft in another language: record the draft's own language as this member's one-off choice. Generates nothing. */
   | { type: "keepLanguage"; memberId: string }
   /** Only asks to start: the confirmation is `OptOutDialog`, which states the scope before anything is recorded. */
