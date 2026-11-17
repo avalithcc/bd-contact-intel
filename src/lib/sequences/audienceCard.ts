@@ -8,6 +8,7 @@ import { formatArgentinaDayMonth } from "@/lib/i18n/format";
 import type { DetailMember } from "./detailQueries";
 import { resolveDraftLanguage, type ResolvedDraftLanguage } from "./languageChoice";
 import { languageMismatch, type LanguageMismatch } from "./languageMismatch";
+import type { AudienceLanguage, ComplianceAddress } from "./complianceAudience";
 
 /** Who set the preferred language and when, as the card and the dialog quote it. Null when there is no history row: they then say nothing about it rather than "cargado por ?". */
 export function preferredStamp(p: { byName: string | null; at: Date | null }): { by: string; when: string } | null {
@@ -23,6 +24,39 @@ export function memberLanguage(m: { audience?: MemberAudience; languageChoice?: 
 export function memberDraftMismatch(m: Pick<DetailMember, "state" | "draft" | "audience" | "languageChoice" | "preferredLanguage">): LanguageMismatch | null {
   if (m.state !== "drafted" || !m.draft) return null;
   return languageMismatch(m.draft.language, memberLanguage(m)?.language ?? null);
+}
+
+/**
+ * "This stored draft no longer matches what the audience resolves to now". Built ONLY on what is provable: the draft's stored
+ * `language` against the language memberLanguage answers today (the same comparison as memberDraftMismatch), plus the address the
+ * audience resolves to now.
+ *
+ * What it deliberately does NOT carry: the address the draft was composed with. `sequence_draft` stores `language` but not the
+ * address, so a draft whose country moved from Argentina to the United States while its language stayed the same drifted in
+ * address and this cannot see it. Callers must never word the warning as "the draft has the old address".
+ */
+export interface DraftDrift { readonly draft: AudienceLanguage; readonly now: AudienceLanguage; readonly address: ComplianceAddress }
+export function draftDrift(m: Pick<DetailMember, "state" | "draft" | "audience" | "languageChoice" | "preferredLanguage">): DraftDrift | null {
+  const mismatch = memberDraftMismatch(m);
+  const address = m.audience?.audience?.address;
+  return mismatch && address ? { ...mismatch, address } : null;
+}
+
+/** What the card shows under the headline: the person's own country (editable) and, only when it decided the audience, the company's (read-only, linked). */
+export interface CountryLine { readonly person: string | null; readonly company: { readonly name: string; readonly country: string; readonly key: string } | null }
+export function countryLine(m: Pick<DetailMember, "personCountry" | "companyCountry" | "company" | "companyKey" | "audience">): CountryLine {
+  const person = m.personCountry?.trim() || null;
+  const country = m.companyCountry?.trim();
+  const decided = m.audience?.reason === "company_country";
+  return { person, company: decided && country && m.company && m.companyKey ? { name: m.company, country, key: m.companyKey } : null };
+}
+
+/** What a click on the segmented language control does: nothing (already in force), clear the choice (it is the resolved one), or set it. */
+export type LanguagePick = { kind: "none" } | { kind: "reset" } | { kind: "set"; language: AudienceLanguage };
+export function languagePick(m: Pick<DetailMember, "audience" | "languageChoice" | "preferredLanguage">, clicked: AudienceLanguage): LanguagePick {
+  const current = memberLanguage(m);
+  if (!current || current.language === clicked) return { kind: "none" };
+  return clicked === current.baseline ? { kind: "reset" } : { kind: "set", language: clicked };
 }
 
 /**
