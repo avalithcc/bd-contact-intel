@@ -263,3 +263,24 @@ test("PRODUCER step 2 reminder: stays in the language step 1 was written in even
   assert.ok(reminder.body.includes(OPT_OUT_TEXT.en) && !reminder.body.includes(OPT_OUT_TEXT.es));
   assert.equal(reminder.language, "en");
 });
+
+test("PRODUCER reminder subject: step 2 stores 'Re: ' + step 1's subject, never the generator's; step 1 keeps the generator's", async () => {
+  const { db } = await import("@/db");
+  const { sequenceDraft, sequenceMember } = await import("@/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+  const { generateMemberDraft, generateReminderDraft, regenerateReminderDraft } = await import("@/lib/sequences/draftQueries");
+  const m = await mkMember("remsubj");
+  // Every call returns a different subject, so a reminder that used the generator's could never match by coincidence.
+  let n = 0;
+  const varying = { siteUrl: "https://example.test", generate: (async (input: Input) => ({ ...(await generate(input)), subject: `Generated subject ${++n}` })) as never };
+  await generateMemberDraft(bdId, sequenceId, m.memberId, varying);
+  const step1 = (await db.select().from(sequenceDraft).where(and(eq(sequenceDraft.sequenceMemberId, m.memberId), eq(sequenceDraft.step, 1))))[0];
+  assert.equal(step1.subject, "Generated subject 1", "step 1 still comes from the generator");
+  await db.update(sequenceMember).set({ state: "sent" }).where(eq(sequenceMember.id, m.memberId));
+  assert.equal(await generateReminderDraft(bdId, sequenceId, m.memberId, varying), "generated");
+  const step2 = async () => (await db.select().from(sequenceDraft).where(and(eq(sequenceDraft.sequenceMemberId, m.memberId), eq(sequenceDraft.step, 2))))[0];
+  assert.equal((await step2()).subject, "Re: Generated subject 1");
+  await regenerateReminderDraft(bdId, sequenceId, m.memberId, varying);
+  assert.equal((await step2()).subject, "Re: Generated subject 1", "a regenerated reminder keeps the inherited subject");
+  assert.ok(n >= 3, "the generator was called (and ignored) for the reminder");
+});
