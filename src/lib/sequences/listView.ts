@@ -37,8 +37,17 @@ export function listView(rows: readonly SequenceListRow[]) {
     //
     // `total > 0` matters: an empty Sequence has no member outside the closed states either, but it is not finished —
     // nothing was ever sent — and labelling it so would be a lie in the opposite direction.
+    // Reminders written and waiting for approval. A member in the sent state is not idle while one of these exists,
+    // and nothing on this screen said so: a Sequence with six sent members and four unapproved reminders read exactly
+    // like one with nothing left to do, which is how the owner came to ask why it was not marked finished.
+    // Only on members still OPEN. A member can reach no_reply with its reminder draft never approved: the reply window
+    // closed, so that reminder will never go out and is not work anyone can do. Counting it produced a row reading
+    // "Terminada" and "2 recordatorios por aprobar" at the same time, which is worse than the silence it replaced.
+    const remindersToReview = r.members.filter(
+      (m) => m.reminderToReview === true && !(CLOSED_STATES as readonly string[]).includes(m.state),
+    ).length;
     const finished = stats.total > 0 && r.members.every((m) => (CLOSED_STATES as readonly string[]).includes(m.state));
-    return { id: r.id, name: r.name, createdAt: r.createdAt, total: stats.total, counts, finished, segments: stats.segments, companies: r.companies, cap: r.dailySendCap, capHigh: r.dailySendCap > DAILY_SEND_CAP_WARN_ABOVE, afterDays: r.schedule.step2.afterDays, nextReleaseAt: stats.nextReleaseAt, owner: r.owner };
+    return { id: r.id, name: r.name, createdAt: r.createdAt, total: stats.total, counts, finished, remindersToReview, segments: stats.segments, companies: r.companies, cap: r.dailySendCap, capHigh: r.dailySendCap > DAILY_SEND_CAP_WARN_ABOVE, afterDays: r.schedule.step2.afterDays, nextReleaseAt: stats.nextReleaseAt, owner: r.owner };
   });
   const releases = views.flatMap((v) => (v.nextReleaseAt ? [v.nextReleaseAt.getTime()] : []));
   const sum = (pick: (v: (typeof views)[number]) => number) => views.reduce((acc, v) => acc + pick(v), 0);

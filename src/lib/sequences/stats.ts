@@ -23,13 +23,19 @@ export type StatMember = {
   scheduledFor: Date | null;
   /** When step 1 went out; null if it never did. Drives "Enviados" and "No contactables". */
   sentAt: Date | null;
+  /** A written step 2 reminder is waiting for approval: a member in the sent state carrying one is not idle.
+   * Optional because only the LIST reads it — the detail screen renders the reminder itself and has no such notion,
+   * so absent there is the truth rather than a `false` someone has to remember to pass. */
+  reminderToReview?: boolean;
   /** Why the member was discarded (`bounce`, `opt_out`, ...); null when it was not. */
   discardReason: string | null;
 };
 
 /** The one mapping from a detail member to what the stats read, so the screen cannot drop `sentAt` or `discardReason`. */
-export function toStatMember(m: { state: MemberState; sentAt: Date | null; discardReason: string | null; draft: { scheduledFor: Date | null } | null }): StatMember {
-  return { state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null, sentAt: m.sentAt, discardReason: m.discardReason };
+export function toStatMember(m: { state: MemberState; sentAt: Date | null; discardReason: string | null; draft: { scheduledFor: Date | null } | null; reminder?: { approvedAt: Date | null } | null }): StatMember {
+  // The DETAIL screen shows the reminder itself, so this count is only for the list; `reminder` is optional and
+  // absent there rather than faked.
+  return { state: m.state, hasDraft: m.draft !== null, scheduledFor: m.draft?.scheduledFor ?? null, sentAt: m.sentAt, discardReason: m.discardReason, reminderToReview: m.reminder != null && m.reminder.approvedAt === null };
 }
 
 const UNCONTACTABLE_REASONS = ["bounce", "opt_out"];
