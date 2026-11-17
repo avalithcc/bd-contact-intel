@@ -7,7 +7,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 (globalThis as { React?: unknown }).React = React;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { SubmitButton, SubmitButtonView, resolveSubmitState } = require("@/components/forms/SubmitButton") as typeof import("@/components/forms/SubmitButton");
+const { SubmitButton, resolveSubmitState } = require("@/components/forms/SubmitButton") as typeof import("@/components/forms/SubmitButton");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { BusyButton } = require("@/components/forms/BusyButton") as typeof import("@/components/forms/BusyButton");
 
 test("pending: disabled, busy flags, spinner and the pending label", () => {
   assert.deepEqual(resolveSubmitState(true, false, "Fusionar", "Fusionando…"), {
@@ -53,14 +55,14 @@ test("idle markup is a plain submit button that keeps className, aria-label and 
 
 test("pending markup: busy flags, disabled, spinner before the pending label", () => {
   assert.equal(
-    renderToStaticMarkup(createElement(SubmitButtonView, { pending: true, className: "btn", pendingLabel: "Fusionando…", children: "Fusionar" })),
+    renderToStaticMarkup(createElement(BusyButton, { pending: true, className: "btn", pendingLabel: "Fusionando…", children: "Fusionar" })),
     '<button type="submit" class="btn" disabled="" aria-busy="true" data-busy="true"><span class="spinner" aria-hidden="true"></span>Fusionando…</button>',
   );
 });
 
 test("pending icon-only markup: the spinner replaces the icon and the aria-label stays", () => {
   assert.equal(
-    renderToStaticMarkup(createElement(SubmitButtonView, { pending: true, className: "x", ariaLabel: "Eliminar vista", children: "×" })),
+    renderToStaticMarkup(createElement(BusyButton, { pending: true, className: "x", ariaLabel: "Eliminar vista", children: "×" })),
     '<button type="submit" class="x" disabled="" aria-label="Eliminar vista" aria-busy="true" data-busy="true"><span class="spinner" aria-hidden="true"></span></button>',
   );
 });
@@ -116,4 +118,58 @@ test("a spinner inside a non-.btn button takes the button's own text colour", ()
   assert.match(rule, /border-right-color:\s*transparent/);
   // The pairing is deliberate: the generic ring is the thing being overridden, so it must still be accent-topped.
   assert.match(css, /\.spinner\s*\{[^}]*border-top-color:\s*var\(--color-accent\)/);
+});
+
+test("BusyButton idle: no spinner, no aria-busy, keeps form/type/value for a footer button outside its form", () => {
+  const html = renderToStaticMarkup(
+    createElement(BusyButton, { pending: false, type: "button", form: "f1", value: "approve", className: "btn", pendingLabel: "Generando…", children: "Generar" }),
+  );
+  assert.equal(html, '<button type="button" class="btn" form="f1" value="approve">Generar</button>');
+  assert.doesNotMatch(html, /spinner|aria-busy/);
+});
+
+test("BusyButton pending: aria-busy is on the BUTTON itself, with exactly one spinner", () => {
+  const html = renderToStaticMarkup(createElement(BusyButton, { pending: true, form: "f1", className: "btn", pendingLabel: "Generando…", children: "Generar" }));
+  assert.match(html, /^<button [^>]*aria-busy="true"/);
+  assert.equal(html.match(/class="spinner"/g)?.length, 1);
+  assert.match(html, /disabled=""/);
+  assert.match(html, /Generando…<\/button>$/);
+});
+
+test("a caller's own disabled keeps an idle BusyButton disabled without a spinner or aria-busy", () => {
+  const html = renderToStaticMarkup(createElement(BusyButton, { pending: false, disabled: true, pendingLabel: "x", children: "Go" }));
+  assert.match(html, /disabled=""/);
+  assert.doesNotMatch(html, /spinner|aria-busy/);
+});
+
+/** The spinner JSX lives in BusyButton only: a site that draws its own next to the shared control would show two. */
+const BUSY_SITES = [
+  "src/app/(app)/contacts/[id]/GenerateMessageDialog.tsx",
+  "src/app/(app)/outreach/GenerateMessageButton.tsx",
+  "src/app/(app)/account/email/never-log/NeverLogManager.tsx",
+  "src/app/(app)/account/SignatureEditor.tsx",
+  "src/app/(app)/admin/absorptions/ApplyDialog.tsx",
+  "src/app/(app)/leads/UploadLeadsForm.tsx",
+  "src/app/(app)/sequences/_components/BulkBar.tsx",
+  "src/app/(app)/sequences/_components/CountryLine.tsx",
+  "src/app/(app)/sequences/_components/EditSequenceDialog.tsx",
+  "src/app/(app)/sequences/_components/ReviewDialog.tsx",
+  "src/app/(app)/sequences/_components/SequenceCreateForm.tsx",
+  "src/app/(auth)/account/password/PasswordForm.tsx",
+  "src/app/(auth)/forgot-password/ForgotPasswordForm.tsx",
+  "src/app/(auth)/login/LoginForm.tsx",
+  "src/app/UploadForm.tsx",
+];
+
+test("every busy site uses BusyButton and draws no spinner of its own", () => {
+  for (const f of BUSY_SITES) {
+    const src = readFileSync(f, "utf8");
+    assert.match(src, /<BusyButton\b/, `${f} lost the shared busy control`);
+    assert.doesNotMatch(src, /className=["']spinner["']/, `${f} draws its own spinner next to the shared control`);
+  }
+});
+
+test("BusyButton is the only component that renders the button spinner", () => {
+  assert.match(readFileSync("src/components/forms/BusyButton.tsx", "utf8"), /className="spinner"/);
+  assert.doesNotMatch(readFileSync("src/components/forms/SubmitButton.tsx", "utf8"), /className="spinner"/);
 });

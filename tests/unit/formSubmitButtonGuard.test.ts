@@ -54,6 +54,8 @@ function scan(root: string, outsideAllowed: Set<string> = OUTSIDE_FORM_SUBMITS):
       }
       // Exempt file: this form must be driven by a pending flag, on the form itself or on every submit button. A form
       // with no button inside submits from a form="id" button elsewhere in the file (a Dialog footer): that one must carry it.
+      // A BusyButton takes a required `pending` prop (type-checked), so it IS the pending feedback: a form whose submit is one has no bare button.
+      if (buttons.length === 0 && /<BusyButton\b/.test(text)) continue;
       const openTag = form.match(new RegExp(String.raw`^<form\b${TAG}`))?.[0] ?? "";
       const submits = buttons.length > 0 ? buttons : allButtons.filter((b) => /\bform=/.test(b) && !NOT_SUBMIT.test(b));
       if (!PENDING.test(openTag) && !(submits.length > 0 && submits.every((b) => PENDING.test(b)))) offenders.push(file);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { t } from "@/lib/i18n/dictionaries";
 import type { Locale } from "@/lib/i18n/locales";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 export function ForgotPasswordForm({ locale }: { locale: Locale }) {
   const dict = t(locale);
@@ -61,9 +62,9 @@ export function ForgotPasswordForm({ locale }: { locale: Locale }) {
           />
         </div>
         {!sent && (
-          <button type="submit" disabled={busy}>
-            {busy ? dict.common.ellipsis : dict.forgotPassword.submit}
-          </button>
+          <BusyButton pending={busy} pendingLabel={dict.common.ellipsis}>
+            {dict.forgotPassword.submit}
+          </BusyButton>
         )}
         {sent && (
           <p className="muted mb-0">{dict.forgotPassword.genericConfirmation}</p>

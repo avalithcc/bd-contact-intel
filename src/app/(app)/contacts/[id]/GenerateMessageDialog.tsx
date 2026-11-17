@@ -10,6 +10,7 @@ import { splitEmailDraft } from "@/lib/outreach/emailDraftFormat";
 import type { OutreachChannel } from "@/lib/outreach/channel";
 import { DEFAULT_OUTREACH_CHANNEL } from "@/lib/outreach/channel";
 import { DEFAULT_MESSAGE_LANGUAGE, type MessageLanguage } from "@/lib/outreach/messageLanguage";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 /**
  * "Generar mensaje" dialog (mockups/contact-record.html #generate): Canal +
@@ -88,9 +89,9 @@ export function GenerateMessageDialog({
       wide
       footer={
         <>
-          <button type="submit" form={formId} className="btn btn-ghost left" disabled={pending}>
-            {pending ? l.generatingMessage : state?.ok ? l.regenerateMessage : l.generateMessageGenerateAction}
-          </button>
+          <BusyButton pending={pending} pendingLabel={l.generatingMessage} form={formId} className="btn btn-ghost left">
+            {state?.ok ? l.regenerateMessage : l.generateMessageGenerateAction}
+          </BusyButton>
           <button type="button" className="btn btn-secondary" onClick={handleCopy} disabled={pending || !draft.trim()}>
             {copied ? l.copiedMessage : l.copyMessage}
           </button>

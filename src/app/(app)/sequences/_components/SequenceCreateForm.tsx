@@ -15,6 +15,7 @@ import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnCreateSequence } from "./actions";
 import { RosterPicker } from "./RosterPicker";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 /** "Elegiste {n} contactos de {c} empresas" with the two numbers in bold, as the mockup draws it. */
 function chosenLine(template: string, vars: { n: number; c: number; contacts: string; companies: string }): ReactNode[] {
@@ -109,7 +110,7 @@ export function SequenceCreateForm({ contacts, hasMore, loadPage, industryCounts
           {attempted && blockedReason && <span className="error-text" role="alert">{blockedReason}</span>}
           {error && <span className="error-text" role="alert">{error}</span>}
           <Link className="btn btn-ghost" href="/sequences">{l.newCancel}</Link>
-          <button type="submit" className="btn btn-primary" disabled={v.blocked || busy}>{submitLabel}</button>
+          <BusyButton pending={busy} pendingLabel={submitLabel} className="btn btn-primary" disabled={v.blocked}>{submitLabel}</BusyButton>
         </div>
       </form>
     </>

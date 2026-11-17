@@ -4,6 +4,7 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { Dialog } from "@/components/Dialog";
 import { CheckIcon, WarningIcon } from "@/components/icons";
 import { confirmationMatches } from "@/lib/companies/absorptionReview";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 type Labels = Record<"open" | "title" | "body" | "confirm" | "audit" | "cancel", string>;
 
@@ -60,9 +61,9 @@ export function ApplyDialog({
             <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)} disabled={pending}>
               {labels.cancel}
             </button>
-            <button type="submit" form={formId} className="btn btn-primary" disabled={pending || !confirmationMatches(typed, expectedName)}>
+            <BusyButton pending={pending} pendingLabel={labels.open} form={formId} className="btn btn-primary" disabled={!confirmationMatches(typed, expectedName)}>
               {labels.open}
-            </button>
+            </BusyButton>
           </>
         }
       >

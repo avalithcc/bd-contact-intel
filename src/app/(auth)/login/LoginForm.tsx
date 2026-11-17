@@ -11,6 +11,7 @@ import { isCaptureNextPath } from "@/lib/contacts/linkedinCapture";
 import { InfoIcon } from "@/components/icons";
 import { PASSWORD_RESET_ENABLED } from "@/lib/auth/passwordReset";
 import { ALLOWED_WORK_EMAIL_DOMAIN } from "@/lib/auth/allowedEmail";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 export function LoginForm({
   locale,
@@ -103,9 +104,9 @@ export function LoginForm({
           />
         </div>
         <div className="legacy-row">
-          <button type="submit" disabled={busy}>
-            {busy ? dict.common.ellipsis : dict.login.signIn}
-          </button>
+          <BusyButton pending={busy} pendingLabel={dict.common.ellipsis}>
+            {dict.login.signIn}
+          </BusyButton>
         </div>
         {msg && (
           <p className="muted mb-0 mt-md">

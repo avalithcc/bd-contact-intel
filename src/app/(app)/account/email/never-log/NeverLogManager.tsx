@@ -5,6 +5,7 @@ import { CloseIcon, MailIcon, PlusIcon } from "@/components/icons";
 import { addNeverLogEntryAction, removeNeverLogEntryAction } from "../neverLogActions";
 import type { EmailNeverLog } from "@/db/schema";
 import type { NeverLogKind } from "@/lib/gmail/neverLogRules";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 export interface NeverLogLabels {
   sectionTitle: string;
@@ -113,10 +114,10 @@ export function NeverLogManager({ initialEntries, labels: l }: { initialEntries:
           {error}
         </p>
       )}
-      <button type="submit" className="btn btn-secondary btn-sm" disabled={busy}>
+      <BusyButton pending={busy} className="btn btn-secondary btn-sm" pendingLabel={l.addButton}>
         <PlusIcon className="icon" />
         {l.addButton}
-      </button>
+      </BusyButton>
     </>
   );
 

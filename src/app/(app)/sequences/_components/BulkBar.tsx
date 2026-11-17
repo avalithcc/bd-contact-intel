@@ -14,6 +14,7 @@ import { nameList } from "@/lib/sequences/detailFlow";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnBulkAction } from "./actions";
 import { approvalSchedule, cadenceHint, type SequenceSendContext } from "./sendContext";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 /**
  * `selection` is every selected row with its reviewed flag: the counter and the gate are computed from it, nothing else.
@@ -102,7 +103,7 @@ export function RemoveReasonDialog({ open, count, labels: l, onClose, onConfirm,
   const id = useId();
   return (
     <Dialog open={open} onClose={onClose} title={l.bulkRemove} closeDisabled={busy}
-      footer={<><button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>{l.bulkRemoveCancel}</button><button type="submit" form={id} className="btn btn-primary" disabled={busy}>{l.bulkRemoveConfirm}</button></>}>
+      footer={<><button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>{l.bulkRemoveCancel}</button><BusyButton pending={busy} pendingLabel={l.bulkRemoveConfirm} form={id} className="btn btn-primary">{l.bulkRemoveConfirm}</BusyButton></>}>
       <form id={id} className="stack" onSubmit={(e) => { e.preventDefault(); const reason = String(new FormData(e.currentTarget).get("reason") ?? "").trim(); if (reason) onConfirm(reason); }}>
         <p>{fill(count === 1 ? l.bulkRemoveBodyOne : l.bulkRemoveBody, { n: count })}</p>
         <div className="field"><label className="label" htmlFor={`${id}-reason`}>{l.bulkRemoveReason}</label><input className="input" id={`${id}-reason`} name="reason" type="text" required /></div>

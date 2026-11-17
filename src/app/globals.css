@@ -1301,15 +1301,6 @@ a:hover {
   border-color: var(--color-accent);
 }
 
-/* "Generating…" indicator shown in place of the button while the server
-   action is pending. */
-.generate-message-pending {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-ink-soft);
-  font-size: var(--text-base);
-}
 .spinner {
   width: 1rem;
   height: 1rem;

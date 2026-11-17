@@ -7,6 +7,7 @@ import type { CountryLine as CountryLineView } from "@/lib/sequences/audienceCar
 import { countryOptionsFor } from "@/lib/sequences/countryOptions";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnAction } from "./actions";
+import { BusyButton } from "@/components/forms/BusyButton";
 
 /**
  * "País: Chile ✎ · Flybondi: Argentina ↗" under the headline. The person's own country is edited here; the container performs the
@@ -75,7 +76,7 @@ export function CountryLine({ view, memberId, personId, name, l, onAction }: { v
               <option key={`${o.iso}-${o.label}`} value={o.label}>{o.label}</option>
             ))}
           </select>
-          <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>{t.countrySave}</button>
+          <BusyButton pending={busy} pendingLabel={t.countrySave} className="btn btn-primary btn-sm">{t.countrySave}</BusyButton>
           <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setEditing(false)}>{t.countryCancel}</button>
         </form>
       ) : editable ? (
