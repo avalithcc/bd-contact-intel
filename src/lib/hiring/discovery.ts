@@ -138,6 +138,9 @@ export async function getCandidateCompanies(
       mode() within group (order by c.company) as display_name,
       count(*)::int as contact_count
     from contact c
+    -- Only to tell "never probed" from "probed and past cooldown" in the ORDER BY. company_probe is keyed by
+    -- company_key, so this cannot fan the rows out, and the grouping is unchanged.
+    left join company_probe cp_order on cp_order.company_key = c.company_key
     where c.company_key is not null and c.company_key != ''
       and not exists (
         select 1 from target_company tc where tc.company_key = c.company_key
@@ -160,7 +163,15 @@ export async function getCandidateCompanies(
       )
     group by c.company_key
     having min(coalesce(c.company_category, 'unclassified')) not in (${excluded})
-    order by count(*) desc
+    -- Never-probed companies come FIRST, and only then the densest.
+    --
+    -- Ordering by contact count alone starved the backlog. PROBE_COOLDOWN_DAYS is 30, the first sweep ran two months
+    -- ago, so every company probed back then is eligible again — and they are the dense ones, so they sort above every
+    -- company that has never been looked at. Measured on 2026-11-16: a 200-company run recorded 2 new rows in
+    -- company_probe and left the never-probed count completely unmoved. The run was re-checking the same companies.
+    --
+    -- A re-probe is still worth doing (a company can adopt an ATS later), it just must not come before a first look.
+    order by (min(cp_order.last_probed_at) is null) desc, count(*) desc
     limit ${limit}
   `);
 
