@@ -936,6 +936,10 @@ export const es: typeof en = {
     toastNoteSaved: "Nota guardada.",
     toastTaskCreated: "Tarea creada.",
     toastEmailSent: "Correo enviado.",
+    toastEmailSentReturnsOwner: "Correo enviado. Vuelve a los seguimientos de {owner} a partir del {date}.",
+    toastEmailSentReturns: "Correo enviado. Vuelve a tus seguimientos a partir del {date}.",
+    toastEmailSentExcludedOwner: "Correo enviado. {owner} excluyó este grupo de rol de sus seguimientos, así que no le va a volver.",
+    toastEmailSentExcluded: "Correo enviado. Este cargo está excluido de tus seguimientos.",
     toastEmailScheduled: "Correo programado.",
     // --- scheduled-send slice 2 (envio-programado.html sections 2, 3, 4, 5) ---
     schedulePresetMonday: "Lunes 9:00 en Miami",

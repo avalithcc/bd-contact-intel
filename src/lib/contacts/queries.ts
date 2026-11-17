@@ -121,9 +121,15 @@ async function findPersonById(id: string): Promise<Person | undefined> {
  * updateContactProperty (propertyEditDb.ts), which guards inline.
  */
 export async function assertContactEditableById(personId: string): Promise<void> {
+  await loadEditableContact(personId);
+}
+
+/** Same guard, and hands back the row it already read so the caller needs no second query. */
+export async function loadEditableContact(personId: string): Promise<Person> {
   const row = await findPersonById(personId);
   if (!row) throw new ContactNotFoundError(personId);
   assertContactEditable(row);
+  return row;
 }
 
 /**
