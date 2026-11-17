@@ -8,11 +8,17 @@ import type { StatusReasonEvidence } from "@/lib/status/deriveStatus";
 // convention as src/lib/leads/labels.ts / src/lib/i18n/navLabels.ts.
 // `leadStatuses` is reused as-is: `person.status` and `lead.status` share
 // the same vocabulary (design D4).
-export type ContactRecordLabels = ClientStrings<Dictionary["contactRecord"]> & {
-  leadStatuses: Dictionary["leadStatuses"];
-  // Meeting copy shared with the Reuniones page (meeting-outcomes): the register dialog, the strip and the timeline cards.
-  meetings: Dictionary["meetings"];
-};
+// The intersection goes INSIDE `ClientStrings`, as it already does in src/lib/leads/labels.ts. Written the other way
+// round — `ClientStrings<contactRecord> & { leadStatuses; meetings }` — the two added slices escape the constraint
+// entirely, and a formatter added to `dict.meetings` would compile and then throw on every render of the contact
+// record and the contacts board. clientStrings.ts records that this shape has already caused production crashes.
+export type ContactRecordLabels = ClientStrings<
+  Dictionary["contactRecord"] & {
+    leadStatuses: Dictionary["leadStatuses"];
+    // Meeting copy shared with the Reuniones page (meeting-outcomes): the register dialog, the strip and the timeline cards.
+    meetings: Dictionary["meetings"];
+  }
+>;
 
 export function pickContactRecordLabels(dict: Dictionary): ContactRecordLabels {
   return { ...dict.contactRecord, leadStatuses: dict.leadStatuses, meetings: dict.meetings };
