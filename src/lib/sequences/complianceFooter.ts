@@ -19,7 +19,13 @@ function entryFor(config: ComplianceConfig, address: ComplianceAddress): Address
 export function buildFooter(config: ComplianceConfig, address: ComplianceAddress, language: AudienceLanguage, unsubscribeUrl: string): FooterResult {
   const entry = entryFor(config, address);
   if (!entry) return { status: "unmapped", address };
-  return { status: "ok", text: `--\n${entry.postalAddress}\n\n${OPT_OUT_TEXT[language]}\n${unsubscribeUrl}` };
+  // ONE content line under the dashes. The dashes line itself stays because `splitFooter` keys on it (a dashes line
+  // followed by an exact configured address) and because a plain-text email, sent when the BD has no signature, has no
+  // other way to mark where the message ends. In the HTML path the dashes are dropped at render: see composeRelease.ts.
+  //
+  // Size is NOT the lever here. The HTML footer is already at MIN_FOOTER_PX, a floor set deliberately: a footer nobody
+  // can read carries the same legal exposure as no footer. Fewer lines is the only honest way to make it smaller.
+  return { status: "ok", text: `--\n${entry.postalAddress} · ${OPT_OUT_TEXT[language]} ${unsubscribeUrl}` };
 }
 
 /** The generated body, then a blank line, then the footer. Used for step 1 and for the reminder. */

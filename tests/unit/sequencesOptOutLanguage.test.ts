@@ -17,8 +17,11 @@ const SIGNATURE = '<table><tr><td><b>Jane Doe</b><br>BD Lead</td></tr></table>';
 const ADDRESSES = ["mdp", "miami"] as const;
 const LANGUAGES = ["es", "en"] as const;
 
-const ENGLISH = 'If you would rather not receive further emails from us, use the link below or simply reply with "unsubscribe".';
-const SPANISH = 'Si prefieres no recibir más correos nuestros, usa el enlace de abajo o simplemente responde a este mensaje con la palabra "baja".';
+const ENGLISH = 'To stop receiving these emails, use the link or reply "unsubscribe".';
+/** Retired 2026-11-17 but still stripped: replies quoting an email we already sent must not read as a fresh opt-out. */
+const ENGLISH_RETIRED = 'If you would rather not receive further emails from us, use the link below or simply reply with "unsubscribe".';
+const SPANISH = 'Para no recibir más correos, usa el enlace o responde "baja".';
+const SPANISH_RETIRED = 'Si prefieres no recibir más correos nuestros, usa el enlace de abajo o simplemente responde a este mensaje con la palabra "baja".';
 
 test("the two sentences are pinned by literal text, and the language keys are exactly es and en", () => {
   assert.equal(OPT_OUT_TEXT.en, ENGLISH);
@@ -43,7 +46,7 @@ test("the footer carries the sentence of its language, for both addresses and bo
 test("MIGRATION GUARD: bodyHasFooter accepts a body holding EITHER sentence, for either address", () => {
   for (const address of ADDRESSES) {
     for (const sentence of [ENGLISH, SPANISH]) {
-      const body = `Hi\n\n--\n${COMPLIANCE_CONFIG[address]!.postalAddress}\n\n${sentence}\n${URL_OK}`;
+      const body = `Hi\n\n--\n${COMPLIANCE_CONFIG[address]!.postalAddress} · ${sentence} ${URL_OK}`;
       assert.equal(bodyHasFooter(body, COMPLIANCE_CONFIG, address), true, `${address}: ${sentence.slice(0, 12)}`);
       assert.equal(footerRemovedOnSave(body, address), false);
       assert.equal(complianceRefusal(address, body, COMPLIANCE_CONFIG), null, "an already stored English draft still passes the send gate");
@@ -85,7 +88,7 @@ test("the composed email for a Spanish audience has the Spanish sentence above a
       accountEmail: "sender@mailbox.test", step1RfcMessageId: null, step1ThreadId: null, signatureHtml: SIGNATURE,
     });
     const h = msg.bodyHtml ?? "";
-    const iSentence = h.indexOf("Si prefieres no recibir");
+    const iSentence = h.indexOf("Para no recibir más correos");
     const iLink = h.indexOf(`<a href="${URL_OK}"`);
     assert.ok(iSentence >= 0 && iLink > iSentence, `${address}: ${h}`);
     const anchors = [...h.matchAll(/<a href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].filter(([, href]) => href.includes("/api/unsubscribe"));
@@ -138,7 +141,7 @@ test("a Spanish reply that only QUOTES our Spanish footer raises no prompt (it l
   assert.equal(detectOptOutPhrase(`Gracias!\n\n${OPT_OUT_TEXT.es.replace(/ (usa|simplemente) /g, "\n$1 ")}`), null, "re-wrapped by a mail client");
   // Not under a ">" and not under an attribution line, so ONLY the KNOWN_FOOTER_TEXT strip can silence it (the old
   // "El lun escribió:\n> ..." variant was silenced by the ">" stripping and never exercised the strip).
-  assert.equal(detectOptOutPhrase(`Dale.\n\n--\n${f}\n\n${OPT_OUT_TEXT.es}`), null);
+  assert.equal(detectOptOutPhrase(`Dale.\n\n--\n${f} · ${OPT_OUT_TEXT.es}`), null);
 });
 
 test("baja is deliberately noisy: the detector is advisory and leans toward a prompt (owner decision)", () => {
@@ -236,4 +239,15 @@ test("recall: an opt-out that names a replacement contact is still flagged (the 
     "no me contacten, el responsable es +54 11 5555 5555",
   ];
   assert.deepEqual(optOuts.filter((b) => detectOptOutPhrase(b) === null), []);
+});
+
+/**
+ * The reason `ALL_OPT_OUT_TEXTS` keeps retired sentences. Every email already sent carries the OLD wording, and a reply
+ * quoting it must still be stripped before the detector looks for a request — otherwise the quoted "baja" reads as a
+ * fresh one and raises a false opt-out on a contact who never asked.
+ */
+test("a reply quoting a RETIRED footer sentence is still not an opt-out", () => {
+  for (const retired of [SPANISH_RETIRED, ENGLISH_RETIRED]) {
+    assert.equal(detectOptOutPhrase(`Gracias, lo veo.\n\n${retired}\n${URL_OK}`), null, retired.slice(0, 40));
+  }
 });

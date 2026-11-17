@@ -33,12 +33,28 @@ export type ComplianceConfig = Readonly<Partial<Record<ComplianceAddress, Addres
  * detector also strips every sentence here before matching (ALL_OPT_OUT_TEXTS), so quoting our footer never raises a prompt.
  */
 export const OPT_OUT_TEXT: Readonly<Record<AudienceLanguage, string>> = {
-  en: "If you would rather not receive further emails from us, use the link below or simply reply with \"unsubscribe\".",
-  es: "Si prefieres no recibir más correos nuestros, usa el enlace de abajo o simplemente responde a este mensaje con la palabra \"baja\".",
+  en: "To stop receiving these emails, use the link or reply \"unsubscribe\".",
+  es: "Para no recibir más correos, usa el enlace o responde \"baja\".",
 };
 
-/** Every configured sentence in every language: what the send gate accepts and what the detector strips. */
-export const ALL_OPT_OUT_TEXTS: readonly string[] = Object.values(OPT_OUT_TEXT);
+/**
+ * Sentences we no longer SEND but must still recognise.
+ *
+ * `ALL_OPT_OUT_TEXTS` is what the reply detector strips before looking for an opt-out request (optOutPhrases.ts) and
+ * what the send gate accepts (complianceFooter.ts#hasFooter). Drop a retired sentence from it and a reply quoting an
+ * email we already sent stops being stripped — the quoted "baja" then reads as a fresh request and raises a false
+ * opt-out prompt. Every email ever sent is forever, so this list only ever grows.
+ *
+ * Shortened on 2026-11-17 at the owner's request: the footer read as four lines in a plain-text email and the prose
+ * wrapped. The replyable word is unchanged, because it must stay one the detector recognises (PHRASES below).
+ */
+const RETIRED_OPT_OUT_TEXTS: readonly string[] = [
+  "If you would rather not receive further emails from us, use the link below or simply reply with \"unsubscribe\".",
+  "Si prefieres no recibir más correos nuestros, usa el enlace de abajo o simplemente responde a este mensaje con la palabra \"baja\".",
+];
+
+/** Every sentence, current and retired: what the send gate accepts and what the detector strips. */
+export const ALL_OPT_OUT_TEXTS: readonly string[] = [...Object.values(OPT_OUT_TEXT), ...RETIRED_OPT_OUT_TEXTS];
 
 export const COMPLIANCE_CONFIG: ComplianceConfig = {
   miami: {

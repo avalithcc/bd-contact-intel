@@ -47,6 +47,12 @@ function lines(text: string, link: string | null): string {
   return text.split(link).map(escape).join(anchor);
 }
 
+/*
+ * Why the dashes line survives in the HTML part too, even though the footer already sits in its own quieter div:
+ * the text/plain ALTERNATIVE is derived from this HTML (see gmail/send.ts), and that is the version a client without
+ * HTML shows. There the dashes are the only thing marking where the message ends. Stripping them to win one line of
+ * vertical space silently removed the separator from the fallback — caught by the plain-text ordering test.
+ */
 export function composeReleaseBody(
   body: string,
   signatureHtml: string | null | undefined,
