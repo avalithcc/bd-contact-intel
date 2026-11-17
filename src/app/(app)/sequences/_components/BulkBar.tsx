@@ -75,6 +75,28 @@ export function BulkBar({ selection, labels: l, onAction, send, recipients, cap,
   );
 }
 
+/**
+ * The bar for a selection of step-2 reminders: the count, the review gate and one plain approve button. No send split
+ * button, no cap warning, no "Quitar": a reminder is not scheduled by the BD, it follows the cadence.
+ */
+export function ReminderBulkBar({ selection, labels: l, onAction, lock }: { selection: readonly GateRow[]; labels: SequenceLabels; onAction: OnBulkAction; lock: GenerationLock }) {
+  const v = bulkBarView(selection);
+  if (!v.visible) return null;
+  const one = v.selected === 1;
+  const unopened = v.selected - v.reviewed;
+  const missing = fill(unopened === 1 ? l.reminderBulkMissingOne : l.reminderBulkMissing, { n: unopened });
+  const n = { n: v.selected };
+  return (
+    <div className="bulk-bar" role="region" aria-label={v.allReviewed ? l.bulkAriaAll : l.bulkAriaPartial}>
+      <span className="count">{fill(one ? l.bulkCountOne : l.bulkCount, n)}</span><span className="sep"></span>
+      <span>{fill(v.allReviewed ? l.reminderBulkReviewedAll : l.reminderBulkReviewed, { reviewed: v.reviewed, total: v.selected })}</span>
+      <span className="grow"></span>
+      <button type="button" className="btn btn-primary btn-sm" disabled={!v.approveEnabled || lock.bulkApproveDisabled} title={lock.bulkApproveDisabled ? l.generateBulkWaitTitle : !v.approveEnabled ? `${missing} ${l.bulkMissingPending}` : undefined} onClick={() => void onAction({ type: "approveReminders", memberIds: v.ids })}>{fill(one ? l.reminderBulkApproveOne : l.reminderBulkApprove, n)}</button>
+      {unopened > 0 && <p className="note"><strong>{missing}</strong> {l.bulkMissingPending}. {l.bulkBlockedWhy}</p>}
+    </div>
+  );
+}
+
 /** One reason for all the selected members. Controlled by the container, which closes it on success and keeps it open on failure. */
 export function RemoveReasonDialog({ open, count, labels: l, onClose, onConfirm, busy = false, error = null }: { open: boolean; count: number; labels: SequenceLabels; onClose: () => void; onConfirm: (reason: string) => void; busy?: boolean; error?: string | null }) {
   const id = useId();

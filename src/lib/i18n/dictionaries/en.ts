@@ -3958,6 +3958,14 @@ export const en = {
     bulkRemoveCancel: "Cancel",
     // Container copy for the routed pages (go-live): toasts, errors, the edit dialog. Plain strings with {n} placeholders.
     selectMember: "Select {name}",
+    reminderBulkReviewed: "{reviewed} of {total} reminders reviewed",
+    reminderBulkReviewedAll: "{reviewed} of {total} reminders already reviewed",
+    reminderBulkApprove: "Approve all {n} reminders",
+    reminderBulkApproveOne: "Approve the reminder",
+    reminderBulkMissing: "{n} reminders still",
+    reminderBulkMissingOne: "1 reminder still",
+    selectBlockedByReminders: "You already selected reminders. Deselect them to choose drafts.",
+    selectBlockedByDrafts: "You already selected drafts. Deselect them to choose reminders.",
     actionFailed: "The action could not be completed. Try again.",
     reviewErrors: {
       empty: "The subject and body cannot be empty.",
@@ -3993,6 +4001,8 @@ export const en = {
     toastApproved: "Approved. It goes out in the next send.",
     bulkRefusedLine: "{reason} Affected: {names}.",
     bulkRefusedMore: "+{n} more",
+    toastRemindersApprovedOne: "Reminder approved. It follows the cadence.",
+    toastRemindersApprovedMany: "{n} reminders approved. Each follows its own contact's cadence.",
     toastApprovedMany: "{n} drafts approved and scheduled.",
     toastCancelled: "Send cancelled. The contact is back in drafts.",
     toastSubjectRegenerated: "Subject regenerated. The body is unchanged, and the draft needs approving again.",

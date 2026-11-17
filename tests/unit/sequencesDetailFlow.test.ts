@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { approveStep, cardStep, gateRows, readyMemberIds, runReviewIntent, sameContent, summarizeRefusals } from "@/lib/sequences/detailFlow";
+import { prunedSelection, approveStep, cardStep, gateRows, isSelectableReminder, readyMemberIds, reminderGateRows, selectionBlocked, selectionStep, runReviewIntent, sameContent, summarizeRefusals } from "@/lib/sequences/detailFlow";
+import { bulkApprovalGate } from "@/lib/sequences/bulkApprovalGate";
 import type { DetailDraft, DetailMember } from "@/lib/sequences/detailQueries";
 
 const NOW = new Date("2026-10-15T15:00:00Z");
@@ -127,6 +128,49 @@ test("'Aprobar' on a card approves the reminder only when the card is the remind
   assert.equal(approveStep(neverWritten, NOW), 1, "a reminder that does not exist is never the thing being approved");
 });
 
+// --- bulk approve for step-2 reminders --------------------------------------------------------------------------
+
+const DUE = new Date("2026-10-15T13:00:00Z");
+const reminder = (id: string, over: Partial<DetailMember> = {}): DetailMember => member(id, { state: "sent", draft: draft(), reminderDueAt: DUE, reminderDraft: draft(), ...over });
+
+test("a due reminder with an unapproved draft is selectable; not-yet-due, already approved and no-draft are not", () => {
+  assert.equal(isSelectableReminder(reminder("due"), NOW), true);
+  assert.equal(isSelectableReminder(reminder("later", { reminderDueAt: new Date("2026-10-20T13:00:00Z") }), NOW), false);
+  assert.equal(isSelectableReminder(reminder("done", { reminderDraft: draft({ approvedAt: NOW }) }), NOW), false);
+  assert.equal(isSelectableReminder(reminder("none", { reminderDraft: null }), NOW), false);
+  assert.equal(isSelectableReminder(member("step1"), NOW), false, "a step-1 draft is not a reminder");
+});
+
+test("reminder rows take reviewed from the STEP-2 draft, and drop ids that are not selectable reminders", () => {
+  const members = [reminder("a", { reminderDraft: draft({ reviewedAt: NOW }), draft: draft() }), reminder("b"), reminder("c", { reminderDraft: null }), member("d")];
+  assert.deepEqual(reminderGateRows(members, ["a", "b", "c", "d", "gone"], NOW), [{ id: "a", reviewed: true, wrongLanguage: false }, { id: "b", reviewed: false, wrongLanguage: false }]);
+});
+
+test("the gate still blocks a reminder selection when a selected reminder was never opened", () => {
+  const members = [reminder("a", { reminderDraft: draft({ reviewedAt: NOW }) }), reminder("b")];
+  assert.equal(bulkApprovalGate(reminderGateRows(members, ["a", "b"], NOW)).enabled, false);
+  assert.equal(bulkApprovalGate(reminderGateRows(members, ["a"], NOW)).enabled, true);
+  // The step-1 draft's review must not unlock the reminder.
+  const m = reminder("x", { draft: draft({ reviewedAt: NOW }), reminderDraft: draft({ reviewedAt: null }) });
+  assert.equal(bulkApprovalGate(reminderGateRows([m], ["x"], NOW)).enabled, false);
+});
+
+test("a reminder bulk approve resolves to step 2; a draft bulk approve still resolves to step 1", () => {
+  const members = [reminder("r1"), reminder("r2"), member("d1"), member("d2")];
+  assert.equal(selectionStep(members, ["r1", "r2"], NOW), 2);
+  assert.equal(selectionStep(members, ["d1", "d2"], NOW), 1);
+  assert.equal(selectionStep(members, [], NOW), null);
+  assert.equal(selectionStep(members, ["gone"], NOW), null);
+});
+
+test("mixing is prevented: the other step's checkbox is disabled, but a ticked one can always be unticked", () => {
+  assert.equal(selectionBlocked(1, 2, false), true);
+  assert.equal(selectionBlocked(2, 1, false), true);
+  assert.equal(selectionBlocked(2, 2, false), false);
+  assert.equal(selectionBlocked(1, null, false), false, "nothing selected: both steps are open");
+  assert.equal(selectionBlocked(1, 2, true), false);
+});
+
 // --- a bulk refusal names the members it refused ----------------------------------------------------------------
 
 test("refusal groups: one group per reason, in first-seen order, naming at most 3 and counting the rest", () => {
@@ -178,4 +222,25 @@ test("an oversized bulk request reports its own reason to the review dialog, not
   const p = ports({ approve: async () => ({ ok: false, error: "too_many", limit: 200 }) });
   const r = await runReviewIntent("approve", { stored, text: stored }, p.ports);
   assert.deepEqual(r, { ok: false, error: "too_many", persisted: false });
+});
+
+// --- a ticked card that stops qualifying ------------------------------------------------------------------------
+
+/**
+ * The ghost tick. A selected draft is sent and its reminder falls due, so the selection holds both steps for a moment.
+ * Step 1 wins and the reminder id leaves the gate rows, but its checkbox stayed ticked and did nothing — and came back
+ * as a selection of one the instant the last draft was unticked. What is ticked must be what gets approved.
+ */
+test("a selected id the active step dropped is pruned out of the selection", () => {
+  assert.deepEqual(prunedSelection([{ id: "a" }], ["a", "ghost"]), ["a"]);
+  assert.deepEqual(prunedSelection([], ["ghost"]), [], "the last ghost leaves an empty selection, not a bar of one");
+});
+
+test("nothing to prune returns null, so the screen never loops setting the same selection", () => {
+  assert.equal(prunedSelection([{ id: "a" }, { id: "b" }], ["a", "b"]), null);
+  assert.equal(prunedSelection([{ id: "a" }], []), null);
+});
+
+test("pruning keeps the surviving ids and their order", () => {
+  assert.deepEqual(prunedSelection([{ id: "c" }, { id: "a" }], ["a", "ghost", "c"]), ["a", "c"]);
 });

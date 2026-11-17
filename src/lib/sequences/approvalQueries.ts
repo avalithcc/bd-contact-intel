@@ -125,7 +125,12 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
       const language = m && d ? { draft: d.language, today: languageNow(step, a?.language ?? null, { chosen: m.draftLanguage, preferred: a?.preferred }, step1Language.get(m.id)) } : undefined;
       const refusal = m && d ? complianceRefusal(a?.address ?? null, d.body, COMPLIANCE_CONFIG, language) : null;
       if (!m) rejected.push({ memberId: id, reason: "not_found" });
-      else if (!(step === 1 ? canTransition(m.state as MemberState, "approved", "approve") : m.state === "sent" && m.reminderDueAt !== null)) rejected.push({ memberId: id, reason: "not_approvable" });
+      // Step 1 cannot be re-approved because the member leaves "drafted"; a step 2 member STAYS "sent", so nothing
+      // stopped a second approval from rewriting approvedAt and recomputing scheduledFor against a later `now` —
+      // moving a send the BD had already settled. The unapprove path below has always guarded on approvedAt; this
+      // one never did. Reachable from a stale tab, and bulk approval widens it from one member to the selection.
+      // `d` undefined falls through to the no_draft branch, which keeps that reason distinct.
+      else if (!(step === 1 ? canTransition(m.state as MemberState, "approved", "approve") : m.state === "sent" && m.reminderDueAt !== null && (d?.approvedAt ?? null) === null)) rejected.push({ memberId: id, reason: "not_approvable" });
       else if (!d) rejected.push({ memberId: id, reason: "no_draft" });
       else if (step === 1 && !checkStep1Subject(d.subject).ok) rejected.push({ memberId: id, reason: "reply_prefix_subject" });
       else if (refusal) rejected.push({ memberId: id, reason: refusal });

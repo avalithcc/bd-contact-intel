@@ -3973,6 +3973,14 @@ export const es: typeof en = {
     bulkRemoveCancel: "Cancelar",
     // Container copy for the routed pages (go-live): toasts, errors, the edit dialog. Plain strings with {n} placeholders.
     selectMember: "Elegir a {name}",
+    reminderBulkReviewed: "{reviewed} de {total} recordatorios revisados",
+    reminderBulkReviewedAll: "{reviewed} de {total} recordatorios ya revisados",
+    reminderBulkApprove: "Aprobar los {n} recordatorios",
+    reminderBulkApproveOne: "Aprobar el recordatorio",
+    reminderBulkMissing: "{n} recordatorios todavía",
+    reminderBulkMissingOne: "1 recordatorio todavía",
+    selectBlockedByReminders: "Ya seleccionaste recordatorios. Deseleccionalos para elegir borradores.",
+    selectBlockedByDrafts: "Ya seleccionaste borradores. Deseleccionalos para elegir recordatorios.",
     actionFailed: "No se pudo completar la acción. Probá de nuevo.",
     reviewErrors: {
       empty: "El asunto y el cuerpo no pueden estar vacíos.",
@@ -4008,6 +4016,8 @@ export const es: typeof en = {
     toastApproved: "Aprobado. Sale en el próximo envío.",
     bulkRefusedLine: "{reason} Afectados: {names}.",
     bulkRefusedMore: "+{n} más",
+    toastRemindersApprovedOne: "Recordatorio aprobado. Sale según la cadencia.",
+    toastRemindersApprovedMany: "{n} recordatorios aprobados. Salen según la cadencia de cada contacto.",
     toastApprovedMany: "{n} borradores aprobados y programados.",
     toastCancelled: "Envío cancelado. El contacto volvió a borradores.",
     toastSubjectRegenerated: "Asunto regenerado. El cuerpo quedó igual, y el borrador vuelve a necesitar aprobación.",
