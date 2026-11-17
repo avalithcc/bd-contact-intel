@@ -91,3 +91,16 @@ to save the language as the contact's preferred one. The segmented control
 is a correction to this draft, not that question.
 
 **Desktop only, by owner direction.**
+
+## Correction after the owner read the card (2026-11-17)
+
+The address sat unlabelled beside the language, as `· Miami`. The owner — who
+commissioned this screen — asked whether Miami was where the contact lives. It is
+not: it is Avalith's own postal address, which CAN-SPAM requires in the footer, and
+it follows the contact's country (Argentina → Mar del Plata, everywhere else →
+Miami).
+
+Unlabelled, two values of completely different nature sat side by side separated by
+a dot, so both read as attributes of the person. It now carries the label the
+language dialog already used for the same thing, **Dirección legal**, rather than a
+second word for one concept, plus a `title` explaining where it comes from.

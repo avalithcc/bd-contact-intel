@@ -3789,6 +3789,7 @@ export const es: typeof en = {
       changingAfter: "Queda guardado para {name}: si regenerás el borrador, vuelve a salir en {chosen}.",
       warnEs: "El idioma resuelto para {name} es inglés. Escribirle en español solo tiene sentido si sabés que lo prefiere.",
       addressLabel: "Dirección legal",
+      addressCardTitle: "La dirección postal de Avalith que va en el pie del correo, exigida por CAN-SPAM. No es dónde vive el contacto: sale de su país, y Argentina usa Mar del Plata mientras el resto usa Miami.",
       addressFixed: "fija",
       addressWhy: "Sale de dónde está el destinatario ({where}), no del idioma. Elegir otro idioma no la cambia.",
       footerLabel: "Pie del correo, como lo va a leer el destinatario",

@@ -3785,6 +3785,7 @@ export const en = {
       changingAfter: "It is saved for {name}: if you regenerate the draft, it comes out in {chosen} again.",
       warnEs: "The resolved language for {name} is English. Writing in Spanish only makes sense if you know they prefer it.",
       addressLabel: "Legal address",
+      addressCardTitle: "Avalith's postal address in the email footer, required by CAN-SPAM. It is not where the contact lives: it follows their country, with Argentina using Mar del Plata and everywhere else Miami.",
       addressFixed: "fixed",
       addressWhy: "It comes from where the recipient is ({where}), not from the language. Choosing another language does not change it.",
       footerLabel: "Email footer, as the recipient will read it",
