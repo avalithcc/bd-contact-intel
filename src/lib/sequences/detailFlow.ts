@@ -12,7 +12,7 @@ import type { ApprovalRejection, ApproveResult } from "./approvalQueries";
 import type { DetailMember } from "./detailQueries";
 import type { GateRow } from "./bulkApprovalGate";
 import type { SaveEditResult } from "./draftQueries";
-import { mapMemberCard, type CardActionId } from "./memberCard";
+import { mapMemberCard, type CardActionId, type CardKind } from "./memberCard";
 import { memberDraftMismatch } from "./audienceCard";
 
 export type ReviewText = { subject: string; body: string };
@@ -68,11 +68,50 @@ export function gateRows(members: readonly DetailMember[], selected: readonly st
 /** Which draft a card action refers to: only the reminder action means step 2. */
 export const cardStep = (action: CardActionId): 1 | 2 => (action === "reviewReminder" || action === "viewReminder" || action === "cancelReminder" ? 2 : 1);
 
+/** The card the screen renders for a member (without the approved-moment detail, which never changes the kind). The single source of truth for what a card is. */
+const cardOf = (m: DetailMember, now: Date) => mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, reminderApproved: m.reminderDraft?.approvedAt != null, hasReminderDraft: m.reminderDraft !== null }, now);
+
 /** "Aprobar" on a card: the reminder when the card is the reminder-due-today card, step 1 otherwise. */
 export function approveStep(m: DetailMember, now: Date): 1 | 2 {
-  const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, reminderApproved: m.reminderDraft?.approvedAt != null, hasReminderDraft: m.reminderDraft !== null }, now);
-  return card.kind === "reminderToday" ? 2 : 1;
+  return cardOf(m, now).kind === "reminderToday" ? 2 : 1;
 }
+
+/** Which step a card of this kind can be selected for: a draft card is step 1, a reminder-due-today card is step 2, anything else is not selectable. */
+export const selectableStep = (kind: CardKind): 1 | 2 | null => (kind === "draft" ? 1 : kind === "reminderToday" ? 2 : null);
+
+/** A step-2 reminder the bulk bar can approve: the member's card is the reminder-due-today card (due, written, not yet approved). */
+export const isSelectableReminder = (m: DetailMember, now: Date): boolean => selectableStep(cardOf(m, now).kind) === 2;
+
+/** Bulk-bar rows for the selected reminders. Same gate as drafts: `reviewed` is the step-2 draft's own reviewedAt. wrongLanguage stays false: memberDraftMismatch is written against the step-1 draft, and the server refuses wrong_language anyway. */
+export function reminderGateRows(members: readonly DetailMember[], selected: readonly string[], now: Date): GateRow[] {
+  const byId = new Map(members.map((m) => [m.memberId, m]));
+  return selected.flatMap((id) => {
+    const m = byId.get(id);
+    return m && m.reminderDraft && isSelectableReminder(m, now) ? [{ id, reviewed: m.reminderDraft.reviewedAt !== null, wrongLanguage: false }] : [];
+  });
+}
+
+/** The step of the current selection: 1 (drafts), 2 (reminders) or null (nothing selectable). A selection is never mixed, so the first non-empty kind decides. */
+export function selectionStep(members: readonly DetailMember[], selected: readonly string[], now: Date): 1 | 2 | null {
+  if (gateRows(members, selected).length > 0) return 1;
+  return reminderGateRows(members, selected, now).length > 0 ? 2 : null;
+}
+
+/**
+ * The selection, reduced to the ids the active step will actually act on, or null when nothing has to change.
+ *
+ * A ticked card can stop qualifying under the user: a selected draft is sent and its reminder falls due, so the
+ * selection briefly holds both steps. Step 1 wins and the reminder id is dropped from the gate rows — but its checkbox
+ * stayed ticked, doing nothing, and came back as a selection of one the moment the last draft was unticked. What is
+ * ticked has to be what gets approved, so whatever the active step leaves behind is dropped from the selection too.
+ */
+export function prunedSelection(rows: readonly { id: string }[], selected: readonly string[]): string[] | null {
+  const live = new Set(rows.map((r) => r.id));
+  return selected.some((id) => !live.has(id)) ? selected.filter((id) => live.has(id)) : null;
+}
+
+/** Whether a card selectable for `cardStepOf` must have its checkbox disabled because the other step is selected. A ticked box is never disabled, so it can always be undone. */
+export const selectionBlocked = (cardStepOf: 1 | 2, active: 1 | 2 | null, checked: boolean): boolean => active !== null && active !== cardStepOf && !checked;
 
 /** The member states whose draft Regenerar may replace, per step. The server uses the same lists, so client and server agree on who is touched. */
 export const REGENERABLE_STATES: Record<1 | 2, readonly string[]> = { 1: ["drafted", "approved"], 2: ["sent"] };

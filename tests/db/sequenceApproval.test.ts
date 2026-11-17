@@ -535,3 +535,30 @@ test("the version the read produces marks the reminder (step 2), and a stale rem
     assert.deepEqual(await markDraftReviewed(bdId, stale.memberId, await shownVersion(stale.memberId, 2), 2), { ok: true });
   });
 });
+
+/**
+ * Step 1 cannot be re-approved because the member leaves "drafted". A step 2 member STAYS "sent", so nothing stopped a
+ * second approval from rewriting approvedAt and recomputing scheduledFor against a later `now` — moving a send the BD
+ * had already settled. Reachable from a stale tab, and bulk approval widened it from one member to a whole selection.
+ * The unapprove path has always guarded on approvedAt; this one did not.
+ */
+test("an already approved reminder is refused a second approval, and nothing about the first one moves", async () => {
+  const { approveBulk, approveMember } = await import("@/lib/sequences/approvalQueries");
+  const m = await mkSent("reapprove", { reviewed: true });
+  assert.equal((await approveMember(bdId, m.memberId, 2)).ok, true);
+  const first = await draftOf(m.memberId, 2);
+  assert.ok(first.approvedAt && first.scheduledFor, "the first approval settled a send");
+
+  const again = await approveMember(bdId, m.memberId, 2);
+  assert.equal(again.ok, false, "a second approval must be refused");
+  assert.deepEqual(again.ok === false && again.error === "rejected" ? again.rejected.map((r) => r.reason) : null, ["not_approvable"]);
+
+  // The bulk path is the one this widened: one stale id must not drag the selection's send times with it.
+  assert.equal((await approveBulk(bdId, [m.memberId], 2)).ok, false, "and refused in bulk too");
+
+  const after = await draftOf(m.memberId, 2);
+  assert.equal(after.approvedAt?.toISOString(), first.approvedAt?.toISOString(), "approvedAt must not be rewritten");
+  assert.equal(after.scheduledFor?.toISOString(), first.scheduledFor?.toISOString(), "and the scheduled send must not move");
+  const audit = await auditFor(m.personId, "sequence_member_approve");
+  assert.equal(audit.length, 1, "a refused approval writes no audit row");
+});

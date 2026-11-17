@@ -10,6 +10,7 @@ import { SendSplitButton } from "@/components/send/SendSplitButton";
 import { resolveRecipientZone, zoneClock } from "@/lib/sendSchedule/zones";
 import { slotOf } from "@/lib/sendSchedule/time";
 import { countryLine, draftDrift } from "@/lib/sequences/audienceCard";
+import { selectableStep, selectionBlocked } from "@/lib/sequences/detailFlow";
 import { showOptOutPrompt } from "@/lib/sequences/contactContext";
 import type { DetailMember } from "@/lib/sequences/detailQueries";
 import { approvedMoment, type ApprovedMoment } from "@/lib/sequences/approvedMoment";
@@ -195,7 +196,7 @@ function Actions({ card, m, l, onAction, generation, send, now, moment, reminder
 }
 
 /** `selection` makes a draft card selectable for the bulk bar (the spec's "selecting rows"); a card in any other state has nothing to select. */
-export type CardSelection = { selected: boolean; onToggle: () => void };
+export type CardSelection = { selected: boolean; onToggle: () => void; /** The step of the current selection (null: nothing selected). The other step's checkbox is disabled, never cleared. */ activeStep?: 1 | 2 | null };
 
 export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generation, send }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generation: GenerationLock; send: SequenceSendContext }) {
   const moment = m.state === "approved" && m.draft ? approvedMoment(m.draft, send.schedule, now) : null;
@@ -215,11 +216,14 @@ export function MemberCard({ member: m, now, labels: l, onAction, ownView, readO
   // A draft written in another language than today's cannot be approved or selected; the alert below it says why and offers the two exits.
   const mismatch = card.kind === "draft" ? draftDrift(m) : null;
   const mismatchVars = mismatch ? { draft: languageWord(mismatch.draft, l), now: languageWord(mismatch.now, l) } : null;
+  // A draft card is selectable for step 1, a reminder-due-today card for step 2; a selection is one step or the other, never mixed.
+  const selectStep = selectableStep(card.kind);
+  const otherStep = selection && selectStep !== null ? selectionBlocked(selectStep, selection.activeStep ?? null, selection.selected) : false;
   const generationLockTitle = generation.active ? fill(l.generateWaitTitle, { name: generation.generatingName ?? "" }) : undefined;
   return (
     <div className="card">
       <div className="card-body row row-lg" style={{ flexWrap: "wrap", alignItems: "flex-start" }}>
-        {selection && card.kind === "draft" && <input type="checkbox" checked={selection.selected} onChange={selection.onToggle} disabled={mismatch !== null && !selection.selected} title={mismatchVars ? fill(l.languageMismatch.selectTitle, mismatchVars) : undefined} aria-label={fill(l.selectMember, { name })} />}
+        {selection && selectStep !== null && <input type="checkbox" checked={selection.selected} onChange={selection.onToggle} disabled={otherStep || (mismatch !== null && !selection.selected)} title={otherStep ? (selectStep === 1 ? l.selectBlockedByReminders : l.selectBlockedByDrafts) : mismatchVars ? fill(l.languageMismatch.selectTitle, mismatchVars) : undefined} aria-label={fill(l.selectMember, { name })} />}
         <Avatar id={m.personId} initials={initialsFromName(name)} />
         <div className="stack-sm" style={{ flex: "1 1 320px", minWidth: 0 }}>
           <div className="row wrap">

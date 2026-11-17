@@ -48,8 +48,8 @@ export type ReviewAction =
   | { type: "approve"; memberId: string; step: 1 | 2; subject: string; body: string; when?: SendChoice };
 export type OnReviewAction = (action: ReviewAction) => void | Promise<unknown>;
 
-/** What the bulk bar asks for. `remove` only asks to start: the reason is collected by `RemoveReasonDialog`. */
-export type BulkAction = { type: "remove"; memberIds: string[] } | { type: "approve"; memberIds: string[]; when: SendChoice };
+/** What the bulk bar asks for. `remove` only asks to start: the reason is collected by `RemoveReasonDialog`. `approveReminders` approves step-2 reminders: no send choice, they follow the cadence. */
+export type BulkAction = { type: "remove"; memberIds: string[] } | { type: "approve"; memberIds: string[]; when: SendChoice } | { type: "approveReminders"; memberIds: string[] };
 export type OnBulkAction = (action: BulkAction) => void | Promise<boolean | void>;
 
 /** What the Contact-record block asks for. Same rule as `optOut` above: the container opens `OptOutDialog`, then calls recordOptOutForMember. */

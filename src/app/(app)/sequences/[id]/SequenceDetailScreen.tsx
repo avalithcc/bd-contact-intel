@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/ToastProvider";
 import type { ApproveResult } from "@/lib/sequences/approvalQueries";
 import type { SequenceDetail } from "@/lib/sequences/detailQueries";
-import { approveStep, cardStep, gateRows, mismatchedNames, readyMemberIds, refusalKey, runReviewIntent, summarizeRefusals } from "@/lib/sequences/detailFlow";
+import { approveStep, cardStep, gateRows, mismatchedNames, prunedSelection, readyMemberIds, refusalKey, reminderGateRows, runReviewIntent, selectionStep, summarizeRefusals } from "@/lib/sequences/detailFlow";
 import type { SkippedEdit } from "@/lib/sequences/draftCompose";
 import type { SendControlLabels } from "@/lib/sendSchedule/labels";
 import type { SendChoice } from "@/lib/sequences/sendMoment";
@@ -42,7 +42,7 @@ import {
   saveSequenceDraft,
   updateSequenceSettings,
 } from "../actions";
-import { BulkBar, RemoveReasonDialog } from "../_components/BulkBar";
+import { BulkBar, RemoveReasonDialog, ReminderBulkBar } from "../_components/BulkBar";
 import { EditSequenceDialog } from "../_components/EditSequenceDialog";
 import { LanguageChoiceDialog } from "../_components/LanguageChoiceDialog";
 import { OptOutDialog } from "../_components/OptOutDialog";
@@ -152,16 +152,20 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     showToast(text[t.key], t.tone);
   };
   /** After an approval or a move: "now" says what the immediate release did; anything else says it was approved or scheduled. */
-  const toastApproval = (when: SendChoice, count: number, release: ReleaseOutcome | undefined) => {
+  const toastApproval = (when: SendChoice, count: number, release: ReleaseOutcome | undefined, step: 1 | 2 = 1) => {
     if (when.kind === "now") return toastFor(releaseToast(release, count));
+    // Reminders are not drafts, and a bulk of them cannot name one date: each follows its own member's cadence.
+    // The single-reminder path says the date because it has only one; this one says the cadence instead.
+    if (step === 2) return showToast(count > 1 ? fill(l.toastRemindersApprovedMany, { n: count }) : l.toastRemindersApprovedOne, "success");
     if (count > 1) return showToast(fill(l.toastApprovedMany, { n: count }), "success");
     showToast(when.kind === "at" ? l.toastScheduledOne : l.toastApproved, "success");
   };
 
   /** One server call for a card (one member) or the bulk bar (several, gated). Resolves `true` when it worked, which closes the popover. */
-  async function approveWith(ids: string[], when: SendChoice, bulk: boolean): Promise<boolean> {
+  async function approveWith(ids: string[], when: SendChoice, bulk: boolean, step: 1 | 2 = 1): Promise<boolean> {
     setSendError(null);
-    const r = await guarded(() => (bulk ? approveBulk(ids, 1, when) : approveMember(ids[0]!, 1, when)), setSendError);
+    // A reminder approval carries no send choice (they follow the cadence), so the server gets `undefined`, as the single-card path does.
+    const r = await guarded(() => (bulk ? approveBulk(ids, step, step === 2 ? undefined : when) : approveMember(ids[0]!, step, when)), setSendError);
     if (!r) return false;
     if (!r.ok) {
       const message = bulk ? bulkRefusalText(r) : reasonText(refusalKey(r));
@@ -176,7 +180,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       return false;
     }
     router.refresh();
-    toastApproval(when, ids.length, r.release);
+    toastApproval(when, ids.length, r.release, step);
     if (bulk) setSelected([]);
     return true;
   }
@@ -399,6 +403,8 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
   async function onBulk(a: BulkAction): Promise<boolean | void> {
     if (readOnly) return;
     if (a.type === "remove") return setRemoveIds(a.memberIds);
+    // `when` is ignored for step 2 (see approveWith); the cadence choice only feeds the toast wording.
+    if (a.type === "approveReminders") return approveWith(a.memberIds, { kind: "cadence" }, true, 2);
     return approveWith(a.memberIds, a.when, true);
   }
 
@@ -438,7 +444,10 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
   const optOutLive = optOutMember ? detail.members.filter((m) => m.state !== "discarded" && m.email?.trim().toLowerCase() === optOutMember.email?.trim().toLowerCase()).length : 0;
   // Computed once: the cards, the banner, the bulk bar and the dialog all read this one value.
   const lock = generationLock(generatingId, detail.members, l.unnamed);
-  const rows = gateRows(detail.members, selected);
+  const step = selectionStep(detail.members, selected, now);
+  const rows = step === 2 ? reminderGateRows(detail.members, selected, now) : gateRows(detail.members, selected);
+  const prune = prunedSelection(rows, selected);
+  useEffect(() => { if (prune) setSelected(prune); });
   const send: SequenceSendContext = { labels: sendLabels, schedule: detail.schedule, busy, error: sendError };
   const selectedMembers = detail.members.filter((m) => selected.includes(m.memberId));
 
@@ -446,8 +455,8 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     <>
       <SequenceDetailView
         detail={detail} labels={l} send={send} now={now} onAction={onAction} viewerBdId={viewerBdId} optOutPhrases={optOutPhrases}
-        lock={lock} selected={new Set(selected)} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
-        bulk={readOnly ? undefined : (g) => <BulkBar lock={g} selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} mismatched={mismatchedNames(detail.members)} />}
+        lock={lock} selected={new Set(selected)} selectionStep={step} onToggle={(id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))}
+        bulk={readOnly ? undefined : (g) => step === 2 ? <ReminderBulkBar lock={g} selection={rows} labels={l} onAction={onBulk} /> : <BulkBar lock={g} selection={rows} labels={l} onAction={onBulk} send={send} recipients={sendRecipients(selectedMembers)} cap={{ cap: detail.dailySendCap, sentToday: detail.sentToday }} now={now} mismatched={mismatchedNames(detail.members)} />}
       />
       <ReviewDialog open={review !== null && reviewed !== null} onClose={closeDialogs} member={reviewed} step={review?.step ?? 1} fromAddress={detail.fromAddress} readOnly={readOnly} ownerName={detail.ownerName} schedule={detail.schedule} signals={review?.signals ?? null} now={now} labels={l} ownView={ownView} onAction={onReview} busy={busy} regenerateLocked={lock.active} generating={reviewed !== null && lock.card(reviewed.memberId).busyHere} error={error} stale={review !== null && staleKey === reviewKey(review.memberId, review.step)} send={{ ...send, error }} />
       <RemoveReasonDialog open={removeIds !== null} count={removeIds?.length ?? 0} labels={l} onClose={closeDialogs} onConfirm={onRemove} busy={busy} error={error} />
