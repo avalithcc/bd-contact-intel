@@ -2124,6 +2124,8 @@ export const en = {
     overdueTitle: "Overdue",
     todayTitle: "Today",
     overdueBadge: "Overdue",
+    emailedByMeBadge: "You emailed",
+    emailedByMeTitle: "You sent this contact a personal email from your own mailbox. Not a sequence send.",
     queuedSince: "in the queue since {date}",
     overdueAgo: "overdue by {n} d",
     dueTomorrow: "Due tomorrow",
