@@ -72,7 +72,10 @@ const ALL_KINDS: DetailMember[] = [
   member(2, { draft: null }),
   member(3, { state: "approved", holdReason: "sync_stale", draft: draft({ approvedAt: hours(2), scheduledFor: new Date("2026-10-16T13:00:00Z") }) }),
   member(4, { state: "sent", ...sentOver }),
-  member(5, { state: "sent", sentAt: hours(170), reminderDueAt: new Date("2026-10-15T13:00:00Z") }),
+  // Due AND written: the ordinary "Recordatorio hoy" card.
+  member(5, { state: "sent", sentAt: hours(170), reminderDueAt: new Date("2026-10-15T13:00:00Z"), reminderDraft: draft() }),
+  // Due and NEVER written: the card that used to offer "Revisar recordatorio" over nothing at all.
+  member(12, { state: "sent", sentAt: hours(170), reminderDueAt: new Date("2026-10-15T13:00:00Z"), reminderDraft: null }),
   member(6, { state: "no_reply", sentAt: hours(300) }),
   member(7, { state: "replied", sentAt: hours(96), repliedAt: hours(6) }),
   member(8, { state: "discarded", discardedAt: hours(24), discardReason: "no title" }),

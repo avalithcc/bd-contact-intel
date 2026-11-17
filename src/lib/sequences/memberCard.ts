@@ -16,11 +16,11 @@ import { miamiCalendarDate } from "./miamiTime";
 import { canTransition, type MemberState } from "./memberState";
 import { DRAFT_HOLD_REASONS, type HoldReason } from "./preSendChecks";
 
-export type CardKind = "draft" | "noDraft" | "approved" | "scheduled" | "sent" | "reminderToday" | "reminderApproved" | "noReply" | "replied" | "discarded";
+export type CardKind = "draft" | "noDraft" | "approved" | "scheduled" | "sent" | "reminderToday" | "reminderMissing" | "reminderApproved" | "noReply" | "replied" | "discarded";
 export type CardTone = "info" | "brand" | "contacted" | "warn" | "replied" | "discarded" | "neutral";
 export type CardActionId =
   | "generate" | "reviewDraft" | "approve" | "viewEmail" | "cancel" | "viewSent" | "advanceReminder" | "reviewReminder"
-  | "viewDraft" | "viewReminder" | "cancelReminder" | "change" | "sendNow" | "cancelSchedule" | "openConversation" | "readmit" | "regenerate" | "regenerateSubject" | "openContact" | "remove" | "optOut";
+  | "viewDraft" | "viewReminder" | "cancelReminder" | "change" | "sendNow" | "cancelSchedule" | "generateReminder" | "openConversation" | "readmit" | "regenerate" | "regenerateSubject" | "openContact" | "remove" | "optOut";
 export type CardAction = { id: CardActionId; style: "primary" | "secondary" | "ghost" };
 
 export type CardFacts = {
@@ -37,6 +37,12 @@ export type CardFacts = {
    * unapproved — the very bug this field was added to fix — and optional would let that pass the typecheck.
    */
   reminderApproved: boolean;
+  /**
+   * Sent only: a step 2 draft EXISTS. Required on purpose, like `reminderApproved` — this card used to offer "Revisar
+   * recordatorio" and "Aprobar" the moment the reminder fell due, without ever asking whether there was one. A member
+   * whose reminder generation failed got both buttons and neither did anything, because there was nothing to open.
+   */
+  hasReminderDraft: boolean;
   /** Approved only: the BD chose the moment ("scheduled") or it follows the cadence (approvedMoment.ts). Unknown reads as the cadence. */
   approvedMode?: "cadence" | "scheduled";
 };
@@ -89,6 +95,11 @@ function mapOwnCard(f: CardFacts, now: Date): CardView {
     case "sent":
       // An approved reminder reads as approved whether or not its due day arrived; it must never offer "Aprobar" again.
       if (f.reminderApproved) return { ...base, kind: "reminderApproved", tone: "brand", actions: [act("viewReminder", "ghost"), act("cancelReminder", "secondary")] };
+      // Due, but the reminder was never written: offer to write it, not to review something that does not exist.
+      // Step 1 has had a `noDraft` state for this since the beginning; the reminder path never did.
+      if (reminderDue(f, now) && !f.hasReminderDraft) {
+        return { ...base, kind: "reminderMissing", tone: "warn", actions: [act("generateReminder", "primary")] };
+      }
       return reminderDue(f, now)
         ? { ...base, kind: "reminderToday", tone: "warn", actions: [act("reviewReminder", "secondary"), act("approve", "primary")] }
         : { ...base, kind: "sent", tone: "contacted", actions: [act("viewSent", "ghost"), act("advanceReminder", "secondary")] };

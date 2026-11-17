@@ -116,11 +116,15 @@ test("the reminder actions mean step 2; everything else on a card means step 1",
 });
 
 test("'Aprobar' on a card approves the reminder only when the card is the reminder-due-today card", () => {
-  const due = member("r", { state: "sent", reminderDueAt: new Date("2026-10-15T13:00:00Z") });
-  const notYet = member("s", { state: "sent", reminderDueAt: new Date("2026-10-20T13:00:00Z") });
+  const due = member("r", { state: "sent", reminderDueAt: new Date("2026-10-15T13:00:00Z"), reminderDraft: draft() });
+  const notYet = member("s", { state: "sent", reminderDueAt: new Date("2026-10-20T13:00:00Z"), reminderDraft: draft() });
+  // Due, but the reminder was never written. There is nothing to approve, so this must NOT resolve to step 2 — the
+  // card offers to generate it instead. A member in exactly this state had both buttons and neither did anything.
+  const neverWritten = member("n", { state: "sent", reminderDueAt: new Date("2026-10-15T13:00:00Z"), reminderDraft: null });
   assert.equal(approveStep(due, NOW), 2);
   assert.equal(approveStep(member("d"), NOW), 1);
   assert.equal(approveStep(notYet, NOW), 1);
+  assert.equal(approveStep(neverWritten, NOW), 1, "a reminder that does not exist is never the thing being approved");
 });
 
 // --- a bulk refusal names the members it refused ----------------------------------------------------------------

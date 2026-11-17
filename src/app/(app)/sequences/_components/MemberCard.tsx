@@ -199,7 +199,7 @@ export type CardSelection = { selected: boolean; onToggle: () => void };
 
 export function MemberCard({ member: m, now, labels: l, onAction, ownView, readOnly = false, optOutPhrase = null, selection, generation, send }: { member: DetailMember; now: Date; labels: SequenceLabels; onAction: OnAction; ownView: boolean; readOnly?: boolean; optOutPhrase?: string | null; selection?: CardSelection; generation: GenerationLock; send: SequenceSendContext }) {
   const moment = m.state === "approved" && m.draft ? approvedMoment(m.draft, send.schedule, now) : null;
-  const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, approvedMode: moment?.mode, reminderApproved: m.reminderDraft?.approvedAt != null }, now, readOnly);
+  const card = mapMemberCard({ state: m.state, hasDraft: m.draft !== null, holdReason: m.holdReason, reminderDueAt: m.reminderDueAt, florida: m.florida, discardReason: m.discardReason, approvedMode: moment?.mode, reminderApproved: m.reminderDraft?.approvedAt != null, hasReminderDraft: m.reminderDraft !== null }, now, readOnly);
   const discarded = card.kind === "discarded" ? discardedView(m) : null;
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   const title = m.jobTitle?.trim() || l.noTitle;

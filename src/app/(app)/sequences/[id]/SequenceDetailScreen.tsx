@@ -323,6 +323,16 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
       case "cancelReminder": return void guarded(() => cancelApproval(a.memberId, 2)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastReminderCancelled, "success"); else fail(); router.refresh(); });
       case "cancel": return void guarded(() => cancelApproval(a.memberId, 1)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastCancelled, "success"); else fail(); router.refresh(); });
       case "advanceReminder": return void guarded(() => advanceReminder(a.memberId)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastAdvanced, "success"); else fail(); router.refresh(); });
+      // The reminder fell due and was never written — its generation failed when step 1 went out and nothing retried.
+      // regenerateSequenceReminder creates it: for step 2 it only requires that step 1 exists, which it does here.
+      // Takes the generation lock like every other model call on this screen.
+      case "generateReminder":
+        return void guarded(() => whileGenerating(a.memberId, () => regenerateSequenceReminder(detail.id, a.memberId))).then((r) => {
+          if (!r) return;
+          if (r.ok) showToast(l.toastReminderGenerated, "success");
+          else fail();
+          router.refresh();
+        });
       case "readmit": return void guarded(() => reinstateMember(a.memberId)).then((r) => { if (!r) return; if (r.ok) showToast(l.toastReadmitted, "success"); else fail((l.reinstateErrors as Record<string, string>)[r.error] ?? l.actionFailed); router.refresh(); });
       default: return;
     }
