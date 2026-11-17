@@ -131,6 +131,19 @@ export function validateSubject(subject: string, opts: { senderName?: string | n
   return violations;
 }
 
+/**
+ * The banned vendor vocabulary found in an email BODY (the compliance footer already stripped by the caller), in list order.
+ *
+ * Same list as the subject, so the two cannot drift. Matched as whole words, unlike the subject's substring test: a body is
+ * long prose from an engineering-staffing company, and "microservices" must not be refused for containing "services".
+ * The capacidad/senior co-occurrence is NOT applied here for the same reason: across a whole body the two words
+ * legitimately appear far apart.
+ */
+export function bannedTermsInBody(text: string): string[] {
+  const normalized = normalizeSubject(text);
+  return SUBJECT_BANNED_PHRASES.filter((term) => containsWord(normalized, normalizeSubject(term)));
+}
+
 /** One line per violation, appended to a retry so the model is told what it broke rather than asked again blindly. */
 export function describeViolations(violations: readonly SubjectViolation[]): string {
   return violations
@@ -158,7 +171,7 @@ export function describeViolations(violations: readonly SubjectViolation[]): str
 /** The banned-vocabulary line of the prompt, generated from the same array the validator reads. */
 export function bannedVocabularyPromptLine(): string {
   const quoted = SUBJECT_BANNED_PHRASES.map((t) => `"${t}"`).join(", ");
-  return `Never use vendor vocabulary: ${quoted}. This also covers the same words written apart — "capacidad de ingeniería senior" is as forbidden as "capacidad senior". A subject containing any of them is rejected and regenerated, so it costs you a retry.`;
+  return `Never use vendor vocabulary: ${quoted}. This also covers the same words written apart — "capacidad de ingeniería senior" is as forbidden as "capacidad senior". A subject or a body containing any of them is rejected and regenerated, so it costs you a retry.`;
 }
 
 const REPLY_PREFIX = /^re:\s*/i;

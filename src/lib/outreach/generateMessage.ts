@@ -20,7 +20,7 @@ import {
 } from "@/lib/outreach/messagePrompt";
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
 import { parseEmailModelOutput, parseSubjectModelOutput, capBody, MAX_BODY_CHARS, type ParsedEmailMessage } from "@/lib/outreach/emailOutputParsing";
-import { describeViolations, validateSubject } from "@/lib/outreach/subjectRules";
+import { bannedTermsInBody, describeViolations, validateSubject } from "@/lib/outreach/subjectRules";
 import { formatEmailDraft } from "@/lib/outreach/emailDraftFormat";
 import type { OutreachChannel } from "@/lib/outreach/channel";
 
@@ -59,7 +59,7 @@ export type GenerateOutreachMessageResult =
     }
   | {
       ok: false;
-      errorKey: "notFound" | "gatewayNotConfigured" | "generationFailed" | "invalidModelOutput";
+      errorKey: "notFound" | "gatewayNotConfigured" | "generationFailed" | "invalidModelOutput" | "bannedVocabulary";
     };
 
 /**
@@ -77,27 +77,33 @@ export type GenerateOutreachMessageResult =
 export const SUBJECT_RETRY_ATTEMPTS = 2;
 
 /**
- * Regenerates while the subject breaks the rule, telling the model exactly what it broke each time.
+ * Regenerates while the subject or the body breaks the vendor-vocabulary rule, telling the model exactly what it broke.
  *
- * When every attempt fails, the LAST one is returned rather than failing the draft: a BD with a flawed subject they can
- * edit is better off than a BD with no draft. The give-up is logged with the subject and the violations, because the
- * previous attempt to fix this shipped with no way to tell whether it had worked — and it had not, for weeks, silently.
- * `scripts/measure/subject-rule-violations.ts` reads the same rule against live data to answer that question.
+ * The two ends differ on purpose. A subject that still breaks the rule after the retries is returned and logged: a BD can
+ * edit one line. A BODY that still carries banned vocabulary is NOT returned: `null` makes the caller fail the generation
+ * visibly. The subject's log-and-return is what let 81.5% of live subjects break the rule unnoticed, and the body must not
+ * repeat it. Approval refuses such a body too (approvalChecks.checkBodyVocabulary), so the two locks do not rely on each other.
  */
-async function retryUntilSubjectPasses(
+async function retryUntilRulesPass(
   first: ParsedEmailMessage,
   ctx: { system: string; prompt: string; input: BuildOutreachMessagePromptInput; generate: typeof generateText },
-): Promise<ParsedEmailMessage> {
+): Promise<ParsedEmailMessage | null> {
+  const subjectOpts = { senderName: ctx.input.senderName, companyName: ctx.input.contact.companyName };
   let current = first;
 
   for (let attempt = 1; attempt <= SUBJECT_RETRY_ATTEMPTS; attempt++) {
-    const violations = validateSubject(current.subject, { senderName: ctx.input.senderName, companyName: ctx.input.contact.companyName });
-    if (violations.length === 0) return current;
+    const violations = validateSubject(current.subject, subjectOpts);
+    const bodyTerms = bannedTermsInBody(current.body);
+    if (violations.length === 0 && bodyTerms.length === 0) return current;
 
+    const feedback = [
+      violations.length ? `the subject "${current.subject}" was REJECTED because ${describeViolations(violations)}. Write a different subject that obeys every subject rule` : null,
+      bodyTerms.length ? `the body was REJECTED because it used the banned vendor ${bodyTerms.length > 1 ? "terms" : "term"} ${bodyTerms.map((t) => `"${t}"`).join(", ")}. Rewrite the body without them, describing what Avalith does in plain words instead` : null,
+    ].filter(Boolean).join(". Also, ");
     const { text, finishReason } = await ctx.generate({
       model: OUTREACH_MODEL,
       system: ctx.system,
-      prompt: `${ctx.prompt}\n\nYour previous attempt used the subject "${current.subject}", which was REJECTED because ${describeViolations(violations)}. Write a different subject that obeys every subject rule. Keep the body's substance; only the subject must change.`,
+      prompt: `${ctx.prompt}\n\nYour previous attempt was rejected: ${feedback}. Keep everything that was not rejected.`,
       maxOutputTokens: MAX_OUTPUT_TOKENS.email,
     });
 
@@ -107,11 +113,16 @@ async function retryUntilSubjectPasses(
     current = reparsed;
   }
 
-  const remaining = validateSubject(current.subject, { senderName: ctx.input.senderName, companyName: ctx.input.contact.companyName });
+  const remaining = validateSubject(current.subject, subjectOpts);
   if (remaining.length > 0) {
     console.error(
       `[outreach] subject still breaks the rule after ${SUBJECT_RETRY_ATTEMPTS} retries: ${JSON.stringify({ subject: current.subject, violations: remaining })}`,
     );
+  }
+  const remainingBody = bannedTermsInBody(current.body);
+  if (remainingBody.length > 0) {
+    console.error(`[outreach] body still carries banned vocabulary after ${SUBJECT_RETRY_ATTEMPTS} retries, draft discarded: ${JSON.stringify(remainingBody)}`);
+    return null;
   }
   return current;
 }
@@ -195,7 +206,8 @@ export async function runGenerateOutreachMessage(
 
       // The subject rule is checked, not merely requested. See subjectRules.ts for why: it was stated in the prompt for
       // weeks while 10 of the last 25 live subjects broke it. A violation costs a retry that NAMES what was broken.
-      const accepted = await retryUntilSubjectPasses(parsed, { system, prompt, input, generate });
+      const accepted = await retryUntilRulesPass(parsed, { system, prompt, input, generate });
+      if (!accepted) return { ok: false, errorKey: "bannedVocabulary" };
       return {
         ok: true,
         channel: "email",

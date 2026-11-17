@@ -76,3 +76,21 @@ test("a subject naming the sender is rejected", async () => {
   await runGenerateOutreachMessage(input, 0, fakeSequence([named, GOOD], calls));
   assert.equal(calls.length, 2, "senderName comes from the input, so the check must use it");
 });
+
+// ---- The body is checked too (2026-11-17: 28 of 37 persisted bodies said "staff augmentation") ----
+const BAD_BODY = '{"subject":"Backend en Card y Fraud, sin pisar a RRHH","body":"Hacemos staff augmentation senior para ustedes."}';
+
+test("a body with banned vocabulary is regenerated and the clean second attempt wins", async () => {
+  const calls: Call[] = [];
+  const r = await runGenerateOutreachMessage(input, 0, fakeSequence([BAD_BODY, GOOD], calls));
+  assert.equal(calls.length, 2);
+  assert.equal(r.ok && r.body, "cuerpo");
+  assert.ok((calls[1]!.prompt ?? "").includes("staff augmentation"), "the retry must name the term");
+});
+
+test("when every attempt carries the vocabulary the draft is NOT returned: no silent save", async () => {
+  const calls: Call[] = [];
+  const r = await runGenerateOutreachMessage(input, 0, fakeSequence([BAD_BODY], calls));
+  assert.equal(calls.length, SUBJECT_RETRY_ATTEMPTS + 1);
+  assert.deepEqual(r, { ok: false, errorKey: "bannedVocabulary" });
+});

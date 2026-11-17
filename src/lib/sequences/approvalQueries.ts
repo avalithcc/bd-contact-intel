@@ -8,7 +8,7 @@ import { and, eq, exists, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, sequence, sequenceDraft, sequenceMember } from "@/db/schema";
 import { sequenceAuditRow } from "./approvalAudit";
-import { checkStep1Subject } from "./approvalChecks";
+import { checkBodyVocabulary, checkStep1Subject, type BannedVocabularyReason } from "./approvalChecks";
 import { bulkApprovalGate } from "./bulkApprovalGate";
 import { parseDraftVersion } from "./draftVersion";
 import { resolveComplianceAudience, type AudienceLanguage, type ComplianceAddress } from "./complianceAudience";
@@ -32,7 +32,7 @@ const REVIEWABLE: Record<ApprovalStep, readonly string[]> = { 1: ["drafted", "ap
 
 export type ApprovalRejection = {
   memberId: string;
-  reason: "not_found" | "not_approvable" | "no_draft" | "unreviewed" | "reply_prefix_subject" | ComplianceRefusal | SendMomentRefusal;
+  reason: "not_found" | "not_approvable" | "no_draft" | "unreviewed" | "reply_prefix_subject" | BannedVocabularyReason | ComplianceRefusal | SendMomentRefusal;
 };
 /** `too_many`: the request named more members than the page can ever offer (SEQUENCE_DETAIL_MEMBER_LIMIT). Refused before any lock. */
 export type ApproveResult = { ok: true; approved: string[]; scheduledFor?: Date } | { ok: false; error: "rejected"; rejected: ApprovalRejection[] } | { ok: false; error: "too_many"; limit: number };
@@ -124,6 +124,8 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
       // The language of today is the resolver's (one-off > preferred > audience); a reminder is pinned to step 1's. A stored language that differs refuses the approval.
       const language = m && d ? { draft: d.language, today: languageNow(step, a?.language ?? null, { chosen: m.draftLanguage, preferred: a?.preferred }, step1Language.get(m.id)) } : undefined;
       const refusal = m && d ? complianceRefusal(a?.address ?? null, d.body, COMPLIANCE_CONFIG, language) : null;
+      const bodyCheck = d ? checkBodyVocabulary(d.body, COMPLIANCE_CONFIG) : null;
+      const bodyRefusal = bodyCheck && !bodyCheck.ok ? bodyCheck.reason : null;
       if (!m) rejected.push({ memberId: id, reason: "not_found" });
       // Step 1 cannot be re-approved because the member leaves "drafted"; a step 2 member STAYS "sent", so nothing
       // stopped a second approval from rewriting approvedAt and recomputing scheduledFor against a later `now` —
@@ -133,6 +135,7 @@ async function approve(bdId: string, memberIds: readonly string[], gated: boolea
       else if (!(step === 1 ? canTransition(m.state as MemberState, "approved", "approve") : m.state === "sent" && m.reminderDueAt !== null && (d?.approvedAt ?? null) === null)) rejected.push({ memberId: id, reason: "not_approvable" });
       else if (!d) rejected.push({ memberId: id, reason: "no_draft" });
       else if (step === 1 && !checkStep1Subject(d.subject).ok) rejected.push({ memberId: id, reason: "reply_prefix_subject" });
+      else if (bodyRefusal) rejected.push({ memberId: id, reason: bodyRefusal });
       else if (refusal) rejected.push({ memberId: id, reason: refusal });
       else if (step === 1) {
         const moment = resolveSequenceSend(when, { now, schedule: parseSchedule(m.schedule) });
