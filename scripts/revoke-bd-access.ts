@@ -153,6 +153,21 @@ async function executeRevoke(params: { actorBdId: string; target: BdAuthMatch })
     );
   }
 
+  // Step 4b: stop the automated mail. src/lib/gmail/reminderRows.ts says this flag is off "for the e2e test accounts
+  // (and any BD who left)" — but nothing ever did the second half, so a revoked BD kept receiving "reconnect your
+  // Gmail" reminders, and at the third one the system emails the OWNER about someone who no longer works here. That
+  // happened to Mariel Meza, revoked 2026-11-11, two reminders sent before anyone noticed.
+  //
+  // It runs AFTER the ban is verified and BEFORE the audit row, so the row can state what was actually turned off.
+  // `returning` rather than a blind update: a BD whose reminders were already off reports false, not a silent no-op.
+  const remindersTurnedOff = (
+    await db
+      .update(bd)
+      .set({ emailRemindersEnabled: false })
+      .where(eq(bd.id, target.bd.id))
+      .returning({ id: bd.id })
+  ).length > 0;
+
   try {
     await db.insert(auditLog).values({
       actorBdId,
@@ -165,6 +180,7 @@ async function executeRevoke(params: { actorBdId: string; target: BdAuthMatch })
         bannedUntil: bannedUntil!.toISOString(),
         banDuration: PERMANENT_BAN_DURATION,
         lastSignInAt: target.authUser.lastSignInAt?.toISOString() ?? null,
+        emailRemindersTurnedOff: remindersTurnedOff,
         reversible: true,
         note:
           "Supabase Auth sign-in blocked via the admin API (banned_until), read back from auth.users and verified. " +
