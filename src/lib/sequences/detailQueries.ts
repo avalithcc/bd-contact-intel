@@ -66,6 +66,10 @@ export type DetailMember = {
   reminderDraft: DetailDraft | null;
   /** Where the person probably is (person first, then the company's country): input of the time-zone reference only. */
   place?: RecipientPlace;
+  /** The person's own country as filed (person.country), trimmed to null when blank: the value the card edits inline. */
+  personCountry?: string | null;
+  /** The company's country as the audience reads it (companyCountrySql); shown read-only, the company record is where it is edited. */
+  companyCountry?: string | null;
   /** Language and legal address the draft will use, and why (the same chain as the draft itself). */
   audience?: MemberAudience;
   /** The language a person chose for this member's draft (languageChoice.ts); null when nobody did. `byName` is null if that BD is gone. */
@@ -178,6 +182,8 @@ async function readDetail(ex: Executor, sequenceId: string, onlyOwnedBy: string 
       draft: draftOf(r, "d1"),
       reminderDraft: draftOf(r, "d2"),
       place: { city: (r.city ?? null) as string | null, region: (r.region ?? null) as string | null, country: ((r.country || r.company_country) || null) as string | null },
+      personCountry: ((r.country as string | null)?.trim() || null),
+      companyCountry: ((r.audience_company_country as string | null)?.trim() || null),
       languageChoice: languageChoiceOf(r),
       preferredLanguage: preferredLanguageOf(r),
       // The detail read names two of the audience columns differently (`country` is also the place, `audience_company_country` is not `cn.country`).
