@@ -16,6 +16,9 @@ import { DEFAULT_SCHEDULE } from "@/lib/sequences/schedule";
 const member = (state: string, over: Record<string, unknown> = {}) =>
   ({ state, hasDraft: true, approvedAt: null, scheduledFor: null, sentAt: null, ...over }) as never;
 
+const rowOf = (members: readonly unknown[]) =>
+  ({ id: 's', name: 's', createdAt: new Date('2026-11-01T00:00:00Z'), dailySendCap: 5, schedule: DEFAULT_SCHEDULE, companies: [], members }) as never;
+
 const row = (name: string, states: readonly string[]) =>
   ({
     id: name, name, createdAt: new Date("2026-11-01T00:00:00Z"), dailySendCap: 5,
@@ -54,5 +57,32 @@ describe("the Terminada badge", () => {
     const finished = view.rows.filter((r) => r.finished).map((r) => r.name);
     assert.deepEqual(finished, ["Latam Banca - #1"]);
     assert.equal(view.rows.length - finished.length, 2, "and the other two are what the sidebar shows");
+  });
+});
+
+/**
+ * The two badges on a row must never contradict each other. A member can reach a closed state with its step 2
+ * reminder never approved — the reply window shut and that reminder will never go out — so counting it produced a row
+ * reading "Terminada" and "2 recordatorios por aprobar" at once. Caught by running the real read against production,
+ * not by the unit tests, which is why this one exists.
+ */
+describe("the reminder count and the finished badge cannot contradict", () => {
+  it("ignores an unapproved reminder on a closed member: it is not work anyone can do", () => {
+    const view = listView([rowOf([member("no_reply", { reminderToReview: true }), member("discarded", { reminderToReview: true })])]);
+    assert.equal(view.rows[0]!.finished, true);
+    assert.equal(view.rows[0]!.remindersToReview, 0, "a finished sequence can never show pending work");
+  });
+
+  it("counts one on a member still open", () => {
+    const view = listView([rowOf([member("sent", { reminderToReview: true }), member("discarded", { reminderToReview: true })])]);
+    assert.equal(view.rows[0]!.finished, false);
+    assert.equal(view.rows[0]!.remindersToReview, 1, "only the open member's reminder is real work");
+  });
+
+  it("holds for every state: a finished row always reports zero", () => {
+    for (const state of MEMBER_STATES) {
+      const view = listView([rowOf([member(state, { reminderToReview: true })])]);
+      if (view.rows[0]!.finished) assert.equal(view.rows[0]!.remindersToReview, 0, `"${state}" contradicts itself`);
+    }
   });
 });

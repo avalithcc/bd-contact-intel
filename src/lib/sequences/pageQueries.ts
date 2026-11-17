@@ -63,11 +63,17 @@ export async function listAllSequences(meId?: string, limit = ALL_SEQUENCES_LIMI
 async function readListRows(ownerCols: SQL, ownerJoin: SQL, where: SQL): Promise<SequenceListRow[]> {
   const rows = rowsOf<Row>(
     await db.execute(sql`
-      select s.id::text as id, s.name, s.created_at, s.daily_send_cap, s.schedule, sm.state, (d.id is not null) as has_draft, d.scheduled_for, sm.sent_at, sm.discard_reason, ${companyNameColumnsSql}${ownerCols}
+      select s.id::text as id, s.name, s.created_at, s.daily_send_cap, s.schedule, sm.state, (d.id is not null) as has_draft, d.scheduled_for, sm.sent_at, sm.discard_reason,
+             -- A step 2 reminder that is written but not yet approved: the work a member in the sent state still carries.
+             -- It was invisible on this screen, so a Sequence with six sent members and four unapproved reminders
+             -- looked exactly like one with nothing left to do. (No backticks here: this lives in a JS template literal.)
+             (d2.id is not null and d2.approved_at is null) as reminder_to_review, ${companyNameColumnsSql}${ownerCols}
       from sequence s
       ${ownerJoin}
       left join sequence_member sm on sm.sequence_id = s.id
       left join sequence_draft d on d.sequence_member_id = sm.id and d.step = 1
+      -- Unique on (member, step), so this cannot fan the rows out.
+      left join sequence_draft d2 on d2.sequence_member_id = sm.id and d2.step = 2
       left join person p on p.id = sm.person_id
       ${canonicalCompanyJoinSql}
       ${where}
@@ -149,6 +155,8 @@ export async function listContactMemberships(viewerBdId: string, email: string |
       join sequence s on s.id = sm.sequence_id
       join person p on p.id = sm.person_id
       left join sequence_draft d on d.sequence_member_id = sm.id and d.step = 1
+      -- Unique on (member, step), so this cannot fan the rows out.
+      left join sequence_draft d2 on d2.sequence_member_id = sm.id and d2.step = 2
       where (p.email_normalized = ${address} or lower(trim(p.email)) = ${address})
       order by (sm.state = 'discarded' and sm.discard_reason is distinct from 'opt_out'), sm.created_at desc, sm.id
       limit ${MEMBERSHIP_LIMIT}`),

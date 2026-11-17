@@ -4117,6 +4117,8 @@ export const es: typeof en = {
     listTabsLabel: "Vistas de secuencias",
     listColOwner: "Responsable",
     listFinished: "Terminada",
+    listRemindersToReview: "{n} recordatorios por aprobar",
+    listRemindersToReviewTitle: "Recordatorios de seguimiento ya escritos que esperan tu aprobación. Hasta que los apruebes, esos contactos recibieron solo el primer correo.",
     listFinishedTitle: "Todos sus contactos respondieron, no respondieron o fueron descartados. Por eso no suma en el contador de la barra lateral, que solo cuenta secuencias con algo pendiente.",
     listOwnerMe: "(yo)",
     listOwnerFilterLabel: "Filtrar por responsable",

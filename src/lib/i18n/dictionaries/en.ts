@@ -4098,6 +4098,8 @@ export const en = {
     listTabsLabel: "Sequence views",
     listColOwner: "Owner",
     listFinished: "Finished",
+    listRemindersToReview: "{n} reminders to approve",
+    listRemindersToReviewTitle: "Follow-up reminders already written and waiting for your approval. Until you approve them, those contacts have only had the first email.",
     listFinishedTitle: "Every contact replied, did not reply, or was discarded. That is why it does not add to the sidebar count, which only counts sequences with something left to do.",
     listOwnerMe: "(me)",
     listOwnerFilterLabel: "Filter by owner",

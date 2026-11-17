@@ -117,7 +117,14 @@ export function SequenceListView({ rows, labels: l, now, admin = null }: { rows:
                 {/* Why a finished Sequence is marked: the sidebar pill counts only Sequences with something left to do,
                     so a finished one shows in this list and not in that number, and the two read as a contradiction.
                     Neither count was wrong; nothing explained the difference. */}
-                <td><div className="stack-sm"><div className="row wrap" style={{ gap: ".5rem" }}><Link className="strong" href={href}>{v.name}</Link>{v.finished && <span className="badge badge-neutral no-dot" title={l.listFinishedTitle}>{l.listFinished}</span>}</div><div className="meta">{companiesLine(v.companies, l)}</div></div></td>
+                <td><div className="stack-sm"><div className="row wrap" style={{ gap: ".5rem" }}><Link className="strong" href={href}>{v.name}</Link>{v.finished && <span className="badge badge-neutral no-dot" title={l.listFinishedTitle}>{l.listFinished}</span>}
+                  {/* The work a "sent" member still carries. Without it the row looks idle, and the reminders sit
+                      unapproved where nobody goes looking. Warn, not neutral: this is something to do, not a state. */}
+                  {v.remindersToReview > 0 && (
+                    <span className="badge badge-warn no-dot" title={l.listRemindersToReviewTitle}>
+                      {fill(l.listRemindersToReview, { n: String(v.remindersToReview) })}
+                    </span>
+                  )}</div><div className="meta">{companiesLine(v.companies, l)}</div></div></td>
                 {admin && <td>{v.owner && <><span className="owner-chip"><Avatar id={v.owner.id} initials={initialsFromName(v.owner.name)} variant="bd" size="sm" />{v.owner.name}</span>{own && <> <span className="meta">{l.listOwnerMe}</span></>}</>}</td>}
                 <td className="num"><span className="strong">{v.total}</span> <span className="meta">{v.total === 1 ? l.unitContactOne : l.unitContactMany}</span></td>
                 <td><div className="stack-sm">

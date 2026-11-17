@@ -39,7 +39,24 @@ test("companies are the distinct names in roster order, matched without regard t
 test("a member's draft flag and release instant survive the grouping (the queue foot reads them)", () => {
   const at = new Date("2026-10-02T13:00:00Z");
   const [row] = groupListRows([listRow("a", { state: "approved", has_draft: true, scheduled_for: at }), listRow("a", { state: "discarded", has_draft: false, sent_at: at, discard_reason: "bounce" })]);
-  assert.deepEqual(row.members, [{ state: "approved", hasDraft: true, scheduledFor: at, sentAt: null, discardReason: null }, { state: "discarded", hasDraft: false, scheduledFor: null, sentAt: at, discardReason: "bounce" }]);
+  assert.deepEqual(row.members, [
+    { state: "approved", hasDraft: true, scheduledFor: at, sentAt: null, discardReason: null, reminderToReview: false },
+    { state: "discarded", hasDraft: false, scheduledFor: null, sentAt: at, discardReason: "bounce", reminderToReview: false },
+  ]);
+});
+
+/**
+ * The work a member in the sent state still carries. Without this reaching the list, a Sequence whose first email has
+ * gone to everyone looks idle while its reminders sit unapproved — which is exactly how it read when the owner asked
+ * why such a Sequence was not marked finished.
+ */
+test("an unapproved step 2 reminder survives the grouping as reminderToReview", () => {
+  const [row] = groupListRows([
+    listRow("a", { state: "sent", has_draft: true, reminder_to_review: true }),
+    listRow("a", { state: "sent", has_draft: true, reminder_to_review: false }),
+    listRow("a", { state: "sent", has_draft: true }),
+  ]);
+  assert.deepEqual(row.members.map((m) => m.reminderToReview), [true, false, false], "absent reads as false, never as true");
 });
 
 // --- picker: non-addable candidates stay, with a reason ----------------------------------------------------------
