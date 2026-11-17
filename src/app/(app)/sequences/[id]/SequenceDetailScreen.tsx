@@ -359,16 +359,20 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
     // Same path as the card menu's entry, so the two cannot drift: one action, one set of guards, one toast.
     if (a.type === "regenerateSubject") return void onAction(a);
     if (a.type === "markReviewed") {
-      // The dialog reports once per open. Refetch on success, or the bar's "N de M revisados" and the approve gate stay stale.
+      // The BD clicked "Revisado". Refetch on success, or the bar's "N de M revisados" and the approve gate stay stale, and close.
       const r = await markDraftReviewed(a.memberId, a.step, a.version).catch(() => null);
-      if (r?.ok) { setStaleKey(null); router.refresh(); }
+      if (r?.ok) { setStaleKey(null); router.refresh(); closeDialogs(); }
       // Refused: the text on screen is not the stored one. The draft stays unreviewed and the dialog says so.
       else if (r && r.error === "stale") setStaleKey(reviewKey(a.memberId, a.step));
+      else setError(l.actionFailed);
       return;
     }
     if (a.type === "keepLanguage") return void (await keepLanguage(a.memberId));
     if (a.type === "reloadCurrent") {
-      // The warning stays until the re-report of the refetched text answers ok (a stale answer keeps it).
+      // Clear the notice HERE. It used to be cleared by the mark that the old open-effect re-reported automatically;
+      // now only the button marks, so nothing answered and the notice outlived the reload it was about - the dialog
+      // kept saying "what you see below is the previous version" ON TOP of the text it had just refetched.
+      setStaleKey(null);
       router.refresh();
       return;
     }

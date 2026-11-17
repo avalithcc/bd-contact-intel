@@ -29,7 +29,7 @@ export type OnAction = (action: DetailAction) => void | Promise<boolean | void>;
 /**
  * What the review dialog asks for. `save` and `approve` carry the text as it stands in the form: the container saves
  * it (saveSequenceDraft) and, for `approve`, approves only after that save succeeded, because an approval binds to the
- * exact content. `markReviewed` is reported once when a draft nobody opened is opened (markDraftReviewed).
+ * exact content. `markReviewed` is the BD's explicit "Revisado" click (markDraftReviewed); opening or closing the dialog never sends it.
  */
 export type ReviewAction =
   /** `version` is draftVersion() of the text the dialog showed: the server refuses the mark when the stored text moved on. */

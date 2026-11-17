@@ -5,7 +5,7 @@
  * that lands the same version (another action already refreshed) must still end it. It also ends when the dialog closes,
  * when another draft is shown, or on timeout, so the button always becomes usable again and a reopened draft never starts
  * with the previous session's pending state. `reads` moves only when a reload of THIS draft was answered: it remounts the
- * form with the current text and re-reports the review mark once.
+ * form with the current text, and the dialog takes the new text's version for "Revisado".
  */
 export type ReloadState = { pending: { key: string; marker: unknown } | null; reads: number };
 export type ReloadEvent =

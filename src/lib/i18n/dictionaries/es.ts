@@ -3921,6 +3921,9 @@ export const es: typeof en = {
     regenConfirmCancel: "Cancelar",
     regenConfirmAction: "Regenerar igual",
     reviewSave: "Guardar sin aprobar",
+    reviewMarkReviewed: "Revisado",
+    reviewMarkReviewedDirty: "Tenés cambios sin guardar. Guardalos primero: marcar como revisado reporta el texto guardado, no el que estás escribiendo.",
+    reviewMarkReviewedHelp: "Marcá este borrador como revisado. Es lo que habilita aprobarlo junto con otros en lote. Cerrar la ventana no lo marca.",
     reviewApprove: "Aprobar y programar",
     reviewApproveNow: "Aprobar y enviar ahora",
     bulkApproveNow: "Aprobar y enviar ahora los {n}",
@@ -3961,10 +3964,12 @@ export const es: typeof en = {
     bulkApproveOne: "Aprobar y programar el borrador",
     bulkAriaAll: "Acciones masivas, todos revisados",
     bulkAriaPartial: "Acciones masivas, revisión incompleta",
-    // The review-gate reason, in the bar and as the disabled button's title: "<missing> <pending>" ("Faltan 3 borradores por abrir").
+    // The review-gate reason, in the bar and as the disabled button's title: "<missing> <pending>" ("Faltan 3 borradores por revisar").
+    // "por revisar", not "por abrir": opening a draft stopped marking it reviewed when the dialog gained its own
+    // "Revisado" button. A gate that names the wrong act sends the BD to click something that unlocks nothing.
     bulkMissing: "Faltan {n} borradores",
     bulkMissingOne: "Falta 1 borrador",
-    bulkMissingPending: "por abrir",
+    bulkMissingPending: "por revisar",
     bulkBlockedWhy: "Aprobar a ciegas en bloque es exactamente lo que este bloqueo evita.",
     bulkRemoveBody: "Elegí un motivo: se aplica a los {n} contactos seleccionados.",
     bulkRemoveBodyOne: "Elegí un motivo para quitar al contacto seleccionado.",
@@ -3988,7 +3993,7 @@ export const es: typeof en = {
       not_editable: "Este borrador ya no se puede editar.",
       not_approvable: "Este contacto ya no está en un estado que se pueda aprobar.",
       no_draft: "Este contacto no tiene un borrador para aprobar.",
-      unreviewed: "Abrí cada borrador antes de aprobarlo en bloque.",
+      unreviewed: "Marcá cada borrador como revisado antes de aprobarlo en bloque.",
       wrong_language: "Este borrador está en otro idioma que el que usaríamos hoy. Regeneralo o mantenelo en su idioma antes de aprobar.",
       unmapped_market: "No podemos ubicar al contacto en un país, o su país está bajo embargo, así que ningún correo puede llevar su pie legal. Corregí la ubicación del contacto antes de aprobar.",
       missing_footer: "Al borrador le falta el pie de baja que corresponde a la región de este contacto. Regeneralo para recuperarlo antes de aprobar.",
@@ -4012,7 +4017,7 @@ export const es: typeof en = {
       suppressed: "La dirección está en la lista de no contactar.",
       duplicate: "Este contacto ya está en la secuencia.",
     },
-    toastSaved: "Borrador guardado. Hay que abrirlo de nuevo para revisarlo.",
+    toastSaved: "Borrador guardado.",
     toastApproved: "Aprobado. Sale en el próximo envío.",
     bulkRefusedLine: "{reason} Afectados: {names}.",
     bulkRefusedMore: "+{n} más",
