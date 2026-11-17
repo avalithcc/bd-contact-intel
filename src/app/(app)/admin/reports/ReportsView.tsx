@@ -599,6 +599,10 @@ export function ReportsView({
                 </tr>
               </tbody>
             </table>
+            {/* Two sentences, both earning their place: why the new column is here at all, and the one thing a reader
+                cannot discover — that the overflow "+N" is only reachable on hover. The approved mockup
+                (admin-role-group-visibility) carries both; the implementation shipped with only the history caveat. */}
+            <div className="card-footer meta">{dict.queueExcludedRolesFoot}</div>
             <div className="card-footer meta">{dict.queueRecentFoot}</div>
           </>
         ) : (
