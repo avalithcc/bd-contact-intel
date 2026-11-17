@@ -222,7 +222,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         {q && (
           <span className="chip">
             <span className="k">{l.searchFilterLabel}</span> {q}
-            <Link href={clearFilterHref("q")} aria-label={l.removeFilter}>
+            <Link href={clearFilterHref("q")} aria-label={l.removeFilter} className="chip-remove">
               ×
             </Link>
           </span>
@@ -230,7 +230,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         <span className="chip">
           <span className="k">{l.stageFilterLabel}</span> {stage ? stageLabel(stage) : l.stageAny}
           {stage && (
-            <Link href={clearFilterHref("stage")} aria-label={l.removeFilter}>
+            <Link href={clearFilterHref("stage")} aria-label={l.removeFilter} className="chip-remove">
               ×
             </Link>
           )}
@@ -244,7 +244,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         {industry && (
           <span className="chip">
             <span className="k">{l.filterIndustryLabel}</span> {industry}
-            <Link href={clearFilterHref("industry")} aria-label={l.removeFilter}>
+            <Link href={clearFilterHref("industry")} aria-label={l.removeFilter} className="chip-remove">
               ×
             </Link>
           </span>
@@ -252,7 +252,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         {owner && (
           <span className="chip">
             <span className="k">{l.filterOwnerLabel}</span> {ownerNameFor(owner)}
-            <Link href={clearFilterHref("owner")} aria-label={l.removeFilter}>
+            <Link href={clearFilterHref("owner")} aria-label={l.removeFilter} className="chip-remove">
               ×
             </Link>
           </span>
@@ -267,7 +267,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         {accountType && (
           <span className="chip">
             <span className="k">{l.filterAccountTypeLabel}</span> {accountTypeLabelFor(accountType)}
-            <Link href={clearFilterHref("accountType")} aria-label={l.removeFilter}>
+            <Link href={clearFilterHref("accountType")} aria-label={l.removeFilter} className="chip-remove">
               ×
             </Link>
           </span>
@@ -278,7 +278,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         {clientStatus && (
           <span className="chip">
             <span className="k">{l.filterClientStatusLabel}</span> {clientStatusLabelFor(clientStatus)}
-            <Link href={clearFilterHref("clientStatus")} aria-label={l.removeFilter}>
+            <Link href={clearFilterHref("clientStatus")} aria-label={l.removeFilter} className="chip-remove">
               ×
             </Link>
           </span>
@@ -287,7 +287,7 @@ export default async function CompaniesPage({ searchParams }: CompaniesPageProps
         {linkedin && (
           <span className="chip">
             <span className="k">{l.filterLinkedinLabel}</span> {linkedinLabelFor(linkedin)}
-            <Link href={clearFilterHref("linkedin")} aria-label={l.removeFilter}>
+            <Link href={clearFilterHref("linkedin")} aria-label={l.removeFilter} className="chip-remove">
               ×
             </Link>
           </span>

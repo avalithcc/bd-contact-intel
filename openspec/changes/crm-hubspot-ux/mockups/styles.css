@@ -184,6 +184,7 @@ kbd, .kbd {
 .mb-lg { margin-bottom: var(--space-lg); }
 .hr { height: 1px; background: var(--color-border); border: 0; margin: var(--space-lg) 0; }
 .hr.flush { margin: 0; }
+.mt-sm { margin-top: var(--space-sm); }
 .mt-md { margin-top: var(--space-md); }
 .center { text-align: center; }
 .pad-2xs { padding: var(--space-2xs); }

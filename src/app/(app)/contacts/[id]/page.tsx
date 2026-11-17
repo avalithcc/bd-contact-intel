@@ -720,7 +720,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                   </div>
                 ))
               ) : (
-                <div className="placeholder">{l.connectedBdsEmpty}</div>
+                <div className="muted">{l.connectedBdsEmpty}</div>
               )}
             </div>
           </div>
@@ -785,7 +785,7 @@ export default async function ContactRecordPage({ params, searchParams }: Contac
                   </div>
                 ))
               ) : (
-                <div className="placeholder">{l.tasksCardEmpty}</div>
+                <div className="muted">{l.tasksCardEmpty}</div>
               )}
             </div>
           </div>
