@@ -3,6 +3,7 @@
  * list handed in (the read must not truncate it: a count taken from a cut list is a number nobody can tell is wrong), and
  * the badges are a partition of the members by current state, so they add up to the contact count the row states.
  */
+import { CLOSED_STATES } from "@/lib/sequences/memberState";
 import { DAILY_SEND_CAP_WARN_ABOVE } from "./capValidation";
 import { miamiCalendarDate } from "./miamiTime";
 import type { Schedule } from "./schedule";
@@ -30,7 +31,14 @@ export function listView(rows: readonly SequenceListRow[]) {
       review: stats.toReview, noDraft: n((s) => s.state === "drafted" && !s.hasDraft), queued: stats.queued,
       sent: n((s) => s.state === "sent" || s.state === "no_reply"), replied: stats.replied, removed: n((s) => s.state === "discarded"),
     };
-    return { id: r.id, name: r.name, createdAt: r.createdAt, total: stats.total, counts, segments: stats.segments, companies: r.companies, cap: r.dailySendCap, capHigh: r.dailySendCap > DAILY_SEND_CAP_WARN_ABOVE, afterDays: r.schedule.step2.afterDays, nextReleaseAt: stats.nextReleaseAt, owner: r.owner };
+    // The sidebar pill counts Sequences with at least one member OUTSIDE CLOSED_STATES (appShellBadgeCountsQuery.ts),
+    // while this list shows every Sequence the BD owns. A finished one therefore appears here and not there, and the
+    // owner read the two numbers as a contradiction. The counts are both right; nothing said so. This is what says it.
+    //
+    // `total > 0` matters: an empty Sequence has no member outside the closed states either, but it is not finished —
+    // nothing was ever sent — and labelling it so would be a lie in the opposite direction.
+    const finished = stats.total > 0 && r.members.every((m) => (CLOSED_STATES as readonly string[]).includes(m.state));
+    return { id: r.id, name: r.name, createdAt: r.createdAt, total: stats.total, counts, finished, segments: stats.segments, companies: r.companies, cap: r.dailySendCap, capHigh: r.dailySendCap > DAILY_SEND_CAP_WARN_ABOVE, afterDays: r.schedule.step2.afterDays, nextReleaseAt: stats.nextReleaseAt, owner: r.owner };
   });
   const releases = views.flatMap((v) => (v.nextReleaseAt ? [v.nextReleaseAt.getTime()] : []));
   const sum = (pick: (v: (typeof views)[number]) => number) => views.reduce((acc, v) => acc + pick(v), 0);

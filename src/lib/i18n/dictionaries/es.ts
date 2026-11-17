@@ -4116,6 +4116,8 @@ export const es: typeof en = {
     listTabAll: "Todas",
     listTabsLabel: "Vistas de secuencias",
     listColOwner: "Responsable",
+    listFinished: "Terminada",
+    listFinishedTitle: "Todos sus contactos respondieron, no respondieron o fueron descartados. Por eso no suma en el contador de la barra lateral, que solo cuenta secuencias con algo pendiente.",
     listOwnerMe: "(yo)",
     listOwnerFilterLabel: "Filtrar por responsable",
     listAllNote: "Se muestran las secuencias de todos los BD",
