@@ -8,6 +8,7 @@ import { fillTemplate } from "@/lib/i18n/template";
 import { argentinaCalendarDate } from "@/lib/tasks/argentinaDate";
 import { InfoIcon } from "@/components/icons";
 import { statusBadgeClass } from "@/lib/contacts/statusBadge";
+import { roleGroupLabel } from "@/lib/followUp/roleGroupLabel";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { roleGroupPanelLabels, roleGroupPanelRows } from "@/lib/followUp/roleGroupPanelProps";
@@ -94,6 +95,12 @@ export default async function FollowUpsPage() {
                 {name}
               </Link>
               <span className={statusBadgeClass(item.dueStatus)}>{dict.leadStatuses[item.dueStatus]}</span>
+              {/* follow-up-role-groups, mockup decision 5: it answers "why is this person in my queue today", and it is
+                  the only place a BD sees a group they meant to exclude still taking one of the ten daily slots.
+                  Absent when the contact was never classified — a blank badge would say less than no badge. */}
+              {roleGroupLabel(item.roleGroup, dict.roleGroups) && (
+                <span className="badge badge-outline no-dot">{roleGroupLabel(item.roleGroup, dict.roleGroups)}</span>
+              )}
               {due && <span className="badge badge-warn no-dot">{l.overdueBadge}</span>}
             </div>
             {headline && <p className="headline">{headline}</p>}
