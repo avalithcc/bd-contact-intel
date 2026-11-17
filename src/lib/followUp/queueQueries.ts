@@ -38,6 +38,8 @@ export interface FollowUpQueueRow {
   companyKey: string | null;
   companyName: string | null;
   workedToday: boolean;
+  /** True when the queue's own BD has a personal (non-sequence) email_sent to this contact. */
+  emailedByMe: boolean;
 }
 
 /**
@@ -91,6 +93,27 @@ function workedTodayExists(now: Date) {
   );
 }
 
+/**
+ * Correlated EXISTS ("emailed by me"), same style as `workedTodayExists` — one select, never a per-row query (rule 7).
+ * A personal email is an `email_sent` activity with NO `metadata.sequenceId` (a sequence send is not personal), whose
+ * actor is the BD this queue row belongs to (`follow_up_queue_item.bd_id`), so every BD sees their own mail only.
+ */
+function emailedByMeExists() {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(activity)
+      .where(
+        and(
+          eq(activity.personId, followUpQueueItem.personId),
+          eq(activity.type, "email_sent"),
+          eq(activity.actorBdId, followUpQueueItem.bdId),
+          sql`${activity.metadata} ->> 'sequenceId' is null`,
+        ),
+      ),
+  );
+}
+
 /** Exported for tests, which pass a rolled-back transaction as `executor`. */
 export async function readQueueRows(
   bdId: string,
@@ -117,6 +140,7 @@ export async function readQueueRows(
       companyKey: person.companyKey,
       companyName: company.displayName,
       workedToday: workedTodayExists(now),
+      emailedByMe: emailedByMeExists(),
     })
     .from(followUpQueueItem)
     .innerJoin(person, eq(person.id, followUpQueueItem.personId))
@@ -147,6 +171,7 @@ export async function readQueueRows(
     state: (r.queueDate < queueDate ? "pending" : r.state) as FollowUpQueueRow["state"],
     dueStatus: r.dueStatus as FollowUpQueueRow["dueStatus"],
     workedToday: Boolean(r.workedToday),
+    emailedByMe: Boolean(r.emailedByMe),
   }));
 }
 

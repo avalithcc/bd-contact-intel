@@ -2108,6 +2108,8 @@ export const es: typeof en = {
     overdueTitle: "Vencidos",
     todayTitle: "Hoy",
     overdueBadge: "Vencido",
+    emailedByMeBadge: "Le escribiste",
+    emailedByMeTitle: "Le escribiste vos, desde tu propio correo, de forma personal. No es un envío de secuencia.",
     queuedSince: "en la cola desde {date}",
     overdueAgo: "vencido hace {n} d",
     dueTomorrow: "Vence mañana",

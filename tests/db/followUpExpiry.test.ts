@@ -584,3 +584,36 @@ test("a LinkedIn message received today also closes it for the page", async () =
     assert.equal((await read(tx, bdId, d0)).length, 0);
   });
 });
+
+test("emailedByMe: true only for a personal email_sent by the queue's own BD, not another BD, a sequence send, or a non-email", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { activity, bd, person } = await import("@/db/schema");
+    const me = await seedBd(tx);
+    const [other] = await tx.insert(bd).values({ email: `zz-other-${Math.random().toString(36).slice(2)}@example.test`, name: "ZZ Other" }).returning();
+    const d0 = await today();
+    const mk = async (label: string) => {
+      const [p] = await tx.insert(person).values({ firstName: label, lastName: "Mine", ownerBdId: me, status: "contacted" }).returning();
+      return p!.id;
+    };
+    const touch = { occurredAt: ago(6).toISOString() };
+    const send = (personId: string, actor: string, extra: Record<string, unknown> = {}, type = "email_sent") =>
+      tx.insert(activity).values({ personId, actorBdId: actor, type, metadata: { ...touch, ...extra }, createdAt: ago(6) });
+    const manual = await mk("manual");
+    const byOther = await mk("byother");
+    const seq = await mk("seq");
+    const call = await mk("call");
+    await send(manual, me);
+    await send(byOther, other!.id);
+    await send(seq, me, { sequenceId: "00000000-0000-0000-0000-000000000001" });
+    await send(call, me, {}, "call");
+    // The call contact needs a non-email touch to enter the queue at all.
+    await send(call, me, {}, "reply_received");
+    await materialize(tx, me, d0);
+    const rows = await read(tx, me, d0);
+    const flag = (id: string) => rows.find((r) => r.personId === id)?.emailedByMe;
+    assert.equal(flag(manual), true);
+    assert.equal(flag(byOther), false);
+    assert.equal(flag(seq), false);
+    assert.equal(flag(call), false);
+  });
+});

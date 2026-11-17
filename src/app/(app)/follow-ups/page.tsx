@@ -1,3 +1,4 @@
+import { EmailedByMeBadge } from "./EmailedByMeBadge";
 import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
@@ -101,6 +102,7 @@ export default async function FollowUpsPage() {
               {roleGroupLabel(item.roleGroup, dict.roleGroups) && (
                 <span className="badge badge-outline no-dot">{roleGroupLabel(item.roleGroup, dict.roleGroups)}</span>
               )}
+              <EmailedByMeBadge emailedByMe={item.emailedByMe} label={l.emailedByMeBadge} title={l.emailedByMeTitle} />
               {due && <span className="badge badge-warn no-dot">{l.overdueBadge}</span>}
             </div>
             {headline && <p className="headline">{headline}</p>}
