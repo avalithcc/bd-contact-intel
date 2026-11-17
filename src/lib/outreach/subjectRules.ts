@@ -134,3 +134,17 @@ export function bannedVocabularyPromptLine(): string {
   const quoted = SUBJECT_BANNED_PHRASES.map((t) => `"${t}"`).join(", ");
   return `Never use vendor vocabulary: ${quoted}. This also covers the same words written apart — "capacidad de ingeniería senior" is as forbidden as "capacidad senior". A subject containing any of them is rejected and regenerated, so it costs you a retry.`;
 }
+
+const REPLY_PREFIX = /^re:\s*/i;
+
+/**
+ * The subject of a step 2 reminder: step 1's subject behind a single "Re: ". A reminder is always sent threaded onto step 1,
+ * so it inherits the subject instead of getting a generated one (the model's own step 2 subjects drifted, and one named
+ * Avalith as the recipient). Idempotent: an existing reply prefix in any case, with or without the space, is normalized
+ * rather than doubled. Deliberately NOT truncated to SUBJECT_MAX_CHARS: the inherited text is already compliant and a reply
+ * prefix must never cut it.
+ */
+export function reminderSubject(step1Subject: string): string {
+  const base = step1Subject.trim().replace(REPLY_PREFIX, "").trim();
+  return `Re: ${base}`;
+}

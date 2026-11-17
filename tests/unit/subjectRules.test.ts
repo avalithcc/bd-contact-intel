@@ -103,3 +103,17 @@ describe("describeViolations", () => {
     assert.ok(text.includes("Avalith"), text);
   });
 });
+
+describe("reminderSubject", () => {
+  it("prefixes a bare subject and is idempotent across reply prefixes", async () => {
+    const { reminderSubject } = await import("@/lib/outreach/subjectRules");
+    assert.equal(reminderSubject("Ingenieria para tu equipo"), "Re: Ingenieria para tu equipo");
+    for (const s of ["Re: X", "RE: X", "re: X", "Re:X", "RE:X", "re:X", "  Re: X  "]) assert.equal(reminderSubject(s), s.trim().replace(/^re:\s*/i, "Re: "), s);
+    assert.equal(reminderSubject(reminderSubject("X")), "Re: X");
+  });
+  it("never truncates the inherited text", async () => {
+    const { reminderSubject } = await import("@/lib/outreach/subjectRules");
+    const long = "a".repeat(SUBJECT_MAX_CHARS);
+    assert.equal(reminderSubject(long), `Re: ${long}`);
+  });
+});
