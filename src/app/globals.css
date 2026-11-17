@@ -1166,6 +1166,12 @@ a:hover {
 .mt-2xs {
   margin-top: var(--space-2xs);
 }
+/* The scale skipped `sm` while `--space-sm` existed, so AbsorbedDialog.tsx and the absorption mockup both reached for
+   a `.mt-sm` that was defined nowhere and silently got no margin. Added rather than rewritten to `mt-md`: the gap was
+   the defect, and the next person will reach for it too. */
+.mt-sm {
+  margin-top: var(--space-sm);
+}
 .mt-md {
   margin-top: var(--space-md);
 }
