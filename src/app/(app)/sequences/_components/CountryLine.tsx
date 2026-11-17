@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { EditPencilIcon, ExternalLinkIcon } from "@/components/icons";
 import type { CountryLine as CountryLineView } from "@/lib/sequences/audienceCard";
+import { countryOptionsFor } from "@/lib/sequences/countryOptions";
 import { fill, type SequenceLabels } from "@/lib/sequences/viewText";
 import type { OnAction } from "./actions";
 
@@ -22,7 +23,7 @@ export function CountryLine({ view, memberId, personId, name, l, onAction }: { v
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const editRef = useRef<HTMLButtonElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLSelectElement>(null);
   const wasEditing = useRef(false);
 
   // Focus moves into the field when it opens and back to the pencil when it closes.
@@ -58,7 +59,22 @@ export function CountryLine({ view, memberId, personId, name, l, onAction }: { v
       <span className="meta">{t.countryLabel}</span>
       {editing ? (
         <form className="row" style={{ gap: ".25rem" }} onSubmit={save} onKeyDown={(e) => { if (e.key === "Escape" && !busy) setEditing(false); }}>
-          <input ref={inputRef} className="input input-sm" aria-label={fill(t.countryInputAria, { name })} value={value} onChange={(e) => setValue(e.target.value)} disabled={busy} />
+          {/* A select, not a text box: its options are derived from the same table `resolveCountry` matches against
+              (see countryOptions.ts), so a BD cannot store a spelling the audience resolver will not understand. An
+              unrecognised country does not degrade gracefully — it HOLDS the contact and no draft is ever written. */}
+          <select
+            ref={inputRef}
+            className="select input-sm"
+            aria-label={fill(t.countryInputAria, { name })}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            disabled={busy}
+          >
+            <option value="">{t.countryNone}</option>
+            {countryOptionsFor(view.person).map((o) => (
+              <option key={`${o.iso}-${o.label}`} value={o.label}>{o.label}</option>
+            ))}
+          </select>
           <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>{t.countrySave}</button>
           <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setEditing(false)}>{t.countryCancel}</button>
         </form>
