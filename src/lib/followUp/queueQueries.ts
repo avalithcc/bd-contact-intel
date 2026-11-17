@@ -34,6 +34,7 @@ export interface FollowUpQueueRow {
   firstName: string | null;
   lastName: string | null;
   jobTitle: string | null;
+  roleGroup: string | null;
   companyKey: string | null;
   companyName: string | null;
   workedToday: boolean;
@@ -110,6 +111,9 @@ export async function readQueueRows(
       firstName: person.firstName,
       lastName: person.lastName,
       jobTitle: person.jobTitle,
+      // follow-up-role-groups: the card shows which group a contact is in, so a BD can tell at a glance why someone is
+      // in today's queue - and spot a group they meant to exclude. Already an indexed column on person; no join added.
+      roleGroup: person.roleGroup,
       companyKey: person.companyKey,
       companyName: company.displayName,
       workedToday: workedTodayExists(now),
