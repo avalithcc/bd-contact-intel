@@ -171,7 +171,9 @@ test("the language is a two-option segmented with the current one on, and no dro
 
 test("the country line shows no definido when the person has none, and the pencil is the edit control", () => {
   const html = card(member("es"));
-  assert.ok(html.includes('<span class="meta">País:</span><button type="button" class="btn btn-ghost btn-sm" aria-label="Editar el país de Test1"><span class="meta">no definido</span>'), html);
+  // The missing value is `.soft` (dim, same size), not `.meta` (dim AND smaller) — it must not shrink relative to a
+  // present value. `.soft` lives in globals.css, not design-system.css; checking only the latter said it did not exist.
+  assert.ok(html.includes('<span class="meta">País:</span><button type="button" class="btn btn-ghost btn-sm" aria-label="Editar el país de Test1"><span class="soft">no definido</span>'), html);
 });
 
 test("a read-only viewer sees the country as text, with no edit button", () => {
@@ -179,14 +181,23 @@ test("a read-only viewer sees the country as text, with no edit button", () => {
   assert.ok(html.includes("País:") && html.includes("Chile") && !html.includes("Editar el país"), html);
 });
 
-test("the stale note names the stored language, the language and address that apply now, and never claims the old address", () => {
+/**
+ * The note ADDS to the alert it sits in; it must not restate it. The alert's own lead already names the stored
+ * language and the one that applies now, so the note carries only what the lead does not: that the written text was
+ * left alone (the owner's decision) and the address that applies today.
+ *
+ * It also must not say the change is optional. The alert immediately above says the draft cannot be approved as it
+ * stands — a gate that predates this feature (#440) — so wording like "regeneralo solo si querés" contradicted it.
+ */
+test("the stale note adds the untouched text and today's address, and never says the change is optional", () => {
   const html = card(member("en"));
-  assert.ok(html.includes("El borrador no cambió: sigue en inglés. Con lo que hay cargado hoy correspondería español y la dirección de Mar del Plata. Regeneralo solo si querés que use lo nuevo."), html);
-  assert.ok(!/dirección (anterior|vieja)|sigue con/.test(html));
+  assert.ok(html.includes("No tocamos el texto que ya estaba escrito. La dirección que correspondería hoy es Mar del Plata."), html);
+  assert.ok(!/solo si querés/.test(html), "must not contradict the approval block right above it");
+  assert.ok(!/dirección (anterior|vieja)|sigue con/.test(html), "the row does not store the old address, so it is never claimed");
 });
 
 test("a draft whose language matches carries no stale note", () => {
-  assert.ok(!card(member("es")).includes("El borrador no cambió"));
+  assert.ok(!card(member("es")).includes("No tocamos el texto"));
 });
 
 test("the English dictionary words the same new keys as plain strings", () => {

@@ -3772,7 +3772,6 @@ export const es: typeof en = {
       // Preferred language (person.preferred_language): the language reason is split from the address reason.
       preferredBy: "idioma preferido de {name}",
       preferredWithout: "Sin esa preferencia sería {resolved}.",
-      menuPreferredInRecord: "Cambiar el idioma preferido en la ficha",
       holdPreferredNote: "Su idioma preferido es {lang}, pero el idioma no resuelve la dirección.",
     },
     // Elegir el idioma antes de generar (LanguageChoiceDialog.tsx, AudienceBlock.tsx). La dirección nunca se elige.
@@ -3818,7 +3817,7 @@ export const es: typeof en = {
     languageMismatch: {
       badge: "Otro idioma",
       // Only what is stored (the draft's language) and what is computed now (language and address). The old address is not recorded, so it is never claimed.
-      staleNote: "El borrador no cambió: sigue en {draft}. Con lo que hay cargado hoy correspondería {now} y la dirección de {address}. Regeneralo solo si querés que use lo nuevo.",
+      staleNote: "No tocamos el texto que ya estaba escrito. La dirección que correspondería hoy es {address}.",
       badgeTitle: "El borrador está en {draft}; hoy le escribiríamos en {now}",
       lead: "El borrador está en {draft}, pero ahora le escribiríamos en {now}",
       blocked: "El correo no se puede aprobar así.",

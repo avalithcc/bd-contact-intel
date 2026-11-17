@@ -3768,7 +3768,6 @@ export const en = {
       generateDisabledTitle: "We need to know where they are to choose language and address",
       preferredBy: "preferred language of {name}",
       preferredWithout: "Without that preference it would be {resolved}.",
-      menuPreferredInRecord: "Change the preferred language in the record",
       holdPreferredNote: "Their preferred language is {lang}, but the language does not resolve the address.",
     },
     // Choosing the language before generating (LanguageChoiceDialog.tsx, AudienceBlock.tsx). The address is never chosen.
@@ -3812,7 +3811,7 @@ export const en = {
     // A draft written in another language than today's (languageMismatch.ts). Exits: regenerate (opens the language dialog) or keep (stores a person's choice).
     languageMismatch: {
       badge: "Other language",
-      staleNote: "The draft did not change: it is still in {draft}. With what is on file today it would be {now} and the {address} address. Regenerate it only if you want it to use the new data.",
+      staleNote: "We did not touch the text already written. The address that would apply today is {address}.",
       badgeTitle: "The draft is in {draft}; today we would write in {now}",
       lead: "The draft is in {draft}, but we would now write in {now}",
       blocked: "The email cannot be approved like this.",

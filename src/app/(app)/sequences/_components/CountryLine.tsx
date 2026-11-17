@@ -49,7 +49,10 @@ export function CountryLine({ view, memberId, personId, name, l, onAction }: { v
     }
   }
 
-  const shown = <span className={view.person ? "" : "meta"}>{view.person ?? t.countryNone}</span>;
+  // `.soft` (globals.css), not `.meta`: both dim the text, but `.meta` also drops it to --text-sm, which would make the
+  // missing value smaller than a present one. The app's CSS is split across design-system.css AND globals.css, and
+  // checking only the first is what made this read as "class does not exist".
+  const shown = <span className={view.person ? "" : "soft"}>{view.person ?? t.countryNone}</span>;
   return (
     <div className="row wrap" style={{ gap: ".35rem" }}>
       <span className="meta">{t.countryLabel}</span>
