@@ -2639,6 +2639,7 @@ export const en = {
     queueExcludedRoleGroupsNone: "—",
     queueEmpty: "The follow-up queue has no history yet for the selected period.",
     queueRecentFoot: "The follow-up queue launched recently — with less than a full period of history, this card still has little to compare against.",
+    queueExcludedRolesFoot: "\"Excluded roles\" is read-only: each BD sets their own in Seguimientos and administration does not change them. It sits on this card because adherence cannot be read without it — a BD who excludes groups is working a different queue, not the same queue harder. Hover a cell to see the full list.",
     total: "Total",
     bdColumn: "BD",
     dialogClose: "Close",

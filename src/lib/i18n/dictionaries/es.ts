@@ -2627,6 +2627,7 @@ export const es: typeof en = {
     queueExcludedRoleGroupsNone: "—",
     queueEmpty: "La cola de seguimientos todavía no tiene historial en el período seleccionado.",
     queueRecentFoot: "La cola de seguimientos se lanzó hace poco — con menos de un período completo de historial, esta tarjeta todavía tiene poca base para comparar.",
+    queueExcludedRolesFoot: "\"Roles excluidos\" es de solo lectura: cada BD configura los suyos en Seguimientos y administración no los cambia. Está en esta tarjeta porque la adherencia no se puede leer sin ellos — un BD que excluye grupos trabaja una cola distinta, no la misma cola con más empeño. Pasá el cursor sobre la celda para ver la lista completa.",
     total: "Total",
     bdColumn: "BD",
     dialogClose: "Cerrar",
