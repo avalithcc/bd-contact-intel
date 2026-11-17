@@ -117,3 +117,56 @@ describe("reminderSubject", () => {
     assert.equal(reminderSubject(long), `Re: ${long}`);
   });
 });
+
+// --- the headline form, and the fragment the owner chose ---------------------------------------------------------
+
+/**
+ * The owner received "Getnet abre backend y Salesforce en LATAM y España" and said it reads strangely: a news bulletin
+ * ABOUT him in the third person, not a line written TO him. The rule text never asked for that — the FIRST shape
+ * example was "Affirm suma backend en Card y Fraud", company plus a conjugated verb, and the model copies shapes.
+ *
+ * Grammar is not regex-detectable in general, so this check is deliberately high-precision rather than complete: a
+ * company name followed by punctuation or a connector is left alone, because neither makes the company act. Only a
+ * BARE word after the name turns the line into a headline.
+ */
+describe("a subject may not read as a headline about the recipient", () => {
+  it("rejects the company as the subject of a verb, naming it in the reason so the retry can fix it", () => {
+    for (const [subject, company] of [
+      ["Getnet abre backend y Salesforce en LATAM y España", "Getnet"],
+      ["Affirm suma backend en Card y Fraud", "Affirm"],
+    ] as const) {
+      const v = validateSubject(subject, { companyName: company });
+      assert.ok(v.some((x) => x.kind === "company_headline"), `not caught: ${subject}`);
+      assert.match(describeViolations(v), new RegExp(company), "the retry prompt must name the company it tripped on");
+    }
+  });
+
+  it("leaves a named company alone when it does not act: a colon or a connector is not a headline", () => {
+    // Both exist in production today. A check that rejected these would be worse than the problem it fixes.
+    for (const [subject, company] of [
+      ["Flybondi: una pregunta sobre ingeniería", "Flybondi"],
+      ["Plataforma 10 y el equipo de ingeniería", "Plataforma 10"],
+      ["Backend y Salesforce en LATAM y España", "Getnet"],
+    ] as const) {
+      assert.deepEqual(validateSubject(subject, { companyName: company }), [], `wrongly rejected: ${subject}`);
+    }
+  });
+
+  it("is inert without a company name, and never fires on a short one", () => {
+    assert.deepEqual(validateSubject("Backend y Salesforce en LATAM y España", {}), []);
+    assert.deepEqual(validateSubject("Ab abre backend en LATAM y en España hoy", { companyName: "Ab" }), [], "a 2-letter name is too ambiguous to judge");
+  });
+});
+
+/** The owner picked the neutral fragment over the direct question, so a question mark is a rejection, not a style. */
+describe("a subject is a fragment, not a question", () => {
+  it("rejects both the Spanish opening mark and the closing one", () => {
+    for (const s of ["¿Cómo están cubriendo backend en España?", "Como estan cubriendo backend en Espana?"]) {
+      assert.ok(validateSubject(s, {}).some((v) => v.kind === "asks_a_question"), `not caught: ${s}`);
+    }
+  });
+
+  it("does not fire on a subject that merely mentions a question", () => {
+    assert.deepEqual(validateSubject("Flybondi: una pregunta sobre ingeniería", { companyName: "Flybondi" }), []);
+  });
+});

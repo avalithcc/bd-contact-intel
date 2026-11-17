@@ -91,7 +91,7 @@ async function retryUntilSubjectPasses(
   let current = first;
 
   for (let attempt = 1; attempt <= SUBJECT_RETRY_ATTEMPTS; attempt++) {
-    const violations = validateSubject(current.subject, { senderName: ctx.input.senderName });
+    const violations = validateSubject(current.subject, { senderName: ctx.input.senderName, companyName: ctx.input.contact.companyName });
     if (violations.length === 0) return current;
 
     const { text, finishReason } = await ctx.generate({
@@ -107,7 +107,7 @@ async function retryUntilSubjectPasses(
     current = reparsed;
   }
 
-  const remaining = validateSubject(current.subject, { senderName: ctx.input.senderName });
+  const remaining = validateSubject(current.subject, { senderName: ctx.input.senderName, companyName: ctx.input.contact.companyName });
   if (remaining.length > 0) {
     console.error(
       `[outreach] subject still breaks the rule after ${SUBJECT_RETRY_ATTEMPTS} retries: ${JSON.stringify({ subject: current.subject, violations: remaining })}`,

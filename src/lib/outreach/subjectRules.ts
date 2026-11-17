@@ -54,7 +54,13 @@ export type SubjectViolation =
   | { kind: "banned_word_pair"; terms: [string, string] }
   | { kind: "too_long"; length: number; max: number }
   | { kind: "names_avalith" }
-  | { kind: "names_sender" };
+  | { kind: "names_sender" }
+  // The owner's choice: the subject is a neutral FRAGMENT naming what they are hiring for, not a question.
+  | { kind: "asks_a_question" }
+  // The headline form: the recipient's company as the subject of a verb, so the subject reads as a news bulletin ABOUT
+  // them instead of a line written TO them. Reported as "Getnet abre backend y Salesforce en LATAM y España", which is
+  // the first shape example ("Affirm suma backend en Card y Fraud") copied with another verb - the model copies shapes.
+  | { kind: "company_headline"; company: string };
 
 /** Lowercased and accent-stripped, so "ingeniería" and "ingenieria" are the same string to every check below. */
 export function normalizeSubject(subject: string): string {
@@ -77,7 +83,7 @@ function containsWord(haystack: string, word: string): boolean {
  * messagePrompt.ts: a missing company placeholder once made the model address Avalith as the recipient, and four of
  * those emails were sent. A subject reading "para Avalith" is that bug surfacing, so it is rejected outright.
  */
-export function validateSubject(subject: string, opts: { senderName?: string | null } = {}): SubjectViolation[] {
+export function validateSubject(subject: string, opts: { senderName?: string | null; companyName?: string | null } = {}): SubjectViolation[] {
   const violations: SubjectViolation[] = [];
   const normalized = normalizeSubject(subject);
 
@@ -106,6 +112,22 @@ export function validateSubject(subject: string, opts: { senderName?: string | n
     if (firstName.length > 2 && containsWord(normalized, firstName)) violations.push({ kind: "names_sender" });
   }
 
+  if (subject.includes("?") || subject.includes("\u00bf")) violations.push({ kind: "asks_a_question" });
+  // High precision on purpose: a company name followed by punctuation or a connector is fine ("Flybondi: una pregunta
+  // sobre ingenieria", "Plataforma 10 y el equipo de ingenieria"), because neither makes the company act. Only a BARE
+  // word after it turns the line into a headline. Grammar is not regex-detectable in general; this catches the one
+  // shape that was actually produced, and rejects nothing that exists today.
+  const company = opts.companyName?.trim();
+  if (company && company.length > 2) {
+    const head = normalizeSubject(subject);
+    const name = normalizeSubject(company);
+    if (head.startsWith(name)) {
+      const rest = head.slice(name.length).trimStart();
+      const next = rest.split(/\s+/)[0] ?? "";
+      const connector = next === "" || /^[:,\u2013\u2014-]/.test(rest) || ["y", "e", "and", "en", "in", "de", "of", "para", "for"].includes(next);
+      if (!connector) violations.push({ kind: "company_headline", company });
+    }
+  }
   return violations;
 }
 
@@ -122,6 +144,10 @@ export function describeViolations(violations: readonly SubjectViolation[]): str
           return `it was ${v.length} characters, over the hard maximum of ${v.max}`;
         case "names_avalith":
           return "it named Avalith, which the subject must never do";
+        case "asks_a_question":
+          return "it was a question; the subject must be a neutral fragment naming what they are hiring for, with no question mark";
+        case "company_headline":
+          return `it started with "${v.company}" followed by a verb, which reads as a news headline about them instead of a line written to them`;
         case "names_sender":
           return "it named the sender, which the subject must never do";
       }

@@ -20,6 +20,10 @@ function label(v: SubjectViolation): string {
       return "names_avalith";
     case "names_sender":
       return "names_sender";
+    case "asks_a_question":
+      return "asks_a_question";
+    case "company_headline":
+      return "company_headline";
   }
 }
 
