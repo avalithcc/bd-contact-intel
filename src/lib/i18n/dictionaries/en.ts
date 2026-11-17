@@ -4097,6 +4097,8 @@ export const en = {
     listTabAll: "All",
     listTabsLabel: "Sequence views",
     listColOwner: "Owner",
+    listFinished: "Finished",
+    listFinishedTitle: "Every contact replied, did not reply, or was discarded. That is why it does not add to the sidebar count, which only counts sequences with something left to do.",
     listOwnerMe: "(me)",
     listOwnerFilterLabel: "Filter by owner",
     listAllNote: "Showing every BD's Sequences",
