@@ -102,10 +102,14 @@ test("the help line is inside the footer, so it stays with the disabled approve,
   assert.ok(help, "the help line is in the footer");
   assert.ok(footer.includes(`aria-describedby="${help[1]}"`), "the disabled approve is described by it");
   assert.equal(html.split("Aprobar se habilita").length - 1, 1, "and only there");
-  // `.dialog-footer .left` (margin-right:auto) matches at any depth: the button row keeps the footer's own flex gap and the left button comes first.
-  const row = footer.slice(footer.indexOf('<div class="row"'));
-  assert.ok(row.indexOf('class="btn btn-ghost left"') >= 0 && row.indexOf('class="btn btn-ghost left"') < row.indexOf("Guardar sin aprobar") && row.indexOf("Guardar sin aprobar") < row.indexOf("Aprobar y enviar ahora"), row.slice(0, 200));
-  assert.ok(!footer.slice(0, footer.indexOf('<div class="row"')).includes("<button"), "no button outside the row");
+  // `.dialog-footer .left` is `margin-right: auto`, so exactly ONE element may carry it. Two did once the footer grew
+  // a fourth button, and the first was pushed past the modal's edge. The regenerates now share a single `.left` GROUP,
+  // and no individual button carries the class.
+  const row = footer.slice(footer.indexOf('<div class="row'));
+  assert.equal(row.split('class="row left"').length - 1, 1, "exactly one left-aligned group");
+  assert.ok(!row.includes('class="btn btn-ghost left"'), "no button carries .left itself any more");
+  assert.ok(row.indexOf('class="row left"') < row.indexOf("Guardar sin aprobar") && row.indexOf("Guardar sin aprobar") < row.indexOf("Aprobar y enviar ahora"), row.slice(0, 240));
+  assert.ok(!footer.slice(0, footer.indexOf('<div class="row')).includes("<button"), "no button outside the row");
 });
 
 test("role=alert is only for the dialog: the card's alert is a note", () => {

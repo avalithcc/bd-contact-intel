@@ -1575,6 +1575,10 @@ button.danger:not(.qa):hover:not(:disabled) {
 }
 .dialog-footer {
   display: flex;
+  /* A safety net, not the fix: a footer that outgrows the modal now wraps instead of pushing a button past the edge.
+     The sequence review footer did exactly that when it went from three buttons to four. The structural fix is that
+     `.left` below is `margin-right: auto` and therefore belongs to ONE left-aligned group, not to each button. */
+  flex-wrap: wrap;
   gap: var(--space-sm);
   justify-content: flex-end;
   padding: var(--space-md) var(--space-xl);

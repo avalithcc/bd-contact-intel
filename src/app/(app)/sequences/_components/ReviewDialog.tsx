@@ -105,14 +105,14 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   const footerButton = (id: ReviewFooterId) =>
     id === "regenerate" ? (
       // The spinner is the point: this used to only go disabled, and the dialog read as frozen while the model ran.
-      <button key={id} type="button" className="btn btn-ghost left" disabled={busy || regenerateLocked} aria-busy={generating ? "true" : undefined} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}>
+      <button key={id} type="button" className="btn btn-ghost" disabled={busy || regenerateLocked} aria-busy={generating ? "true" : undefined} onClick={() => onAction({ type: "regenerate", memberId: m.memberId, step })}>
         {generating ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}
         {generating ? l.generating : l.reviewRegenerate}
       </button>
     ) : id === "regenerateSubject" ? (
       // Offered HERE because this is where a BD reads the subject and decides it is weak. It was first shipped only in
       // the card's "⋯" menu, and the owner looked for it in this dialog, which is the obvious place to want it.
-      <button key={id} type="button" className="btn btn-ghost left" disabled={busy || regenerateLocked} aria-busy={generating ? "true" : undefined} onClick={() => onAction({ type: "regenerateSubject", memberId: m.memberId })}>
+      <button key={id} type="button" className="btn btn-ghost" disabled={busy || regenerateLocked} aria-busy={generating ? "true" : undefined} onClick={() => onAction({ type: "regenerateSubject", memberId: m.memberId })}>
         {generating ? <span className="spinner" aria-hidden="true" /> : <GenerateIcon className="icon" />}
         {generating ? l.generating : l.reviewRegenerateSubject}
       </button>
@@ -135,12 +135,30 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
       <button key={id} type="submit" form={formId} value={id} className={`btn ${id === "approve" ? "btn-primary" : "btn-secondary"}`} disabled={busy || (id === "approve" && mismatch !== null)} title={id === "approve" ? blockedTitle : undefined} aria-describedby={id === "approve" && mismatch ? helpId : undefined}>{id === "approve" ? l.reviewApprove : l.reviewSave}</button>
     );
 
+  /**
+   * `.dialog-footer .left` is `margin-right: auto`, which only works for ONE left-aligned item: with two, the first
+   * gets its own auto margin and is pushed past the modal's edge, and the footer does not wrap. That is exactly what
+   * happened when "Regenerar solo el asunto" made this footer go from three buttons to four.
+   *
+   * So the two regenerates share a single `.left` group, which is what that class was drawn for.
+   */
+  const footerRow = () => {
+    const left = view.footer.filter((id) => id === "regenerate" || id === "regenerateSubject");
+    const right = view.footer.filter((id) => id !== "regenerate" && id !== "regenerateSubject");
+    return (
+      <>
+        {left.length > 0 && <div className="row left" style={{ gap: "var(--space-sm)" }}>{left.map(footerButton)}</div>}
+        {right.map(footerButton)}
+      </>
+    );
+  };
+
   return (
     <Dialog open={open} onClose={onClose} title={title} wide closeDisabled={busy}
       footer={view.readOnly ? <button type="button" className="btn btn-secondary" onClick={onClose}>{l.reviewClose}</button> : mismatch ? (
         // The help line lives IN the footer so it cannot scroll away from the disabled button it explains.
-        <div className="stack-sm" style={{ width: "100%" }}><p className="help" id={helpId}>{l.languageMismatch.dialogApproveHelp}</p><div className="row" style={{ justifyContent: "flex-end" }}>{view.footer.map(footerButton)}</div></div>
-      ) : view.footer.map(footerButton)}>
+        <div className="stack-sm" style={{ width: "100%" }}><p className="help" id={helpId}>{l.languageMismatch.dialogApproveHelp}</p><div className="row wrap" style={{ justifyContent: "flex-end", gap: "var(--space-sm)" }}>{footerRow()}</div></div>
+      ) : footerRow()}>
       <form id={formId} className="stack" onSubmit={submit} key={`${m.memberId}-${step}-${reads}`}>
         {(stale || pending !== null) && (
           <div className="alert alert-warn" role="alert">
