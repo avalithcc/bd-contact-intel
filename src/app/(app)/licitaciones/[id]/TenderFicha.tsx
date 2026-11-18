@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { canAnalyse, currentDocument, type TenderAnalysis } from "@/lib/tenders/analysis";
 import type { TenderDetail, TenderEventView } from "@/lib/tenders/detail";
 import { isTenderTriage, type TenderTriage } from "@/lib/tenders/triage";
+import { fillTemplate } from "@/lib/i18n/template";
 import { formatAttachmentSize } from "@/lib/email/attachments/policy";
 import { formatArgentinaDayMonthTime, formatArgentinaDayMonthYear } from "@/lib/i18n/format";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -33,13 +34,13 @@ function eventText(e: TenderEventView, l: Dictionary["tenderDetail"], triage: Re
   const name = (s?: string) => (s && isTenderTriage(s) ? triage[s] : (s ?? ""));
   switch (e.kind) {
     case "triage":
-      return l.eventTriage(name(e.detail.from), name(e.detail.to));
+      return fillTemplate(l.eventTriage, { from: name(e.detail.from), to: name(e.detail.to) });
     case "note":
       return e.detail.text ? l.eventNote : l.eventNoteCleared;
     case "document":
-      return l.eventDocument(e.detail.filename ?? "");
+      return fillTemplate(l.eventDocument, { filename: e.detail.filename ?? "" });
     case "analysis":
-      return l.eventAnalysis(e.detail.filename ?? "");
+      return fillTemplate(l.eventAnalysis, { filename: e.detail.filename ?? "" });
   }
 }
 
@@ -169,7 +170,7 @@ export function TenderFicha({
               <a className="strong" href={`/licitaciones/${t.id}/documento`}>
                 {doc.filename}
               </a>{" "}
-              · {l.documentMeta(formatAttachmentSize(doc.sizeBytes), doc.uploadedBy, when(doc.createdAt))}
+              · {fillTemplate(doc.uploadedBy ? l.documentMetaBy : l.documentMeta, { size: formatAttachmentSize(doc.sizeBytes), who: doc.uploadedBy ?? "", when: when(doc.createdAt) })}
             </p>
           )}
           <TenderDocumentUpload
@@ -194,7 +195,10 @@ export function TenderFicha({
           )}
           {doc && analysis && (
             <>
-              <p className="help">{l.analysisGenerated(doc.filename, analysis.pages, doc.analyzedAt ? when(doc.analyzedAt) : "", doc.analyzedBy)}</p>
+              <p className="help">
+                {fillTemplate(analysis.pages ? l.analysisGeneratedPages : l.analysisGenerated, { filename: doc.filename, pages: String(analysis.pages ?? ""), when: doc.analyzedAt ? when(doc.analyzedAt) : "" })}
+                {doc.analyzedBy ? fillTemplate(l.analysisGeneratedBy, { who: doc.analyzedBy }) : ""}
+              </p>
               <Reading analysis={analysis} labels={l} />
             </>
           )}
