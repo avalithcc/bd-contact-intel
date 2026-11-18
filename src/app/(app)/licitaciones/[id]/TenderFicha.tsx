@@ -89,6 +89,9 @@ export function TenderFicha({
   const { tender: t, documents, events } = detail;
   const doc = currentDocument(documents);
   const analysis = doc?.analysis ?? null;
+  // An owner who is not an admin (cannot be set any more, but may predate the rule) is not in the options: show "no owner"
+  // rather than a select that silently displays the wrong person. The digest treats such a tender as unowned too.
+  const ownerValue = detail.bdOptions.some((o) => o.id === t.ownerBdId) ? (t.ownerBdId ?? "") : "";
   const triage = isTenderTriage(t.triageStatus) ? t.triageStatus : "a_revisar";
   const fields: [string, string][] = [
     [l.fieldFile, t.fileNumber],
@@ -142,7 +145,8 @@ export function TenderFicha({
               <div className="prop">
                 <dt>{l.ownerLabel}</dt>
                 <dd>
-                  <TenderOwnerSelect id={t.id} value={t.ownerBdId ?? ""} options={detail.bdOptions} noneLabel={l.ownerNone} ariaLabel={l.ownerLabel} errorLabel={l.ownerError} setOwner={actions.setOwner} />
+                  <TenderOwnerSelect id={t.id} value={ownerValue} options={detail.bdOptions} noneLabel={l.ownerNone} ariaLabel={l.ownerLabel} errorLabel={l.ownerError} setOwner={actions.setOwner} />
+                  <div className="meta">{l.ownerAdminsOnly}</div>
                 </dd>
               </div>
               <div className="prop">

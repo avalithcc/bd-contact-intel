@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { getCurrentBd } from "@/lib/queries";
+import { notFound } from "next/navigation";
+import { AdminRequiredError } from "@/lib/auth/adminRole";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getDictionary } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/i18n/server";
 import { listTenders, type TenderListRow } from "@/lib/tenders/queries";
@@ -21,8 +23,13 @@ const SOON_DAYS = 3;
 /** `?ver=todas` is the one-click way to everything, discarded and closed included; anything else is the default view. */
 export default async function TendersPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
   const view = (await searchParams).ver === "todas" ? "all" : "relevant";
-  // Anyone signed in sees every tender; getCurrentBd is the session gate, not an owner filter.
-  await getCurrentBd();
+  // Admin-only: a public tender is a business decision, not BD work. Admin screens 404 for everyone else.
+  try {
+    await requireAdmin();
+  } catch (err) {
+    if (err instanceof AdminRequiredError) notFound();
+    throw err;
+  }
   const [dict, locale] = await Promise.all([getDictionary(), getLocale()]);
   const l = dict.tendersPage;
   // One round trip: the rows and the total ride on the same statement.

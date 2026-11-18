@@ -33,7 +33,7 @@ const NOW = new Date("2026-11-18T11:30:00.000Z");
 const days = (n: number) => new Date(NOW.getTime() + n * 86_400_000 + 3 * 3_600_000);
 const tag = () => Math.random().toString(36).slice(2);
 
-async function seedBd(tx: Tx, name: string, over: { emailRemindersEnabled?: boolean } = {}) {
+async function seedBd(tx: Tx, name: string, over: { emailRemindersEnabled?: boolean; role?: string } = {}) {
   const { bd } = await import("@/db/schema");
   const [row] = await tx.insert(bd).values({ email: `zz-tc-${tag()}@example.test`, name, ...over }).returning();
   return row!.id;
@@ -50,13 +50,14 @@ test("assigning an owner sets it, logs who did it and to whom, and shows in the 
   const { listTenders } = await import("@/lib/tenders/queries");
   await inRolledBackTransaction(async (tx) => {
     const actor = await seedBd(tx, "ZZ Actor");
-    const owner = await seedBd(tx, "ZZ Owner");
+    const owner = await seedBd(tx, "ZZ Owner", { role: "admin" });
     const id = await seedTender(tx, "own", days(5));
     assert.equal(await setTenderOwner(id, owner, actor, tx as never), true);
     assert.equal(await setTenderOwner(id, owner, actor, tx as never), true, "same owner again is still a success");
     const detail = await getTenderDetail(id, NOW, tx as never);
     assert.equal(detail!.tender.ownerBdId, owner);
     assert.ok(detail!.bdOptions.some((o) => o.id === owner && o.name === "ZZ Owner"));
+    assert.ok(detail!.bdOptions.every((o) => o.id !== actor), "the actor is a plain BD: not offered as an owner");
     const owned = detail!.events.filter((e) => e.kind === "owner");
     assert.equal(owned.length, 1, "the second, unchanged call logged nothing");
     assert.deepEqual(owned[0]!.detail, { to: "ZZ Owner" });
@@ -70,7 +71,7 @@ test("releasing logs an empty owner, and an unknown BD or tender writes nothing 
   const { setTenderOwner, getTenderDetail } = await import("@/lib/tenders/workspace");
   await inRolledBackTransaction(async (tx) => {
     const actor = await seedBd(tx, "ZZ Actor");
-    const owner = await seedBd(tx, "ZZ Owner");
+    const owner = await seedBd(tx, "ZZ Owner", { role: "admin" });
     const id = await seedTender(tx, "rel", days(5), { ownerBdId: owner });
     assert.equal(await setTenderOwner(id, null, actor, tx as never), true);
     const detail = await getTenderDetail(id, NOW, tx as never);
@@ -83,11 +84,25 @@ test("releasing logs an empty owner, and an unknown BD or tender writes nothing 
   });
 });
 
+test("a non-admin cannot be assigned as owner: the write returns false and changes nothing", async () => {
+  const { setTenderOwner, getTenderDetail } = await import("@/lib/tenders/workspace");
+  await inRolledBackTransaction(async (tx) => {
+    const actor = await seedBd(tx, "ZZ Actor", { role: "admin" });
+    const plain = await seedBd(tx, "ZZ Plain");
+    const id = await seedTender(tx, "nonadmin", days(5));
+    assert.equal(await setTenderOwner(id, plain, actor, tx as never), false);
+    const detail = await getTenderDetail(id, NOW, tx as never);
+    assert.equal(detail!.tender.ownerBdId, null);
+    assert.equal(detail!.events.filter((e) => e.kind === "owner").length, 0);
+    assert.ok(!detail!.bdOptions.some((o) => o.id === plain));
+  });
+});
+
 test("deleting the owner BD releases the tender instead of blocking the delete (ON DELETE SET NULL)", async () => {
   const { bd, tender } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
   await inRolledBackTransaction(async (tx) => {
-    const owner = await seedBd(tx, "ZZ Leaver");
+    const owner = await seedBd(tx, "ZZ Leaver", { role: "admin" });
     const id = await seedTender(tx, "del", days(5), { ownerBdId: owner });
     await tx.delete(bd).where(eq(bd.id, owner));
     const [row] = await tx.select().from(tender).where(eq(tender.id, id));
@@ -115,18 +130,23 @@ test("the digest read keeps open, not-decided-no tenders inside 16 days and agre
   });
 });
 
-test("the digest read carries the owner and null for an unowned tender; recipients honour email_reminders_enabled", async () => {
+test("the digest read carries the owner with their role and null for an unowned tender; recipients are the admins, whatever email_reminders_enabled says", async () => {
   const { getClosingTendersForDigest, getTenderDigestRecipients } = await import("@/lib/tenders/digestQueries");
   await inRolledBackTransaction(async (tx) => {
-    const owner = await seedBd(tx, "ZZ Owner");
-    const muted = await seedBd(tx, "ZZ Muted", { emailRemindersEnabled: false });
+    const owner = await seedBd(tx, "ZZ Owner", { role: "admin" });
+    const mutedAdmin = await seedBd(tx, "ZZ Muted Admin", { role: "admin", emailRemindersEnabled: false });
+    const plain = await seedBd(tx, "ZZ Plain");
     const mineId = await seedTender(tx, "mine", days(3), { ownerBdId: owner });
+    const plainOwnedId = await seedTender(tx, "plain-owned", days(3), { ownerBdId: plain });
     const freeId = await seedTender(tx, "free", days(3));
     const rows = await getClosingTendersForDigest(NOW, 500, tx as never);
-    assert.equal(rows.find((r) => r.id === mineId)!.owner!.bdId, owner);
+    assert.deepEqual(rows.find((r) => r.id === mineId)!.owner, { bdId: owner, bdEmail: rows.find((r) => r.id === mineId)!.owner!.bdEmail, bdName: "ZZ Owner", bdRole: "admin" });
+    assert.equal(rows.find((r) => r.id === plainOwnedId)!.owner!.bdRole, "bd");
     assert.equal(rows.find((r) => r.id === freeId)!.owner, null);
     const recipients = await getTenderDigestRecipients(500, tx as never);
     assert.ok(recipients.some((r) => r.bdId === owner));
-    assert.ok(!recipients.some((r) => r.bdId === muted));
+    assert.ok(recipients.some((r) => r.bdId === mutedAdmin), "an admin is warned even with email_reminders_enabled = false");
+    assert.ok(!recipients.some((r) => r.bdId === plain), "a non-admin is never a tender recipient");
+    assert.ok(recipients.every((r) => r.bdRole === "admin"));
   });
 });

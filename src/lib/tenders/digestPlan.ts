@@ -1,12 +1,14 @@
 /**
  * Which tender reaches which BD in the 08:30 digest. Pure: no I/O, never mutates its inputs.
  *
- * A tender is lost by its deadline passing, so the rule is about who can still act. The owner is warned from 7 days out. A
- * relevant tender with NO owner has nobody to warn, so it goes to every BD, from 14 days out (nobody has started on it, so
- * the window is wider). Closed tenders never appear. "Relevant" is `tenderRelevance` (relevance.ts), the one definition:
+ * Tenders are admin-only (owner, 2026-11-18): the section and this digest are one permission, so a non-admin never gets a
+ * tender line, whatever they own. A tender is lost by its deadline passing, so the rule is about who can still act. An ADMIN
+ * owner is warned from 7 days out. A relevant tender with NO admin owner (none, or one who is not an admin and cannot open it)
+ * goes to every admin, from 14 days out (nobody has started on it, so the window is wider). Closed tenders never appear. "Relevant" is `tenderRelevance` (relevance.ts), the one definition:
  * a human's call beats the model's, and an unclassified tender is included because a failed model call must not hide a deadline.
  */
 import type { DigestTender, DigestTenders } from "@/lib/tasks/digestTenders";
+import { isAdminRole } from "@/lib/auth/adminRole";
 import { tenderRelevance, type RelevanceColumns } from "./relevance";
 import { tenderTiming } from "./timing";
 
@@ -17,6 +19,8 @@ export interface DigestBd {
   bdId: string;
   bdEmail: string;
   bdName: string;
+  /** `bd.role`: only an admin is ever planned a tender line. */
+  bdRole: string;
 }
 
 export interface ClosingTenderRow extends RelevanceColumns {
@@ -31,7 +35,7 @@ export interface PlannedBd extends DigestBd {
   tenders: DigestTenders;
 }
 
-/** `everyone` are the BDs that receive the unowned warning; an owner is added from the row itself even when absent from it. */
+/** `everyone` are the BDs that receive the unowned warning; non-admins in it are ignored. An admin owner is added from the row itself even when absent from it. */
 export function planTenderDigest(rows: readonly ClosingTenderRow[], everyone: readonly DigestBd[], now: Date): Map<string, PlannedBd> {
   const plan = new Map<string, PlannedBd>();
   const slot = (bd: DigestBd): PlannedBd => {
@@ -44,12 +48,12 @@ export function planTenderDigest(rows: readonly ClosingTenderRow[], everyone: re
   for (const { r, timing } of sorted) {
     if (timing.closed || tenderRelevance(r).state === "irrelevant") continue;
     const item: DigestTender = { id: r.id, processNumber: r.processNumber, name: r.name, openingAt: r.openingAt, daysLeft: timing.daysLeft };
-    if (r.owner) {
+    if (r.owner && isAdminRole({ role: r.owner.bdRole })) {
       if (timing.daysLeft <= TENDER_OWN_WINDOW_DAYS) slot(r.owner).tenders.mine.push(item);
     } else if (timing.daysLeft <= TENDER_UNOWNED_WINDOW_DAYS) {
       unowned.push(item);
     }
   }
-  if (unowned.length > 0) for (const bd of everyone) slot(bd).tenders.unowned = [...unowned];
+  if (unowned.length > 0) for (const bd of everyone) if (isAdminRole({ role: bd.bdRole })) slot(bd).tenders.unowned = [...unowned];
   return plan;
 }
