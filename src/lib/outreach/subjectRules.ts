@@ -23,10 +23,12 @@ export const SUBJECT_TARGET_MIN_CHARS = 35;
  * Vendor vocabulary, exactly as the prompt lists it. The prompt text below is BUILT from this array, so adding a term
  * here adds it to what the model is told and to what is enforced, in one edit.
  */
-// "oportunidad" was removed on 2026-11-18 by the owner. It sat on this list while his own call to action - pinned as
-// approved verbatim by messagePromptRegister.test.ts - used it, so the prompt asked for a word the checker rejected.
-// He chose the list, not the sentence. Its English twin "opportunity" is still banned: the English CTA does not use it,
-// so nothing there contradicts, and removing it was not asked for.
+// "oportunidad" and "opportunity" were both removed on 2026-11-18 by the owner. The Spanish one sat on this list while
+// his own call to action - pinned as approved verbatim by messagePromptRegister.test.ts - used it, so the prompt asked
+// for a word the checker rejected; he chose the list, not the sentence. The English twin followed on the same call, so
+// the two languages stay symmetric: the pairs here (soluciones/solutions, propuesta/proposal, servicios/services) are
+// meant to ban a CONCEPT, and banning it in one language only would reject an English draft for what a Spanish one may
+// say. Neither word appeared in any live subject or body when they were removed.
 export const SUBJECT_BANNED_PHRASES = [
   "capacidad senior",
   "staff augmentation",
@@ -37,7 +39,6 @@ export const SUBJECT_BANNED_PHRASES = [
   "servicios",
   "senior capacity",
   "solutions",
-  "opportunity",
   "proposal",
   "services",
 ] as const;
