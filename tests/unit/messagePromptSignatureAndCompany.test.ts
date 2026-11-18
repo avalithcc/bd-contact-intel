@@ -118,7 +118,9 @@ test("the subject rule bars Avalith, caps the length, and bans the vendor vocabu
   const subjectRule = rule(buildOutreachMessagePrompt(EMAIL).system, 12);
   assert.match(subjectRule, /NEVER name Avalith, and never name the sender, in the subject/);
   assert.match(subjectRule, /35-50 characters, never over 60/);
-  for (const word of ["capacidad senior", "staff augmentation", "squads", "nearshore", "soluciones", "oportunidad", "propuesta", "servicios", "solutions", "opportunity", "proposal", "services"]) {
+  // "oportunidad" is deliberately absent: the owner removed it on 2026-11-18 because his approved call to action uses
+  // it. Its English twin stays, since the English CTA does not. Driven off the constant below so the two cannot drift.
+  for (const word of ["capacidad senior", "staff augmentation", "squads", "nearshore", "soluciones", "propuesta", "servicios", "solutions", "opportunity", "proposal", "services"]) {
     assert.ok(subjectRule.includes(`"${word}"`) || subjectRule.includes(`"senior ${word}"`), `vendor word missing from the subject rule: ${word}`);
   }
   assert.match(subjectRule, /no "X para tu equipo", no "X para <company>"/);
