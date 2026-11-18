@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/i18n/server";
@@ -5,6 +6,7 @@ import { listTenders } from "@/lib/tenders/queries";
 import { isTenderTriage, type TenderTriage } from "@/lib/tenders/triage";
 import { formatArgentinaDayMonthTime } from "@/lib/i18n/format";
 import { TenderImportForm } from "./TenderImportForm";
+import { setTenderTriageAction } from "./actions";
 import { TenderTriageSelect } from "./TenderTriageSelect";
 
 // The session decides who may see the page, and the day count depends on "now": neither can be cached.
@@ -62,6 +64,9 @@ export default async function TendersPage() {
                 <th>{l.colAgency}</th>
                 <th>{l.colPortalState}</th>
                 <th>{l.colTriage}</th>
+                <th>
+                  <span className="sr-only">{l.colActions}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -83,7 +88,9 @@ export default async function TendersPage() {
                   </td>
                   <td>
                     <div className="stack-sm">
-                      <span className="strong">{r.name}</span>
+                      <Link className="strong" href={`/licitaciones/${r.id}`}>
+                        {r.name}
+                      </Link>
                       {r.processType && <div className="meta">{r.processType}</div>}
                     </div>
                   </td>
@@ -101,7 +108,13 @@ export default async function TendersPage() {
                       labels={triageLabels}
                       ariaLabel={l.triageAria(r.processNumber)}
                       errorLabel={l.triageError}
+                      setTriage={setTenderTriageAction}
                     />
+                  </td>
+                  <td className="right">
+                    <Link className="btn btn-secondary btn-sm" href={`/licitaciones/${r.id}`}>
+                      {l.open}
+                    </Link>
                   </td>
                 </tr>
               ))}

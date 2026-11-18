@@ -470,6 +470,13 @@
       "when": 1795206000000,
       "tag": "0066_tender",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1795292400000,
+      "tag": "0067_tender_workspace",
+      "breakpoints": true
     }
   ]
 }

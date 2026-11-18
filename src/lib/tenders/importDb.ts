@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, tender } from "@/db/schema";
 import { isUuid } from "@/lib/uuid";
@@ -101,14 +101,27 @@ export async function importTenders(
   });
 }
 
-/** Changes our triage state on one tender. False when the id matches nothing; throws on an invalid state or id. */
-export async function setTenderTriage(id: string, status: TenderTriage, database: Pick<typeof db, "update"> = db): Promise<boolean> {
+/**
+ * Changes our triage state on one tender and, when a BD is named, logs the move (from and to) in the same statement; picking
+ * the state it already has logs nothing. False when the id matches nothing; throws on an invalid state or id.
+ */
+export async function setTenderTriage(
+  id: string,
+  status: TenderTriage,
+  database: Pick<typeof db, "execute"> = db,
+  actorBdId: string | null = null,
+): Promise<boolean> {
   if (!isUuid(id)) throw new Error("setTenderTriage: id must be a uuid");
   if (!isTenderTriage(status)) throw new Error(`setTenderTriage: unknown state ${String(status)}`);
-  const rows = await database
-    .update(tender)
-    .set({ triageStatus: status, updatedAt: sql`now()` })
-    .where(eq(tender.id, id))
-    .returning({ id: tender.id });
-  return rows.length > 0;
+  const rows = (await database.execute(sql`
+    with old as (select triage_status from tender where id = ${id}::uuid),
+    upd as (update tender set triage_status = ${status}::text, updated_at = now() where id = ${id}::uuid returning id),
+    ev as (
+      insert into tender_event (tender_id, actor_bd_id, kind, detail, created_at)
+      select upd.id, ${actorBdId}::uuid, 'triage', jsonb_build_object('from', old.triage_status, 'to', ${status}::text), clock_timestamp()
+      from upd, old where old.triage_status <> ${status}::text
+      returning 1
+    )
+    select (select count(*) from upd)::int as found`)) as unknown as { found: number }[];
+  return (rows[0]?.found ?? 0) > 0;
 }

@@ -65,6 +65,8 @@ const CONVERTED_TABLES: readonly string[] = [
   "email_never_log",
   "task_digest_send",
   "tender",
+  "tender_document",
+  "tender_event",
   "job_posting",
   "contact",
   "conversation",
