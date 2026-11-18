@@ -15,6 +15,7 @@
  */
 import { resolveTaskSubject, type TaskSubjectInput } from "@/lib/tasks/subject";
 import { taskDueDate, type ArgentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
+import { daysUntilExpiry } from "@/lib/followUp/cycle";
 import {
   COLORS as C,
   FONT_STACK,
@@ -69,6 +70,45 @@ export function groupDigestTasks<T extends { dueAt: Date }>(
   return { today, yesterday, overdue };
 }
 
+/**
+ * A follow-up item is warned about when this many days or fewer remain before the day-10 drop. Same threshold as the card
+ * badges on /follow-ups (`deadlineBadgeClass`: warn at <= 3, danger at <= 1), so the email and the screen agree.
+ */
+export const EXPIRY_WARNING_DAYS = 3;
+
+/** One still-open queue item as the route reads it (the SQL decides "open" with `openCycleRowSql`, the expiry job's own rule). */
+export interface DigestFollowUpRow {
+  personId: string;
+  firstName: string | null;
+  lastName: string | null;
+  company: string | null;
+  /** ART `YYYY-MM-DD` the cycle entered the queue; the expiry clock counts from it. */
+  cycleStartedOn: string;
+}
+
+export interface ExpiringFollowUp {
+  personId: string;
+  name: string;
+  company: string | null;
+  daysLeft: number;
+}
+
+/**
+ * Keeps the items with `EXPIRY_WARNING_DAYS` or fewer days left (today = 0), one per person at the soonest deadline, soonest
+ * first. Days left is `daysUntilExpiry`, the number the cards show. Pure: never mutates `rows`.
+ */
+export function selectExpiringFollowUps(rows: readonly DigestFollowUpRow[], today: string): ExpiringFollowUp[] {
+  const byPerson = new Map<string, ExpiringFollowUp>();
+  for (const r of rows) {
+    const daysLeft = daysUntilExpiry(r.cycleStartedOn, today);
+    if (daysLeft < 0 || daysLeft > EXPIRY_WARNING_DAYS) continue;
+    const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim() || "Sin nombre";
+    const existing = byPerson.get(r.personId);
+    if (!existing || daysLeft < existing.daysLeft) byPerson.set(r.personId, { personId: r.personId, name, company: r.company, daysLeft });
+  }
+  return [...byPerson.values()].sort((a, b) => a.daysLeft - b.daysLeft || a.name.localeCompare(b.name));
+}
+
 export interface DigestRecipient {
   name: string;
   email: string;
@@ -90,7 +130,17 @@ function formatDueDate(dueAt: Date): string {
   return `${day}/${month}`;
 }
 
-function buildSubject(groups: DigestGroups<DigestTask>): string {
+function followUpsLabel(n: number): string {
+  return `${n} ${n === 1 ? "seguimiento" : "seguimientos"} por vencer`;
+}
+
+function daysLeftWords(daysLeft: number): string {
+  if (daysLeft <= 0) return "vence hoy";
+  if (daysLeft === 1) return "vence mañana";
+  return `vence en ${daysLeft} días`;
+}
+
+function buildSubject(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[]): string {
   const parts: string[] = [];
   if (groups.today.length > 0) parts.push(`${groups.today.length} para hoy`);
   if (groups.overdue.length > 0) {
@@ -98,6 +148,9 @@ function buildSubject(groups: DigestGroups<DigestTask>): string {
     parts.push(`${groups.overdue.length} ${word}`);
   }
   if (groups.yesterday.length > 0) parts.push(`${groups.yesterday.length} de ayer`);
+  if (expiring.length > 0) parts.push(followUpsLabel(expiring.length));
+  // Only follow-ups: there are no tasks for the "Tus tareas de hoy" lead to be about.
+  if (groups.today.length + groups.overdue.length + groups.yesterday.length === 0) return `${parts.join(", ")} en Avalith CRM`;
   return `Tus tareas de hoy — ${parts.join(", ")}`;
 }
 
@@ -107,7 +160,7 @@ function joinNatural(parts: string[]): string {
 }
 
 /** "Tenés 1 tarea para hoy y 1 pendiente de ayer." — the one-line summary (also the inbox preheader). */
-function buildSummary(groups: DigestGroups<DigestTask>): string {
+function buildSummary(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[]): string {
   const parts: string[] = [];
   if (groups.today.length > 0) {
     const noun = groups.today.length === 1 ? "tarea" : "tareas";
@@ -121,6 +174,7 @@ function buildSummary(groups: DigestGroups<DigestTask>): string {
     const noun = groups.overdue.length === 1 ? "tarea atrasada" : "tareas atrasadas";
     parts.push(`${groups.overdue.length} ${noun}`);
   }
+  if (expiring.length > 0) parts.push(followUpsLabel(expiring.length));
   return `Tenés ${joinNatural(parts)}.`;
 }
 
@@ -173,13 +227,48 @@ function renderSection(heading: string, all: DigestTask[], siteBaseUrl: string, 
   return { text, html };
 }
 
+/** The "Seguimientos por vencer" block: one line per contact, soonest first, linking to /follow-ups. */
+function renderFollowUpSection(all: readonly ExpiringFollowUp[], siteBaseUrl: string): { text: string; html: string } {
+  if (all.length === 0) return { text: "", html: "" };
+  const url = `${siteBaseUrl}/follow-ups`;
+  const shown = all.slice(0, DIGEST_MAX_ROWS_PER_GROUP);
+  const hidden = all.length - shown.length;
+  const label = (f: ExpiringFollowUp) => (f.company ? `${f.name} · ${f.company}` : f.name);
+  const tone = (f: ExpiringFollowUp): DueTone => (f.daysLeft <= 1 ? "danger" : "warn");
+  const rows = shown.map((f, i) => {
+    const words = daysLeftWords(f.daysLeft);
+    const last = i === shown.length - 1 && hidden === 0;
+    return {
+      text: `- ${label(f)} — ${words}`,
+      html:
+        `<tr><td style="padding:12px 16px;${last ? "" : `border-bottom:1px solid ${C.line};`}">` +
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>` +
+        `<td style="font-family:${FONT_STACK};font-size:14px;font-weight:700;color:${C.ink};word-break:break-word;">${escapeHtml(label(f))}</td>` +
+        `<td align="right" style="padding-left:12px;white-space:nowrap;">${emailPill(words, tone(f))}</td>` +
+        `</tr></table></td></tr>`,
+    };
+  });
+  const moreText = `y ${hidden} más en el CRM`;
+  const moreRow = hidden
+    ? `<tr><td style="padding:12px 16px;font-family:${FONT_STACK};font-size:13px;"><a href="${escapeHtml(url)}" style="color:${C.accentStrong};text-decoration:none;font-weight:700;">${moreText}</a></td></tr>`
+    : "";
+  const text = `Seguimientos por vencer (${all.length})\n${rows.map((r) => r.text).join("\n")}\n${hidden ? `${moreText}: ${url}\n` : ""}Ver seguimientos: ${url}\n`;
+  const html =
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">` +
+    `<tr><td style="padding:0 0 10px;font-family:${FONT_STACK};font-size:15px;font-weight:800;color:${C.ink};">Seguimientos por vencer ${emailPill(String(all.length), "danger", "margin-left:4px;padding:2px 8px;")}</td></tr>` +
+    `<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${C.line};border-radius:8px;border-collapse:separate;">${rows.map((r) => r.html).join("")}${moreRow}</table></td></tr>` +
+    `</table>${emailButton("Ver seguimientos", url)}`;
+  return { text, html };
+}
+
 /** At-a-glance counts strip: one cell per non-empty group (empty groups stay omitted), in section order. */
-function countsStrip(groups: DigestGroups<DigestTask>): string {
+function countsStrip(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[]): string {
   const shown = (
     [
       [groups.today.length, "Para hoy", "warn"],
       [groups.yesterday.length, "De ayer", "danger"],
       [groups.overdue.length, "Atrasadas", "danger"],
+      [expiring.length, "Por vencer", "danger"],
     ] as const
   ).filter(([n]) => n > 0);
   const cells = shown.map(
@@ -190,23 +279,26 @@ function countsStrip(groups: DigestGroups<DigestTask>): string {
 }
 
 const DIGEST_REASON =
-  "Recibís este resumen cada mañana porque tenés tareas pendientes en Avalith CRM. Si no hay tareas por atender, no enviamos nada.";
+  "Recibís este resumen cada mañana porque tenés tareas o seguimientos pendientes en Avalith CRM. Si no hay nada por atender, no enviamos nada.";
 
 /**
- * Builds the digest's subject/html/text, or `null` when every group is empty
- * (owner decision: "No email when all three groups are empty"). HTML comes from
+ * Builds the digest's subject/html/text, or `null` when every group AND the expiring follow-ups are empty
+ * (owner decision: "No email when all three groups are empty"; a BD with only expiring follow-ups, the one most likely to be
+ * ignoring the CRM, still gets the warning). HTML comes from
  * the shared email layout; the text twin carries the same sections and links.
  */
 export function buildDigestEmail(
   recipient: DigestRecipient,
   groups: DigestGroups<DigestTask>,
   siteBaseUrl: string,
+  expiring: readonly ExpiringFollowUp[] = [],
 ): DigestEmail | null {
-  if (groups.today.length + groups.overdue.length + groups.yesterday.length === 0) return null;
+  if (groups.today.length + groups.overdue.length + groups.yesterday.length + expiring.length === 0) return null;
 
-  const subject = buildSubject(groups);
-  const summary = buildSummary(groups);
+  const subject = buildSubject(groups, expiring);
+  const summary = buildSummary(groups, expiring);
   const firstName = recipient.name.split(" ")[0] || recipient.name;
+  const hasTasks = groups.today.length + groups.overdue.length + groups.yesterday.length > 0;
   const ctaUrl = `${siteBaseUrl}/tasks`;
   const greeting = `Buen día, ${firstName}.`;
 
@@ -216,19 +308,21 @@ export function buildDigestEmail(
     renderSection("Pendientes de ayer", groups.yesterday, siteBaseUrl, "danger"),
     renderSection("Atrasadas", groups.overdue, siteBaseUrl, "danger"),
   ].filter((s) => s.text !== "");
+  const followUps = renderFollowUpSection(expiring, siteBaseUrl);
 
   const bodyHtml =
     `<p style="margin:0 0 16px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${C.ink};">${escapeHtml(greeting)} ${escapeHtml(summary)}</p>` +
-    countsStrip(groups) +
-    emailButton("Ver mis tareas", ctaUrl) +
+    countsStrip(groups, expiring) +
+    (hasTasks ? emailButton("Ver mis tareas", ctaUrl) : "") +
     sections.map((s) => s.html).join("") +
-    emailButton("Ver mis tareas", ctaUrl);
+    (hasTasks ? emailButton("Ver mis tareas", ctaUrl) : "") +
+    followUps.html;
 
   const html = renderEmail({
     subject,
     preheader: summary,
     eyebrow: "Resumen diario",
-    title: "Tu resumen de tareas",
+    title: hasTasks ? "Tu resumen de tareas" : "Tus seguimientos por vencer",
     bodyHtml,
     reason: DIGEST_REASON,
     replies: false,
@@ -237,7 +331,10 @@ export function buildDigestEmail(
     .due-mobile-row { display: table-row !important; }`,
   });
   const text = renderEmailText({
-    body: `${greeting}\n\n${summary}\n\n${sections.map((s) => s.text).join("\n")}\nVer mis tareas: ${ctaUrl}`,
+    body:
+      `${greeting}\n\n${summary}\n\n${sections.map((s) => s.text).join("\n")}` +
+      (hasTasks ? `\nVer mis tareas: ${ctaUrl}\n` : "") +
+      (followUps.text ? `\n${followUps.text}` : ""),
     reason: DIGEST_REASON,
     replies: false,
   });

@@ -617,3 +617,27 @@ test("emailedByMe: true only for a personal email_sent by the queue's own BD, no
     assert.equal(flag(call), false);
   });
 });
+
+test("the digest warning lists exactly what the expiry job would drop: unworked items in the last 3 days, never a worked one", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { getExpiringFollowUpsForAllBds } = await import("@/lib/tasks/digestQueries");
+    const { expireOverdueFollowUps } = await import("@/lib/followUp/dropQueries");
+    const bdId = await seedBd(tx);
+    const d0 = await today();
+    const unworked = await seedPerson(tx, bdId, "unworked", "contacted", 6);
+    const worked = await seedPerson(tx, bdId, "worked", "contacted", 6);
+    await materialize(tx, bdId, d0);
+    await addActivity(tx, worked, "note", hoursAgo(1));
+
+    const d8 = await plusDays(d0, 8); // 2 days left
+    const listed = (await getExpiringFollowUpsForAllBds(d8, 5000, tx as never)).filter((r) => r.bdId === bdId);
+    assert.deepEqual(listed.map((r) => r.personId), [unworked], "the worked item is closed, only the unworked one is warned about");
+
+    const d5 = await plusDays(d0, 5); // 5 days left: outside the window
+    assert.equal((await getExpiringFollowUpsForAllBds(d5, 5000, tx as never)).filter((r) => r.bdId === bdId).length, 0);
+
+    const d10 = await plusDays(d0, 10);
+    const dropped = await expireOverdueFollowUps(d10, tx as never, { dryRun: true });
+    assert.equal(dropped, listed.length, "warned count equals what the job drops");
+  });
+});
