@@ -82,3 +82,30 @@ test("the prompt builder is pure: the same input twice gives the same output", (
   assert.deepEqual(a, b);
   assert.equal(JSON.stringify(input), snapshot);
 });
+
+/**
+ * Macarena generated her first sequence draft and it introduced her as Cristian. The rule text was never the problem:
+ * the reference-style exemplar hardcoded "Cristian Civita, COO de Avalith" in its sign-off AND its opening clause, and
+ * the comment above that exemplar says it out loud — "SHAPE is copied from the example even over a contradicting rule".
+ * The sender's real identity was already computed one function away (`signOff`) and simply never reached the exemplar.
+ *
+ * Caught before it was sent: one draft, zero deliveries. Every BD's name must flow through, and no other BD's name may
+ * appear anywhere in the prompt.
+ */
+for (const channel of ["email", "linkedin"] as const) {
+  for (const language of ["es", "en"] as const) {
+    test(`${channel}/${language}: the prompt carries the real sender and never another BD's name`, () => {
+      const sender = { senderName: "Macarena Dávila", senderTitle: undefined };
+      const { system } = buildOutreachMessagePrompt({ ...BASE, channel, language, ...sender });
+      assert.ok(system.includes("Macarena Dávila"), "the sender's own name never reached the prompt");
+      assert.doesNotMatch(system, /Cristian/, "another BD's name is in the prompt and the model will copy it");
+    });
+  }
+}
+
+test("a sender with a title is rendered with it, and one without a title gets no invented title", () => {
+  const withTitle = buildOutreachMessagePrompt({ ...BASE, channel: "email", language: "es", senderName: "Cristian Civita", senderTitle: "COO de Avalith" }).system;
+  assert.ok(withTitle.includes("Cristian Civita, COO de Avalith"));
+  const without = buildOutreachMessagePrompt({ ...BASE, channel: "email", language: "es", senderName: "Macarena Dávila", senderTitle: undefined }).system;
+  assert.doesNotMatch(without, /Macarena Dávila,\s*(COO|Chief)/, "a title was invented for a sender who has none on file");
+});
