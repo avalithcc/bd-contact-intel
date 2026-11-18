@@ -47,7 +47,14 @@ const PRODUCERS: ReadonlyArray<readonly [string, (d: Dict) => unknown]> = [
 ];
 
 /** Slices handed to a client component whole, without a producer in between. */
-const WHOLE_SLICES = ["sequences", "sendControl", "companyBulk", "tasksPage", "leadStatuses", "roleGroups"] as const;
+// "tenderDetail" and "tendersPage.triage" are here because they went to production as a WHITE SCREEN on 2026-11-18:
+// /licitaciones/[id] passed dict.tenderDetail straight into a client component and six of its entries were functions
+// (uploading, documentMeta, analysisGenerated, eventTriage, eventDocument, eventAnalysis). A function cannot cross the
+// server-to-client boundary. lint, 6137 unit tests and next build were all green - the unit test renders the component
+// directly in Node, where there is no boundary to cross - and only opening the real page in a browser found it.
+// Same cause as the /follow-ups outage. Any dictionary slice handed WHOLE to a client component belongs in this list.
+const WHOLE_SLICES = ["sequences", "sendControl", "companyBulk", "tasksPage", "leadStatuses", "roleGroups", "tenderDetail"] as const;
+const NESTED_SLICES = [["tendersPage", "triage"]] as const;
 
 const LOCALES = [
   ["en", en],
@@ -62,6 +69,11 @@ describe("client-bound labels are strings, in both locales", () => {
       });
     }
 
+    for (const [parent, child] of NESTED_SLICES) {
+      void it(`${locale}: dict.${parent}.${child} is strings only`, () => {
+        assert.doesNotThrow(() => assertClientStrings((((dict as Dict)[parent] as unknown) as Record<string, unknown>)[child]), `dict.${parent}.${child} leaks a non-string`);
+      });
+    }
     for (const slice of WHOLE_SLICES) {
       it(`${locale}: dict.${slice} crosses whole`, () => {
         assert.doesNotThrow(() => assertClientStrings((dict as Dict)[slice]), `dict.${slice} leaks a non-string`);

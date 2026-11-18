@@ -1,5 +1,7 @@
 "use client";
 
+import { fillTemplate } from "@/lib/i18n/template";
+
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { uploadAttachmentObject } from "@/lib/email/attachments/browserUpload";
@@ -18,7 +20,7 @@ export function TenderDocumentUpload({
 }: {
   tenderId: string;
   register: (input: { tenderId: string; storagePath: string; filename: string; size: number }) => Promise<{ ok: boolean }>;
-  labels: { label: string; help: string; uploading: (percent: number) => string; errors: Record<string, string> };
+  labels: { label: string; help: string; uploading: string; errors: Record<string, string> };
 }) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
@@ -68,7 +70,7 @@ export function TenderDocumentUpload({
           if (file) void onPick(file);
         }}
       />
-      <span className="help">{progress !== null ? labels.uploading(progress) : labels.help}</span>
+      <span className="help">{progress !== null ? fillTemplate(labels.uploading, { percent: String(progress) }) : labels.help}</span>
       {error && (
         <span role="alert" className="error-text">
           {error}
