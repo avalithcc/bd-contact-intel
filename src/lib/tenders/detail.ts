@@ -15,7 +15,7 @@ export interface TenderDocumentView {
   analyzedBy: string | null;
 }
 
-export type TenderEventKind = "triage" | "note" | "document" | "analysis" | "relevance";
+export type TenderEventKind = "triage" | "note" | "document" | "analysis" | "relevance" | "owner";
 
 export interface TenderEventView {
   id: string;
@@ -25,8 +25,16 @@ export interface TenderEventView {
   actor: string | null;
 }
 
+/** A BD a tender can be assigned to. */
+export interface BdOption {
+  id: string;
+  name: string;
+}
+
 export interface TenderDetail {
   tender: Tender & TenderTiming;
+  /** Every BD, by name, for the owner picker. */
+  bdOptions: BdOption[];
   /** Newest first. */
   documents: TenderDocumentView[];
   /** Newest first, bounded. */

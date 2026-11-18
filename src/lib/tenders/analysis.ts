@@ -8,6 +8,14 @@ export interface TenderRequirements {
   antecedents: string | null;
   guarantee: string | null;
   submissionDeadline: string | null;
+  /** Quality or security certifications the bidder must hold (ISO, CMMI and the like). */
+  certifications: string | null;
+  /** Balance sheets, turnover or other financial standing the bidder must prove. */
+  financialStanding: string | null;
+  /** The proposed team: CVs, degrees, credentials. */
+  team: string | null;
+  /** Sworn statements and annexes the pliego demands to be presented verbatim. */
+  affidavits: string | null;
 }
 
 export interface TenderAnalysis {
@@ -16,9 +24,16 @@ export interface TenderAnalysis {
   requirements: TenderRequirements;
   /** Pages the model read, when it says so. */
   pages: number | null;
+  /**
+   * False for a reading stored before the four inadmissibility requirements were asked for: its missing keys mean "never
+   * asked", NOT "the pliego does not state it", so the must-list must not be built from it.
+   */
+  mustListIncluded: boolean;
 }
 
-const REQUIREMENT_KEYS = ["registration", "antecedents", "guarantee", "submissionDeadline"] as const;
+const BASE_REQUIREMENT_KEYS = ["registration", "antecedents", "guarantee", "submissionDeadline"] as const;
+const MUST_LIST_KEYS = ["certifications", "financialStanding", "team", "affidavits"] as const;
+const REQUIREMENT_KEYS = [...BASE_REQUIREMENT_KEYS, ...MUST_LIST_KEYS] as const;
 
 const text = (v: unknown, max: number): string | null => {
   if (typeof v !== "string") return null;
@@ -36,7 +51,8 @@ export function toTenderAnalysis(value: unknown): TenderAnalysis | null {
   const req = (typeof v.requirements === "object" && v.requirements !== null ? v.requirements : {}) as Record<string, unknown>;
   const requirements = Object.fromEntries(REQUIREMENT_KEYS.map((k) => [k, text(req[k], 1500)])) as unknown as TenderRequirements;
   const pages = typeof v.pages === "number" && Number.isInteger(v.pages) && v.pages > 0 ? v.pages : null;
-  return { summary, viability, requirements, pages };
+  const mustListIncluded = MUST_LIST_KEYS.every((k) => k in req);
+  return { summary, viability, requirements, pages, mustListIncluded };
 }
 
 /** The model is asked for bare JSON; it may still wrap it in a code fence or add a line around it. */
@@ -73,6 +89,10 @@ export const ANALYSIS_SYSTEM_PROMPT = [
   '"summary": what is being bought, scope, duration and any option to extend, in 3 to 5 sentences.',
   '"viability": technical fit for a software, cloud and infrastructure services company, and the points to verify before bidding.',
   '"requirements": an object with "registration" (supplier registry enrollment), "antecedents" (similar past projects required),',
-  '"guarantee" (bid or maintenance guarantee) and "submissionDeadline" (date and time to submit, and where). Use null for any the document does not state.',
+  '"guarantee" (bid or maintenance guarantee) and "submissionDeadline" (date and time to submit, and where),',
+  'plus the requirements whose absence makes a bid inadmissible: "certifications" (quality or security certifications such as ISO or CMMI),',
+  '"financialStanding" (balance sheets, turnover or other financial standing), "team" (the proposed team: CVs, degrees, credentials) and',
+  '"affidavits" (sworn statements and annexes the document demands to be presented). Quote or closely paraphrase what the document says, with the clause when it gives one.',
+  "Use null for any the document does not state.",
   '"pages": the number of pages of the document, as an integer, or null.',
 ].join("\n");

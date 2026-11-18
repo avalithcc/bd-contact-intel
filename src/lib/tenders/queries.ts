@@ -1,12 +1,14 @@
-import { asc, desc, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { tender, type Tender } from "@/db/schema";
+import { bd, tender, type Tender } from "@/db/schema";
+import { tenderNotDecidedNoSql } from "./relevanceSql";
 import { tenderTiming, type TenderTiming } from "./timing";
 
 /** The page shows everything the portal gave us; this bounds the read, not the screen (the live set is 5 to 17 rows). */
 export const TENDER_LIST_LIMIT = 500;
 
-export type TenderListRow = Tender & TenderTiming;
+/** `ownerName` is the owner BD's name, null when nobody owns the tender. */
+export type TenderListRow = Tender & TenderTiming & { ownerName: string | null };
 
 /** "relevant": what the BD works from. "all": everything the table holds, discarded and closed included. */
 export type TenderView = "relevant" | "all";
@@ -35,10 +37,11 @@ export async function listTenders(
 ): Promise<TenderList> {
   const nowIso = now.toISOString();
   const isOpen = sql`${tender.openingAt} >= ${nowIso}::timestamptz`;
-  const notDecidedNo = sql`coalesce(${tender.relevanceOverride}, ${tender.aiRelevant}) is distinct from false`;
+  const notDecidedNo = tenderNotDecidedNoSql;
   const found = await database
-    .select({ t: tender, total: sql<string>`count(*) over ()`, all: sql<string>`(select count(*) from tender)` })
+    .select({ t: tender, ownerName: bd.name, total: sql<string>`count(*) over ()`, all: sql<string>`(select count(*) from tender)` })
     .from(tender)
+    .leftJoin(bd, eq(bd.id, tender.ownerBdId))
     .where(view === "relevant" ? sql`${isOpen} and ${notDecidedNo}` : undefined)
     .orderBy(
       sql`case when ${isOpen} then 0 else 1 end`,
@@ -50,7 +53,7 @@ export async function listTenders(
   // An empty view has no row to carry the table count, which is exactly when "see all" matters most: one extra read, only then.
   const all = found.length > 0 ? Number(found[0]!.all) : Number((await database.select({ n: sql<string>`count(*)` }).from(tender))[0]?.n ?? 0);
   return {
-    rows: found.map(({ t }) => ({ ...t, ...tenderTiming(t.openingAt, now) })),
+    rows: found.map(({ t, ownerName }) => ({ ...t, ownerName, ...tenderTiming(t.openingAt, now) })),
     total: found.length === 0 ? 0 : Number(found[0]!.total),
     all,
   };

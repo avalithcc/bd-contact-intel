@@ -5,7 +5,7 @@ import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { isUuid } from "@/lib/uuid";
 import { normalizeNote } from "./note";
 import { toTenderAnalysis, type TenderAnalysis } from "./analysis";
-import type { TenderDetail, TenderEventKind } from "./detail";
+import type { BdOption, TenderDetail, TenderEventKind } from "./detail";
 import { tenderTiming } from "./timing";
 
 /** The log shows the most recent movements; a tender worked over months stays well under this. */
@@ -49,6 +49,8 @@ const eventsJson = sql`(
     limit ${TENDER_EVENT_LIMIT}
   ) y)`;
 
+const bdOptionsJson = sql`(select coalesce(json_agg(json_build_object('id', b.id, 'name', b.name) order by b.name), '[]'::json) from bd b)`;
+
 /**
  * Everything the ficha shows in ONE round trip: the tender row with its documents and its log as two json subqueries.
  * Timestamps inside the json arrive as strings and are turned back into Dates here. Null when the id matches nothing or
@@ -57,13 +59,14 @@ const eventsJson = sql`(
 export async function getTenderDetail(id: string, now: Date = new Date(), database: Pick<typeof db, "select"> = db): Promise<TenderDetail | null> {
   if (!isUuid(id)) return null;
   const [row] = await database
-    .select({ t: tender, docs: documentsJson.mapWith((v) => v as RawDocument[]), events: eventsJson.mapWith((v) => v as RawEvent[]) })
+    .select({ t: tender, docs: documentsJson.mapWith((v) => v as RawDocument[]), events: eventsJson.mapWith((v) => v as RawEvent[]), bds: bdOptionsJson.mapWith((v) => v as BdOption[]) })
     .from(tender)
     .where(eq(tender.id, id))
     .limit(1);
   if (!row) return null;
   return {
     tender: { ...row.t, ...tenderTiming(row.t.openingAt, now) },
+    bdOptions: row.bds,
     documents: row.docs.map((d) => ({
       ...d,
       createdAt: parseDbTimestamp(d.createdAt),
@@ -146,4 +149,30 @@ export async function saveTenderAnalysis(documentId: string, analysis: TenderAna
       select id from upd`),
   );
   return rows.length > 0;
+}
+
+/**
+ * Assigns the tender to a BD, or releases it with `null`, and logs who did it in ONE statement. The log keeps the owner's NAME
+ * as it was then, so the history survives a rename or a deleted BD. Choosing the current owner writes nothing and logs nothing.
+ * False when the tender does not exist or the BD does not.
+ */
+export async function setTenderOwner(id: string, ownerBdId: string | null, actorBdId: string, database: Pick<typeof db, "execute"> = db): Promise<boolean> {
+  if (!isUuid(id) || (ownerBdId !== null && !isUuid(ownerBdId))) return false;
+  const rows = rowsOf<{ found: number }>(
+    await database.execute(sql`
+      with old as (select owner_bd_id from tender where id = ${id}::uuid),
+      who as (select name from bd where id = ${ownerBdId}::uuid),
+      upd as (
+        update tender set owner_bd_id = ${ownerBdId}::uuid, updated_at = now()
+        where id = ${id}::uuid and (${ownerBdId}::uuid is null or exists (select 1 from who)) returning id
+      ),
+      ev as (
+        insert into tender_event (tender_id, actor_bd_id, kind, detail, created_at)
+        select upd.id, ${actorBdId}::uuid, 'owner', jsonb_build_object('to', coalesce((select name from who), '')), clock_timestamp()
+        from upd, old where old.owner_bd_id is distinct from ${ownerBdId}::uuid
+        returning 1
+      )
+      select (select count(*) from upd)::int as found`),
+  );
+  return (rows[0]?.found ?? 0) > 0;
 }

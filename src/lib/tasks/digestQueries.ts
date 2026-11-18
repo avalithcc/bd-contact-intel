@@ -108,21 +108,6 @@ export async function getExpiringFollowUpsForAllBds(
 }
 
 /**
- * Groups already-fetched rows by `bdId`, preserving each BD's row order.
- * Pure — no I/O, but lives here (not digest.ts) since its input shape
- * (`DigestTaskRow`) is DB-query-specific.
- */
-export function groupDigestTaskRowsByBd(rows: readonly DigestTaskRow[]): Map<string, DigestTaskRow[]> {
-  const byBd = new Map<string, DigestTaskRow[]>();
-  for (const row of rows) {
-    const existing = byBd.get(row.bdId);
-    if (existing) existing.push(row);
-    else byBd.set(row.bdId, [row]);
-  }
-  return byBd;
-}
-
-/**
  * Claims one BD's digest send for one Argentina calendar date — the
  * idempotency gate (idempotency rule: "the cron claims the row BEFORE
  * sending"). Returns the claimed row's id when this call may send, `null`

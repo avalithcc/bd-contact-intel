@@ -27,6 +27,7 @@ import {
   renderEmailText,
   type Tone,
 } from "@/lib/mailer/emailLayout";
+import { NO_TENDERS, renderTenderSections, tenderCount, type DigestTenders } from "@/lib/tasks/digestTenders";
 
 export interface DigestTask extends TaskSubjectInput {
   id: string;
@@ -140,7 +141,11 @@ function daysLeftWords(daysLeft: number): string {
   return `vence en ${daysLeft} días`;
 }
 
-function buildSubject(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[]): string {
+function tendersLabel(n: number): string {
+  return `${n} ${n === 1 ? "licitación" : "licitaciones"} por cerrar`;
+}
+
+function buildSubject(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[], tenders: DigestTenders): string {
   const parts: string[] = [];
   if (groups.today.length > 0) parts.push(`${groups.today.length} para hoy`);
   if (groups.overdue.length > 0) {
@@ -149,7 +154,8 @@ function buildSubject(groups: DigestGroups<DigestTask>, expiring: readonly Expir
   }
   if (groups.yesterday.length > 0) parts.push(`${groups.yesterday.length} de ayer`);
   if (expiring.length > 0) parts.push(followUpsLabel(expiring.length));
-  // Only follow-ups: there are no tasks for the "Tus tareas de hoy" lead to be about.
+  if (tenderCount(tenders) > 0) parts.push(tendersLabel(tenderCount(tenders)));
+  // Only follow-ups and tenders: there are no tasks for the "Tus tareas de hoy" lead to be about.
   if (groups.today.length + groups.overdue.length + groups.yesterday.length === 0) return `${parts.join(", ")} en Avalith CRM`;
   return `Tus tareas de hoy — ${parts.join(", ")}`;
 }
@@ -160,7 +166,7 @@ function joinNatural(parts: string[]): string {
 }
 
 /** "Tenés 1 tarea para hoy y 1 pendiente de ayer." — the one-line summary (also the inbox preheader). */
-function buildSummary(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[]): string {
+function buildSummary(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[], tenders: DigestTenders): string {
   const parts: string[] = [];
   if (groups.today.length > 0) {
     const noun = groups.today.length === 1 ? "tarea" : "tareas";
@@ -175,6 +181,7 @@ function buildSummary(groups: DigestGroups<DigestTask>, expiring: readonly Expir
     parts.push(`${groups.overdue.length} ${noun}`);
   }
   if (expiring.length > 0) parts.push(followUpsLabel(expiring.length));
+  if (tenderCount(tenders) > 0) parts.push(tendersLabel(tenderCount(tenders)));
   return `Tenés ${joinNatural(parts)}.`;
 }
 
@@ -262,13 +269,14 @@ function renderFollowUpSection(all: readonly ExpiringFollowUp[], siteBaseUrl: st
 }
 
 /** At-a-glance counts strip: one cell per non-empty group (empty groups stay omitted), in section order. */
-function countsStrip(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[]): string {
+function countsStrip(groups: DigestGroups<DigestTask>, expiring: readonly ExpiringFollowUp[], tenders: DigestTenders): string {
   const shown = (
     [
       [groups.today.length, "Para hoy", "warn"],
       [groups.yesterday.length, "De ayer", "danger"],
       [groups.overdue.length, "Atrasadas", "danger"],
       [expiring.length, "Por vencer", "danger"],
+      [tenderCount(tenders), "Licitaciones", "danger"],
     ] as const
   ).filter(([n]) => n > 0);
   const cells = shown.map(
@@ -279,7 +287,7 @@ function countsStrip(groups: DigestGroups<DigestTask>, expiring: readonly Expiri
 }
 
 const DIGEST_REASON =
-  "Recibís este resumen cada mañana porque tenés tareas o seguimientos pendientes en Avalith CRM. Si no hay nada por atender, no enviamos nada.";
+  "Recibís este resumen cada mañana porque tenés tareas, seguimientos o licitaciones por cerrar en Avalith CRM. Si no hay nada por atender, no enviamos nada.";
 
 /**
  * Builds the digest's subject/html/text, or `null` when every group AND the expiring follow-ups are empty
@@ -292,11 +300,13 @@ export function buildDigestEmail(
   groups: DigestGroups<DigestTask>,
   siteBaseUrl: string,
   expiring: readonly ExpiringFollowUp[] = [],
+  tenders: DigestTenders = NO_TENDERS,
 ): DigestEmail | null {
-  if (groups.today.length + groups.overdue.length + groups.yesterday.length + expiring.length === 0) return null;
+  // Every source counts here. This check once ignored follow-ups and a BD with no tasks got no warning, which is the BD who needs it.
+  if (groups.today.length + groups.overdue.length + groups.yesterday.length + expiring.length + tenderCount(tenders) === 0) return null;
 
-  const subject = buildSubject(groups, expiring);
-  const summary = buildSummary(groups, expiring);
+  const subject = buildSubject(groups, expiring, tenders);
+  const summary = buildSummary(groups, expiring, tenders);
   const firstName = recipient.name.split(" ")[0] || recipient.name;
   const hasTasks = groups.today.length + groups.overdue.length + groups.yesterday.length > 0;
   const ctaUrl = `${siteBaseUrl}/tasks`;
@@ -309,20 +319,22 @@ export function buildDigestEmail(
     renderSection("Atrasadas", groups.overdue, siteBaseUrl, "danger"),
   ].filter((s) => s.text !== "");
   const followUps = renderFollowUpSection(expiring, siteBaseUrl);
+  const tenderBlock = renderTenderSections(tenders, siteBaseUrl);
 
   const bodyHtml =
     `<p style="margin:0 0 16px;font-family:${FONT_STACK};font-size:15px;line-height:1.6;color:${C.ink};">${escapeHtml(greeting)} ${escapeHtml(summary)}</p>` +
-    countsStrip(groups, expiring) +
+    countsStrip(groups, expiring, tenders) +
     (hasTasks ? emailButton("Ver mis tareas", ctaUrl) : "") +
     sections.map((s) => s.html).join("") +
     (hasTasks ? emailButton("Ver mis tareas", ctaUrl) : "") +
-    followUps.html;
+    followUps.html +
+    tenderBlock.html;
 
   const html = renderEmail({
     subject,
     preheader: summary,
     eyebrow: "Resumen diario",
-    title: hasTasks ? "Tu resumen de tareas" : "Tus seguimientos por vencer",
+    title: hasTasks ? "Tu resumen de tareas" : expiring.length === 0 ? "Licitaciones por cerrar" : tenderCount(tenders) === 0 ? "Tus seguimientos por vencer" : "Lo que vence pronto",
     bodyHtml,
     reason: DIGEST_REASON,
     replies: false,
@@ -334,7 +346,8 @@ export function buildDigestEmail(
     body:
       `${greeting}\n\n${summary}\n\n${sections.map((s) => s.text).join("\n")}` +
       (hasTasks ? `\nVer mis tareas: ${ctaUrl}\n` : "") +
-      (followUps.text ? `\n${followUps.text}` : ""),
+      (followUps.text ? `\n${followUps.text}` : "") +
+      (tenderBlock.text ? `\n${tenderBlock.text}` : ""),
     reason: DIGEST_REASON,
     replies: false,
   });
