@@ -2260,3 +2260,57 @@ export const tender = pgTable(
 
 export type Tender = typeof tender.$inferSelect;
 export type NewTender = typeof tender.$inferInsert;
+
+/**
+ * The progress log of one tender: who changed its state, saved a note, uploaded a document or ran an analysis, and when.
+ * Its own table rather than audit_log because the log is read on every ficha by tender (audit_log has no index on it) and
+ * because these are routine work notes, not the consequential actions audit_log exists for.
+ * `kind`: 'triage' (detail {from, to}) | 'note' (detail {text}, "" when cleared) | 'document' (detail {filename}) |
+ * 'analysis' (detail {filename}). `actor_bd_id` is nulled when a BD is deleted: the history outlives the person.
+ */
+export const tenderEvent = pgTable(
+  "tender_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenderId: uuid("tender_id")
+      .notNull()
+      .references(() => tender.id, { onDelete: "cascade" }),
+    actorBdId: uuid("actor_bd_id").references(() => bd.id, { onDelete: "set null" }),
+    kind: text("kind").notNull(),
+    detail: jsonb("detail").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    byTender: index("tender_event_tender_idx").on(t.tenderId, t.createdAt),
+  }),
+);
+
+/**
+ * A pliego uploaded for a tender (private bucket `tender-documents`, path `<auth uid>/<uuid>/<name>`). The AI reading
+ * lives ON the document it read (`analysis`, `analyzed_at`), so the current document is the newest row and a later upload
+ * starts with no analysis instead of inheriting the old one. Older rows stay as history.
+ */
+export const tenderDocument = pgTable(
+  "tender_document",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenderId: uuid("tender_id")
+      .notNull()
+      .references(() => tender.id, { onDelete: "cascade" }),
+    storagePath: text("storage_path").notNull(),
+    filename: text("filename").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    uploadedByBdId: uuid("uploaded_by_bd_id").references(() => bd.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    analysis: jsonb("analysis"),
+    analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
+    analyzedByBdId: uuid("analyzed_by_bd_id").references(() => bd.id, { onDelete: "set null" }),
+  },
+  (t) => ({
+    byTender: index("tender_document_tender_idx").on(t.tenderId, t.createdAt),
+    pathUnique: uniqueIndex("tender_document_storage_path_unique").on(t.storagePath),
+  }),
+);
+
+export type TenderEvent = typeof tenderEvent.$inferSelect;
+export type TenderDocument = typeof tenderDocument.$inferSelect;

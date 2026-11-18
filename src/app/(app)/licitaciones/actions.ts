@@ -5,6 +5,12 @@ import { unstable_rethrow } from "next/navigation";
 import { getCurrentBd } from "@/lib/queries";
 import { importTenderFile, type TenderImportReport } from "@/lib/tenders/importFile";
 import { MAX_TENDERS_PER_IMPORT, setTenderTriage } from "@/lib/tenders/importDb";
+import { matchesMagic } from "@/lib/email/attachments/magic";
+import { createClient } from "@/lib/supabase/server";
+import { runTenderAnalysis } from "@/lib/tenders/analyse";
+import { MAX_TENDER_DOCUMENT_BYTES, TENDER_DOCUMENTS_BUCKET, checkTenderDocument, tenderDocumentPathBelongsTo } from "@/lib/tenders/document";
+import { addTenderDocument, getCurrentTenderDocument, saveTenderAnalysis, saveTenderNote } from "@/lib/tenders/workspace";
+import { isUuid } from "@/lib/uuid";
 import { TenderSheetError } from "@/lib/tenders/parse";
 import { isTenderTriage } from "@/lib/tenders/triage";
 
@@ -39,9 +45,61 @@ export async function importTendersAction(_prev: ImportTendersState, formData: F
 
 /** A normal action: any signed-in BD may change any tender's triage state (tenders are company-wide, not per BD). */
 export async function setTenderTriageAction(id: string, status: string): Promise<void> {
-  await getCurrentBd();
+  const me = await getCurrentBd();
   if (!isTenderTriage(status)) throw new Error("Unknown tender state");
-  const found = await setTenderTriage(id, status);
+  const found = await setTenderTriage(id, status, undefined, me.id);
   if (!found) throw new Error("Tender not found");
   revalidatePath("/licitaciones");
+  revalidatePath(`/licitaciones/${id}`);
+}
+
+/** Any signed-in BD may edit the one shared note; the change is logged with who made it. */
+export async function saveTenderNoteAction(id: string, text: string): Promise<boolean> {
+  const me = await getCurrentBd();
+  const found = await saveTenderNote(id, typeof text === "string" ? text : "", me.id);
+  if (found) revalidatePath(`/licitaciones/${id}`);
+  return found;
+}
+
+/**
+ * The browser already put the file in the bucket; this records it. Nothing the client says is trusted: the type and size
+ * are re-checked and the path must sit inside the caller's own folder, as for the email attachments.
+ */
+export async function registerTenderDocumentAction(input: { tenderId: string; storagePath: string; filename: string; size: number }): Promise<{ ok: boolean }> {
+  const me = await getCurrentBd();
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user || typeof input?.storagePath !== "string" || !tenderDocumentPathBelongsTo(input.storagePath, data.user.id)) return { ok: false };
+  if (typeof input.filename !== "string" || !checkTenderDocument({ filename: input.filename, contentType: "application/pdf", size: Number(input.size) }).ok) return { ok: false };
+  const id = await addTenderDocument({ tenderId: input.tenderId, storagePath: input.storagePath, filename: input.filename, sizeBytes: Number(input.size), actorBdId: me.id });
+  if (!id) return { ok: false };
+  revalidatePath(`/licitaciones/${input.tenderId}`);
+  return { ok: true };
+}
+
+export type AnalyseTenderResult = { ok: true } | { ok: false; error: "noDocument" | "notPdf" | "tooLarge" | "download" | "gatewayNotConfigured" | "generationFailed" | "invalidModelOutput" };
+
+/**
+ * Reads the tender's CURRENT pliego and stores the reading on that document. With no document there is nothing to read and
+ * the answer is "noDocument": the reading is never made from the title. The file is downloaded with the caller's own
+ * session (the bucket lets any signed-in BD read), and its first bytes are checked to really be a PDF.
+ */
+export async function analyseTenderAction(tenderId: string): Promise<AnalyseTenderResult> {
+  const me = await getCurrentBd();
+  if (!isUuid(tenderId)) return { ok: false, error: "noDocument" };
+  const doc = await getCurrentTenderDocument(tenderId);
+  if (!doc) return { ok: false, error: "noDocument" };
+  if (doc.sizeBytes > MAX_TENDER_DOCUMENT_BYTES) return { ok: false, error: "tooLarge" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.storage.from(TENDER_DOCUMENTS_BUCKET).download(doc.storagePath);
+  if (error || !data) return { ok: false, error: "download" };
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  if (bytes.length > MAX_TENDER_DOCUMENT_BYTES) return { ok: false, error: "tooLarge" };
+  if (!matchesMagic("pdf", bytes)) return { ok: false, error: "notPdf" };
+  const result = await runTenderAnalysis(bytes, doc.filename);
+  if (!result.ok) return { ok: false, error: result.error };
+  // Stored on the document that was read, so an upload that landed meanwhile does not inherit it.
+  if (!(await saveTenderAnalysis(doc.id, result.analysis, me.id))) return { ok: false, error: "noDocument" };
+  revalidatePath(`/licitaciones/${tenderId}`);
+  return { ok: true };
 }

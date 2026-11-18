@@ -16,6 +16,8 @@ export function uploadAttachmentObject(input: {
   anonKey: string;
   accessToken: string;
   path: string;
+  /** Defaults to the email attachments bucket; the tender pliegos pass their own. */
+  bucket?: string;
   file: Blob;
   contentType: string;
   onProgress(percent: number): void;
@@ -23,7 +25,7 @@ export function uploadAttachmentObject(input: {
   const xhr = new XMLHttpRequest();
   let aborted = false;
   const done = new Promise<{ ok: true } | { ok: false; aborted: boolean }>((resolve) => {
-    xhr.open("POST", `${input.supabaseUrl}/storage/v1/object/${EMAIL_ATTACHMENTS_BUCKET}/${input.path}`);
+    xhr.open("POST", `${input.supabaseUrl}/storage/v1/object/${input.bucket ?? EMAIL_ATTACHMENTS_BUCKET}/${input.path}`);
     xhr.setRequestHeader("Authorization", `Bearer ${input.accessToken}`);
     xhr.setRequestHeader("apikey", input.anonKey);
     xhr.setRequestHeader("Content-Type", input.contentType);
