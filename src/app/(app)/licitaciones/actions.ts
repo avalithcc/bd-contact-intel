@@ -9,7 +9,7 @@ import { matchesMagic } from "@/lib/email/attachments/magic";
 import { createClient } from "@/lib/supabase/server";
 import { runTenderAnalysis } from "@/lib/tenders/analyse";
 import { MAX_TENDER_DOCUMENT_BYTES, TENDER_DOCUMENTS_BUCKET, checkTenderDocument, tenderDocumentPathBelongsTo } from "@/lib/tenders/document";
-import { addTenderDocument, getCurrentTenderDocument, saveTenderAnalysis, saveTenderNote } from "@/lib/tenders/workspace";
+import { addTenderDocument, getCurrentTenderDocument, saveTenderAnalysis, saveTenderNote, setTenderOwner } from "@/lib/tenders/workspace";
 import { isUuid } from "@/lib/uuid";
 import { TenderSheetError } from "@/lib/tenders/parse";
 import { isTenderTriage } from "@/lib/tenders/triage";
@@ -61,6 +61,15 @@ export async function setTenderRelevanceAction(id: string, choice: string): Prom
   if (!isRelevanceChoice(choice)) throw new Error("Unknown relevance choice");
   const found = await setTenderRelevance(id, choice, undefined, me.id);
   if (!found) throw new Error("Tender not found");
+  revalidatePath("/licitaciones");
+  revalidatePath(`/licitaciones/${id}`);
+}
+
+/** Any signed-in BD may assign any tender to any BD, or release it with an empty value; the move is logged with who made it. */
+export async function setTenderOwnerAction(id: string, ownerBdId: string): Promise<void> {
+  const me = await getCurrentBd();
+  const found = await setTenderOwner(id, ownerBdId === "" ? null : ownerBdId, me.id);
+  if (!found) throw new Error("Tender or BD not found");
   revalidatePath("/licitaciones");
   revalidatePath(`/licitaciones/${id}`);
 }

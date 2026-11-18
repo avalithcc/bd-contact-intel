@@ -45,8 +45,9 @@ test("a note is trimmed, bounded, and blank means no note", () => {
 const ANALYSIS: TenderAnalysis = {
   summary: "Replica de infraestructura critica en nube publica.",
   viability: "Encaja con trabajo de infraestructura.",
-  requirements: { registration: "Inscripcion en el registro", antecedents: null, guarantee: "5%", submissionDeadline: "27/11 14:00" },
+  requirements: { registration: "Inscripcion en el registro", antecedents: null, guarantee: "5%", submissionDeadline: "27/11 14:00", certifications: null, financialStanding: null, team: null, affidavits: null },
   pages: 24,
+  mustListIncluded: true,
 };
 
 test("the model's JSON is accepted bare or fenced, and refused when the summary or viability is missing", () => {
@@ -87,6 +88,7 @@ function detail(over: { documents?: TenderDocumentView[]; events?: TenderEventVi
       aiReason: null,
       aiClassifiedAt: null,
       relevanceOverride: null,
+      ownerBdId: null,
       note: over.note ?? null,
       createdAt: new Date("2026-11-01T10:00:00Z"),
       updatedAt: new Date("2026-11-01T10:00:00Z"),
@@ -95,10 +97,11 @@ function detail(over: { documents?: TenderDocumentView[]; events?: TenderEventVi
     },
     documents: over.documents ?? [],
     events: over.events ?? [],
+    bdOptions: [],
   };
 }
 
-const actions = { setTriage: async () => {}, saveNote: async () => true, registerDocument: async () => ({ ok: true }), analyse: async () => ({ ok: true as const }) };
+const actions = { setTriage: async () => {}, saveNote: async () => true, registerDocument: async () => ({ ok: true }), analyse: async () => ({ ok: true as const }), setOwner: async () => {} };
 // The controls call useRouter().refresh() after a write; a stub router is enough to render them.
 const router = { push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} } as never;
 const render = (d: TenderDetail) =>

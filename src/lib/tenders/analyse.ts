@@ -5,7 +5,7 @@ import { ANALYSIS_SYSTEM_PROMPT, parseTenderAnalysis, type TenderAnalysis } from
 /** Same model the outreach generator uses (src/lib/outreach/generateMessage.ts); Claude reads a PDF natively. */
 const ANALYSIS_MODEL = "anthropic/claude-sonnet-5";
 /** The cap counts reasoning tokens too (see MAX_OUTPUT_TOKENS in generateMessage.ts); the answer itself is short. */
-const MAX_OUTPUT_TOKENS = 4000;
+const MAX_OUTPUT_TOKENS = 6000;
 
 export type AnalyseResult = { ok: true; analysis: TenderAnalysis } | { ok: false; error: "gatewayNotConfigured" | "generationFailed" | "invalidModelOutput" };
 

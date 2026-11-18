@@ -484,6 +484,13 @@
       "when": 1795378800000,
       "tag": "0068_tender_relevance",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1795465200000,
+      "tag": "0069_tender_owner",
+      "breakpoints": true
     }
   ]
 }

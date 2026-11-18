@@ -3,15 +3,18 @@ import { unstable_rethrow } from "next/navigation";
 import { isValidBearer } from "@/lib/cronAuth";
 import { getSiteUrl } from "@/lib/config/siteUrl";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
-import { buildDigestEmail, groupDigestTasks, selectExpiringFollowUps, type DigestTask } from "@/lib/tasks/digest";
+import { buildDigestEmail, groupDigestTasks, selectExpiringFollowUps } from "@/lib/tasks/digest";
 import {
   claimDigestSend,
   getDigestTasksForAllBds,
   getExpiringFollowUpsForAllBds,
-  groupDigestTaskRowsByBd,
   markDigestFailed,
   markDigestSent,
 } from "@/lib/tasks/digestQueries";
+import { buildDigestRecipients, groupDigestTaskRowsByBd } from "@/lib/tasks/digestRecipients";
+import { getClosingTendersForDigest, getTenderDigestRecipients } from "@/lib/tenders/digestQueries";
+import { planTenderDigest } from "@/lib/tenders/digestPlan";
+import { tenderCount } from "@/lib/tasks/digestTenders";
 import { digestRunHasFailure } from "@/lib/tasks/digestOutcome";
 import { sanitizeSendError } from "@/lib/tasks/sendErrorSanitizer";
 import { sendDigestEmail } from "@/lib/mailer/smtpMailer";
@@ -58,7 +61,7 @@ interface DigestResult {
   sent: boolean;
   skippedReason?: "no_open_tasks_due" | "dry_run" | "already_claimed" | "send_failed";
   subject?: string;
-  counts?: { today: number; overdue: number; yesterday: number; expiringFollowUps: number };
+  counts?: { today: number; overdue: number; yesterday: number; expiringFollowUps: number; tenders: number };
   error?: string;
 }
 
@@ -84,13 +87,13 @@ export async function GET(request: Request) {
   const followUpsByBd = new Map<string, typeof followUpRows>();
   for (const r of followUpRows) followUpsByBd.set(r.bdId, [...(followUpsByBd.get(r.bdId) ?? []), r]);
 
-  const recipients = new Map<string, { bdEmail: string; bdName: string; tasks: DigestTask[] }>();
-  for (const [bdId, bdTasks] of byBd) {
-    recipients.set(bdId, { bdEmail: bdTasks[0]!.bdEmail, bdName: bdTasks[0]!.bdName, tasks: bdTasks });
-  }
-  for (const [bdId, items] of followUpsByBd) {
-    if (!recipients.has(bdId)) recipients.set(bdId, { bdEmail: items[0]!.bdEmail, bdName: items[0]!.bdName, tasks: [] });
-  }
+  // Tender deadlines. Unowned ones go to every BD, so the BD list is read only when one exists. The loop below runs over the
+  // union of all three sources: a BD with no tasks and a closing tender is exactly who must not be skipped.
+  const closingTenders = await getClosingTendersForDigest(now);
+  const everyone = closingTenders.some((t) => t.owner === null) ? await getTenderDigestRecipients() : [];
+  const tenderPlan = planTenderDigest(closingTenders, everyone, now);
+
+  const recipients = buildDigestRecipients(byBd, followUpsByBd, tenderPlan);
 
   const results: DigestResult[] = [];
 
@@ -98,7 +101,7 @@ export async function GET(request: Request) {
     const first = { bdEmail: recipient.bdEmail, bdName: recipient.bdName };
     const groups = groupDigestTasks(recipient.tasks, boundaries);
     const expiring = selectExpiringFollowUps(followUpsByBd.get(bdId) ?? [], boundaries.today);
-    const email = buildDigestEmail({ name: first.bdName, email: first.bdEmail }, groups, siteBaseUrl, expiring);
+    const email = buildDigestEmail({ name: first.bdName, email: first.bdEmail }, groups, siteBaseUrl, expiring, recipient.tenders);
 
     if (!email) {
       results.push({ bdId, bdEmail: first.bdEmail, sent: false, skippedReason: "no_open_tasks_due" });
@@ -110,6 +113,7 @@ export async function GET(request: Request) {
       overdue: groups.overdue.length,
       yesterday: groups.yesterday.length,
       expiringFollowUps: expiring.length,
+      tenders: tenderCount(recipient.tenders),
     };
 
     if (dryRun) {

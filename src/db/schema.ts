@@ -2227,7 +2227,8 @@ export type NewLushaReveal = typeof lushaReveal.$inferInsert;
 
 /**
  * A public tender from COMPR.AR (the national procurement portal), tracked from "worth a look" to "we bid / we pass".
- * Company-wide on purpose: no owner column, every signed-in BD sees every tender.
+ * Every signed-in BD sees every tender. `owner_bd_id` is who is working it (NULL = nobody yet, SET NULL when the BD is deleted):
+ * the 08:30 digest warns the owner as the deadline nears, and warns EVERY BD about a relevant tender nobody owns.
  *
  * `process_number` ("Número de Proceso", e.g. 487-0018-LPR26) is the natural key and UNIQUE, so re-importing the portal's
  * Excel updates a row instead of duplicating it. The columns up to `financial_admin_service` mirror the export and are the
@@ -2258,6 +2259,7 @@ export const tender = pgTable(
     aiReason: text("ai_reason"),
     aiClassifiedAt: timestamp("ai_classified_at", { withTimezone: true }),
     relevanceOverride: boolean("relevance_override"),
+    ownerBdId: uuid("owner_bd_id").references(() => bd.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -2275,7 +2277,7 @@ export type NewTender = typeof tender.$inferInsert;
  * Its own table rather than audit_log because the log is read on every ficha by tender (audit_log has no index on it) and
  * because these are routine work notes, not the consequential actions audit_log exists for.
  * `kind`: 'triage' (detail {from, to}) | 'note' (detail {text}, "" when cleared) | 'document' (detail {filename}) |
- * 'analysis' (detail {filename}). `actor_bd_id` is nulled when a BD is deleted: the history outlives the person.
+ * 'analysis' (detail {filename}) | 'relevance' (detail {to}) | 'owner' (detail {to: the owner's name, "" when released}). `actor_bd_id` is nulled when a BD is deleted: the history outlives the person.
  */
 export const tenderEvent = pgTable(
   "tender_event",

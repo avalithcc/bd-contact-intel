@@ -80,6 +80,7 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
                 <th>{l.colAgency}</th>
                 <th>{l.colRelevance}</th>
                 <th>{l.colPortalState}</th>
+                <th>{l.colOwner}</th>
                 <th>{l.colTriage}</th>
                 <th>
                   <span className="sr-only">{l.colActions}</span>
@@ -121,6 +122,7 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
                   <td>
                     <span className="badge badge-neutral no-dot">{r.portalStatus || "—"}</span>
                   </td>
+                  <td className="nowrap">{r.ownerName ?? <span className="meta">{l.ownerNone}</span>}</td>
                   <td>
                     <TenderTriageSelect
                       id={r.id}

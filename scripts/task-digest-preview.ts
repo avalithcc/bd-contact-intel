@@ -15,7 +15,8 @@
  */
 import { argentinaDayBoundaries } from "../src/lib/tasks/argentinaDate";
 import { buildDigestEmail, groupDigestTasks } from "../src/lib/tasks/digest";
-import { getDigestTasksForAllBds, groupDigestTaskRowsByBd } from "../src/lib/tasks/digestQueries";
+import { getDigestTasksForAllBds } from "../src/lib/tasks/digestQueries";
+import { groupDigestTaskRowsByBd } from "../src/lib/tasks/digestRecipients";
 import { getSiteUrl } from "../src/lib/config/siteUrl";
 
 async function main() {
