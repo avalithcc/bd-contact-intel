@@ -3,10 +3,11 @@ import { unstable_rethrow } from "next/navigation";
 import { isValidBearer } from "@/lib/cronAuth";
 import { getSiteUrl } from "@/lib/config/siteUrl";
 import { argentinaDayBoundaries } from "@/lib/tasks/argentinaDate";
-import { buildDigestEmail, groupDigestTasks } from "@/lib/tasks/digest";
+import { buildDigestEmail, groupDigestTasks, selectExpiringFollowUps, type DigestTask } from "@/lib/tasks/digest";
 import {
   claimDigestSend,
   getDigestTasksForAllBds,
+  getExpiringFollowUpsForAllBds,
   groupDigestTaskRowsByBd,
   markDigestFailed,
   markDigestSent,
@@ -57,7 +58,7 @@ interface DigestResult {
   sent: boolean;
   skippedReason?: "no_open_tasks_due" | "dry_run" | "already_claimed" | "send_failed";
   subject?: string;
-  counts?: { today: number; overdue: number; yesterday: number };
+  counts?: { today: number; overdue: number; yesterday: number; expiringFollowUps: number };
   error?: string;
 }
 
@@ -77,12 +78,27 @@ export async function GET(request: Request) {
   const rows = await getDigestTasksForAllBds(boundaries.tomorrowStartUtc);
   const byBd = groupDigestTaskRowsByBd(rows);
 
+  // Follow-ups about to expire (same predicate as the expiry job). A BD with these and NO tasks is not in `byBd`, so the loop
+  // runs over the union of both: that BD, the one most likely to be ignoring the CRM, is exactly who needs the warning.
+  const followUpRows = await getExpiringFollowUpsForAllBds(boundaries.today);
+  const followUpsByBd = new Map<string, typeof followUpRows>();
+  for (const r of followUpRows) followUpsByBd.set(r.bdId, [...(followUpsByBd.get(r.bdId) ?? []), r]);
+
+  const recipients = new Map<string, { bdEmail: string; bdName: string; tasks: DigestTask[] }>();
+  for (const [bdId, bdTasks] of byBd) {
+    recipients.set(bdId, { bdEmail: bdTasks[0]!.bdEmail, bdName: bdTasks[0]!.bdName, tasks: bdTasks });
+  }
+  for (const [bdId, items] of followUpsByBd) {
+    if (!recipients.has(bdId)) recipients.set(bdId, { bdEmail: items[0]!.bdEmail, bdName: items[0]!.bdName, tasks: [] });
+  }
+
   const results: DigestResult[] = [];
 
-  for (const [bdId, bdTasks] of byBd) {
-    const first = bdTasks[0]!;
-    const groups = groupDigestTasks(bdTasks, boundaries);
-    const email = buildDigestEmail({ name: first.bdName, email: first.bdEmail }, groups, siteBaseUrl);
+  for (const [bdId, recipient] of recipients) {
+    const first = { bdEmail: recipient.bdEmail, bdName: recipient.bdName };
+    const groups = groupDigestTasks(recipient.tasks, boundaries);
+    const expiring = selectExpiringFollowUps(followUpsByBd.get(bdId) ?? [], boundaries.today);
+    const email = buildDigestEmail({ name: first.bdName, email: first.bdEmail }, groups, siteBaseUrl, expiring);
 
     if (!email) {
       results.push({ bdId, bdEmail: first.bdEmail, sent: false, skippedReason: "no_open_tasks_due" });
@@ -93,6 +109,7 @@ export async function GET(request: Request) {
       today: groups.today.length,
       overdue: groups.overdue.length,
       yesterday: groups.yesterday.length,
+      expiringFollowUps: expiring.length,
     };
 
     if (dryRun) {

@@ -6,10 +6,13 @@
  * directly; the tested logic lives in src/lib/tasks/digest.ts (pure
  * grouping/rendering) and src/lib/tasks/argentinaDate.ts (pure day math).
  */
-import { and, asc, eq, isNotNull, lt } from "drizzle-orm";
+import { and, asc, eq, isNotNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bd, company, person, task, taskDigestSend } from "@/db/schema";
-import type { DigestTask } from "@/lib/tasks/digest";
+import { bd, company, followUpQueueItem, person, task, taskDigestSend } from "@/db/schema";
+import { FOLLOW_UP_EXPIRY_DAYS } from "@/lib/followUp/cycle";
+import { openCycleRowSql } from "@/lib/followUp/openCycle";
+import { EXPIRY_WARNING_DAYS, type DigestFollowUpRow, type DigestTask } from "@/lib/tasks/digest";
+import { addDaysToDateString } from "@/lib/tasks/argentinaDate";
 import { abandonedClaimCutoff } from "@/lib/tasks/digestClaim";
 
 export interface DigestTaskRow extends DigestTask {
@@ -55,6 +58,53 @@ export async function getDigestTasksForAllBds(before: Date, limit = 5000): Promi
   // nullable in the schema, so drizzle's inferred type is `Date | null` —
   // narrow it here once instead of forcing every caller to re-check.
   return rows.map((row) => ({ ...row, dueAt: row.dueAt! }));
+}
+
+export interface DigestFollowUpDbRow extends DigestFollowUpRow {
+  bdId: string;
+  bdEmail: string;
+  bdName: string;
+}
+
+/**
+ * One batched read for every BD's queue items that are still open and about to expire (the follow-up warning in the digest).
+ * "Still open" is `openCycleRowSql()`, the SAME predicate the day-10 expiry job uses (dropQueries.ts), so the email never warns
+ * about an item the job would not drop. The cycle-date window keeps only items with `EXPIRY_WARNING_DAYS` or fewer days left
+ * (cycle began 7-10 days before `today`, an ART date) and uses the (bd_id, queue_date) neighbourhood of a small table; capped by
+ * `limit`. The page's own `selectExpiringFollowUps` re-applies the exact threshold, so this window only bounds the read.
+ */
+export async function getExpiringFollowUpsForAllBds(
+  today: string,
+  limit = 5000,
+  executor: Pick<typeof db, "select"> = db,
+): Promise<DigestFollowUpDbRow[]> {
+  const oldest = addDaysToDateString(today, -FOLLOW_UP_EXPIRY_DAYS);
+  const newest = addDaysToDateString(today, -(FOLLOW_UP_EXPIRY_DAYS - EXPIRY_WARNING_DAYS));
+  const rows = await executor
+    .select({
+      personId: person.id,
+      firstName: person.firstName,
+      lastName: person.lastName,
+      company: sql<string | null>`coalesce(${company.displayName}, ${person.company})`,
+      cycleStartedOn: followUpQueueItem.cycleStartedOn,
+      bdId: bd.id,
+      bdEmail: bd.email,
+      bdName: bd.name,
+    })
+    .from(followUpQueueItem)
+    .innerJoin(bd, eq(followUpQueueItem.bdId, bd.id))
+    .innerJoin(person, eq(followUpQueueItem.personId, person.id))
+    .leftJoin(company, eq(person.companyKey, company.companyKey))
+    .where(
+      and(
+        sql`${followUpQueueItem.cycleStartedOn} >= ${oldest}::date`,
+        sql`${followUpQueueItem.cycleStartedOn} <= ${newest}::date`,
+        openCycleRowSql(),
+      ),
+    )
+    .orderBy(asc(bd.id), asc(followUpQueueItem.cycleStartedOn))
+    .limit(limit);
+  return rows.map((r) => ({ ...r, cycleStartedOn: r.cycleStartedOn! }));
 }
 
 /**
