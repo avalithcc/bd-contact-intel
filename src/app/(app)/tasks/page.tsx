@@ -18,6 +18,7 @@ import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
 import { CompleteTaskButton } from "./CompleteTaskButton";
 import { NewTaskButton } from "./NewTaskButton";
+import { TasksPageHeader } from "./TasksPageHeader";
 import { TaskTitleLink } from "./TaskTitleLink";
 import type { EditTaskLabels } from "./EditTaskDialog";
 import styles from "./page.module.css";
@@ -74,37 +75,35 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   });
 
   return (
-    <main className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div>
-          <div className={styles.eyebrow}>{l.eyebrow}</div>
-          <h1 className={styles.title}>{l.title}</h1>
-          <p className={styles.subtitle}>{l.subtitle}</p>
-        </div>
-        <div>
-          <NewTaskButton
-            labels={{
-              newTask: l.newTask,
-              taskCreate: l.taskCreate,
-              taskTitleLabel: l.taskTitleLabel,
-              taskDescriptionLabel: l.taskDescriptionLabel,
-              taskSubjectLabel: l.taskSubjectLabel,
-              taskSubjectPlaceholder: l.taskSubjectPlaceholder,
-              taskSubjectContactOption: l.taskSubjectContactOption,
-              taskSubjectCompanyOption: l.taskSubjectCompanyOption,
-              taskSubjectSearching: l.taskSubjectSearching,
-              taskSubjectNoResults: l.taskSubjectNoResults,
-              taskSubjectRequired: l.taskSubjectRequired,
-              taskDueLabel: l.taskDueLabel,
-              taskAssigneeLabel: l.taskAssigneeLabel,
-              taskCreateError: l.taskCreateError,
-              cancel: l.cancel,
-            }}
-            assigneeOptions={ownerOptions}
-            meId={me.id}
-          />
-        </div>
-      </div>
+    <main className="page">
+      <TasksPageHeader
+        eyebrow={l.eyebrow}
+        title={l.title}
+        subtitle={l.subtitle}
+        actions={
+        <NewTaskButton
+          labels={{
+            newTask: l.newTask,
+            taskCreate: l.taskCreate,
+            taskTitleLabel: l.taskTitleLabel,
+            taskDescriptionLabel: l.taskDescriptionLabel,
+            taskSubjectLabel: l.taskSubjectLabel,
+            taskSubjectPlaceholder: l.taskSubjectPlaceholder,
+            taskSubjectContactOption: l.taskSubjectContactOption,
+            taskSubjectCompanyOption: l.taskSubjectCompanyOption,
+            taskSubjectSearching: l.taskSubjectSearching,
+            taskSubjectNoResults: l.taskSubjectNoResults,
+            taskSubjectRequired: l.taskSubjectRequired,
+            taskDueLabel: l.taskDueLabel,
+            taskAssigneeLabel: l.taskAssigneeLabel,
+            taskCreateError: l.taskCreateError,
+            cancel: l.cancel,
+          }}
+          assigneeOptions={ownerOptions}
+          meId={me.id}
+        />
+        }
+      />
 
       <nav className="view-tabs" aria-label={l.eyebrow}>
         {tabs.map((tab) => (
@@ -153,7 +152,7 @@ async function OpenTasksView({
 
   if (!hasAnyTasks) {
     return (
-      <div className={styles.emptyState}>
+      <div className="empty">
         <p>{view === "mine" ? l.emptyState : l.emptyStateAll}</p>
       </div>
     );
@@ -165,7 +164,7 @@ async function OpenTasksView({
         <TaskGroup
           title={l.overdueLabel}
           count={overdueTasks.length}
-          badgeClass={styles.badgeDanger}
+          badgeClass="badge badge-danger no-dot"
           tasks={overdueTasks}
           dict={dict}
           me={me}
@@ -176,7 +175,7 @@ async function OpenTasksView({
         <TaskGroup
           title={l.todayLabel}
           count={todayTasks.length}
-          badgeClass={styles.badgeWarn}
+          badgeClass="badge badge-warn no-dot"
           tasks={todayTasks}
           dict={dict}
           me={me}
@@ -187,7 +186,7 @@ async function OpenTasksView({
         <TaskGroup
           title={l.upcomingLabel}
           count={null}
-          badgeClass={styles.badgeNeutral}
+          badgeClass="badge badge-neutral no-dot"
           tasks={upcomingTasks}
           dict={dict}
           me={me}
@@ -212,7 +211,7 @@ async function CompletedTasksView({
 
   if (completedTasks.length === 0) {
     return (
-      <div className={styles.emptyState}>
+      <div className="empty">
         <p>{l.emptyStateDone}</p>
       </div>
     );
@@ -222,7 +221,7 @@ async function CompletedTasksView({
     <TaskGroup
       title={l.completedLabel}
       count={null}
-      badgeClass={styles.badgeNeutral}
+      badgeClass="badge badge-neutral no-dot"
       tasks={completedTasks}
       dict={dict}
       me={me}
@@ -249,16 +248,16 @@ function TaskGroup({
   ownerOptions: { id: string; name: string }[];
 }) {
   return (
-    <section className={styles.section}>
-      <h3 className={styles.sectionTitle}>
+    <section>
+      <h3 className="mb-lg">
         {title}
-        {count !== null && <span className={styles.groupBadge}>{count}</span>}
+        {count !== null && <> <span className="badge badge-danger no-dot">{count}</span></>}
       </h3>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
+      <div className="table-wrap mb-lg">
+        <table className="data">
           <thead>
             <tr>
-              <th className={styles.colCheck}>{dict.tasksPage.colComplete}</th>
+              <th className="col-check"><span className="sr-only">{dict.tasksPage.colComplete}</span></th>
               <th>{dict.tasksPage.colTask}</th>
               <th>{dict.tasksPage.colSubject}</th>
               <th>{dict.tasksPage.colOwner}</th>
@@ -296,7 +295,7 @@ function TaskRow({
 
   return (
     <tr>
-      <td className={styles.colCheck}>
+      <td className="col-check">
         <CompleteTaskButton taskId={task.id} title={task.title} done={task.status === "done"} ariaLabel={l.completeAria} errorLabel={l.completeError} completedLabel={l.completedToast} undoLabel={l.completeUndo} undoErrorLabel={l.completeUndoError} />
       </td>
       <td>
@@ -317,13 +316,13 @@ function TaskRow({
           meId={me.id}
           labels={pickEditTaskLabels(l)}
         />
-        {task.description && <p className={styles.taskDescription}>{task.description}</p>}
+        {task.description && <p className="meta">{task.description}</p>}
       </td>
       <td>
         {subject ? <Link href={subject.href}>{subject.label}</Link> : "—"}
       </td>
       <td>
-        <span className={styles.ownerChip}>
+        <span className="owner-chip">
           <Avatar id={ownerName} initials={initialsFromName(ownerName)} variant="bd" size="sm" />
           {ownerName}
         </span>
