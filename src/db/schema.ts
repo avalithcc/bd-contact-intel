@@ -2234,6 +2234,11 @@ export type NewLushaReveal = typeof lushaReveal.$inferInsert;
  * only ones an import may write; `triage_status` and `note` are ours and an import never touches them.
  * `triage_status`: 'a_revisar' | 'en_analisis' | 'vamos' | 'descartada' — validated by the app (src/lib/tenders/triage.ts),
  * no CHECK, same convention as sequence_draft.language. Days left is derived from `opening_at` on read, never stored.
+ *
+ * Relevance (is this a software job for Avalith?): `ai_relevant` + `ai_reason` are the model's verdict, written at import and
+ * NULL when it never ran or failed (a NULL tender is shown, never hidden). `relevance_override` is a human's call (true =
+ * "this IS relevant", false = "it is not", NULL = no call) and WINS over the model; an import never writes it, and a new
+ * model verdict never replaces it. See src/lib/tenders/relevance.ts for the one definition of the effective value.
  */
 export const tender = pgTable(
   "tender",
@@ -2249,6 +2254,10 @@ export const tender = pgTable(
     financialAdminService: text("financial_admin_service").notNull().default(""),
     triageStatus: text("triage_status").notNull().default("a_revisar"),
     note: text("note"),
+    aiRelevant: boolean("ai_relevant"),
+    aiReason: text("ai_reason"),
+    aiClassifiedAt: timestamp("ai_classified_at", { withTimezone: true }),
+    relevanceOverride: boolean("relevance_override"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

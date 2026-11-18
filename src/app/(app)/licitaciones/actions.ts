@@ -13,6 +13,8 @@ import { addTenderDocument, getCurrentTenderDocument, saveTenderAnalysis, saveTe
 import { isUuid } from "@/lib/uuid";
 import { TenderSheetError } from "@/lib/tenders/parse";
 import { isTenderTriage } from "@/lib/tenders/triage";
+import { isRelevanceChoice } from "@/lib/tenders/relevance";
+import { setTenderRelevance } from "@/lib/tenders/relevanceDb";
 
 /** The portal's export is a few KB; anything near this is not it. */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -48,6 +50,16 @@ export async function setTenderTriageAction(id: string, status: string): Promise
   const me = await getCurrentBd();
   if (!isTenderTriage(status)) throw new Error("Unknown tender state");
   const found = await setTenderTriage(id, status, undefined, me.id);
+  if (!found) throw new Error("Tender not found");
+  revalidatePath("/licitaciones");
+  revalidatePath(`/licitaciones/${id}`);
+}
+
+/** Any signed-in BD may overrule the model on one tender ("auto" gives the decision back to it); the move is logged with who made it. */
+export async function setTenderRelevanceAction(id: string, choice: string): Promise<void> {
+  const me = await getCurrentBd();
+  if (!isRelevanceChoice(choice)) throw new Error("Unknown relevance choice");
+  const found = await setTenderRelevance(id, choice, undefined, me.id);
   if (!found) throw new Error("Tender not found");
   revalidatePath("/licitaciones");
   revalidatePath(`/licitaciones/${id}`);

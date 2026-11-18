@@ -27,6 +27,7 @@ export function TenderImportForm({ locale }: { locale: Locale }) {
         <div className="alert alert-success mb-lg" role="status">
           <div>
             {l.importResult(state.report.created, state.report.updated, state.report.unchanged)}
+            {state.report.unclassified > 0 ? ` ${l.importUnclassified(state.report.unclassified)}` : state.report.classified > 0 ? ` ${l.importClassified(state.report.classified)}` : ""}
             {state.report.rejected.length > 0 && <> {l.importRejected(state.report.rejected.length)}</>}
           </div>
         </div>

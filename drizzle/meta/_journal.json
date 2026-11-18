@@ -477,6 +477,13 @@
       "when": 1795292400000,
       "tag": "0067_tender_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1795378800000,
+      "tag": "0068_tender_relevance",
+      "breakpoints": true
     }
   ]
 }

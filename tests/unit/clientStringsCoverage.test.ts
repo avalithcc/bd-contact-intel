@@ -54,7 +54,7 @@ const PRODUCERS: ReadonlyArray<readonly [string, (d: Dict) => unknown]> = [
 // directly in Node, where there is no boundary to cross - and only opening the real page in a browser found it.
 // Same cause as the /follow-ups outage. Any dictionary slice handed WHOLE to a client component belongs in this list.
 const WHOLE_SLICES = ["sequences", "sendControl", "companyBulk", "tasksPage", "leadStatuses", "roleGroups", "tenderDetail"] as const;
-const NESTED_SLICES = [["tendersPage", "triage"]] as const;
+const NESTED_SLICES = [["tendersPage", "triage"], ["tendersPage", "relevanceChoices"]] as const;
 
 const LOCALES = [
   ["en", en],
