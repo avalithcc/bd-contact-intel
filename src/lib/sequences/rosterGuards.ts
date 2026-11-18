@@ -2,11 +2,12 @@
  * Per-Contact roster accept/reject. Pure: every guard runs here and the caller never drops a Contact silently, each
  * rejected one comes back with a reason code. Enforced server-side on add, bulk add and re-admit.
  */
+import type { ActiveSequenceHold } from "./activeMembership";
 import { isSuppressed, type SuppressionRule } from "./suppression";
 
 export const COMPANY_MEMBER_LIMIT = 2;
 
-export type RosterRejection = "unreachable" | "company_limit" | "client" | "suppressed" | "unmapped_market" | "duplicate";
+export type RosterRejection = "unreachable" | "company_limit" | "client" | "suppressed" | "unmapped_market" | "duplicate" | "in_active_sequence";
 
 export interface RosterCandidate {
   personId: string;
@@ -31,6 +32,12 @@ export interface RosterContext {
   existingPersonIds: ReadonlySet<string>;
   /** Non-discarded members per person.company_key. Discarded members must not be counted by the caller. */
   activeCountByCompany: ReadonlyMap<string, number>;
+  /**
+   * Persons live (not in CLOSED_STATES) in ANOTHER sequence, owned by anyone, with the sequence that holds them. The caller
+   * loads it for the candidates and excludes this sequence, so a person already here still reads as `duplicate`.
+   * Required, so a new caller cannot forget the guard.
+   */
+  activeElsewhere: ReadonlyMap<string, ActiveSequenceHold>;
 }
 
 export interface RosterDecision {
@@ -64,6 +71,11 @@ export function evaluateRosterAdds(candidates: readonly RosterCandidate[], ctx: 
     const staticReason = staticRosterRejection(c, ctx.suppressionRules);
     if (staticReason) {
       reject(staticReason);
+      continue;
+    }
+    // Two live threads from two mailboxes to one person. Before the company limit, so a held contact takes no slot.
+    if (ctx.activeElsewhere.has(c.personId)) {
+      reject("in_active_sequence");
       continue;
     }
     if (c.companyKey && (counts.get(c.companyKey) ?? 0) >= COMPANY_MEMBER_LIMIT) {

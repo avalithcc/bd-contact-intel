@@ -4007,6 +4007,7 @@ export const en = {
       client: "The company is listed as a client.",
       suppressed: "The address is on the do-not-contact list.",
       duplicate: "This contact is already in the sequence.",
+      in_active_sequence: "This contact is in another sequence that is still active.",
     },
     toastSaved: "Draft saved.",
     toastApproved: "Approved. It goes out in the next send.",
@@ -4263,6 +4264,8 @@ export const en = {
       // The key name is historical (it predates the compliance audience); the reason is now "we cannot place this contact in a country".
       unmappedMarket: "Location unknown or restricted",
       companyLimit: "Company limit",
+      inActiveSequence: "In another sequence",
+      inOwnActiveSequence: "In another of your sequences",
     },
     blockWhy: {
       client: "{company} is an active Avalith client; it gets no cold outreach.",
@@ -4276,6 +4279,8 @@ export const en = {
       noPosting: "{company} has no open IT postings in the US.",
       unmappedMarket: "We cannot place this contact in a country (the country is missing or is not a country name, and nothing else locates them), or its country is under an embargo. Every email must carry the right postal address, so it cannot be added.",
       companyLimit: "You already chose {max} contacts from {company} ({names}). The maximum is {max} per company.",
+      inActiveSequence: "Already in the sequence \"{sequence}\" owned by {owner}, which is still active. Two sequences in parallel would send them two threads from two mailboxes; sort it out with them before adding.",
+      inOwnActiveSequence: "Already in your sequence \"{sequence}\", which is still active. Two sequences in parallel would send them two threads; wait for it to finish or remove them there before adding.",
     },
     contextBadges: {
       drafted: "Draft",

@@ -60,16 +60,32 @@ after(async () => {
   await db.delete(bd).where(inArray(bd.id, [bdId]));
 });
 
-test("the picker lists the contact as addable: the canonical company's country decides", async () => {
+/**
+ * The fixture contact is a live member of `sequenceId` (the draft test needs that). A contact live in ANOTHER sequence is
+ * blocked by design, which would mask the country rule these two tests pin, so the membership is closed while `fn` runs.
+ */
+async function withMemberClosed<T>(fn: () => Promise<T>): Promise<T> {
+  const { db } = await import("@/db");
+  const { sequenceMember } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await db.update(sequenceMember).set({ state: "no_reply" }).where(eq(sequenceMember.id, memberId));
+  try {
+    return await fn();
+  } finally {
+    await db.update(sequenceMember).set({ state: "drafted" }).where(eq(sequenceMember.id, memberId));
+  }
+}
+
+test("the picker lists the contact as addable: the canonical company's country decides", () => withMemberClosed(async () => {
   const { listPickerPage } = await import("@/lib/sequences/pageQueries");
   const { DEFAULT_PICKER_QUERY } = await import("@/lib/sequences/pickerFilters");
   const page = await listPickerPage({ ...DEFAULT_PICKER_QUERY, search: firstName, showBlocked: true }, bdId, "?");
   const row = page.contacts.find((c) => c.personId === personId);
   assert.ok(row, "listed");
   assert.equal(row.block, null);
-});
+}));
 
-test("the add guard admits the same contact", async () => {
+test("the add guard admits the same contact", () => withMemberClosed(async () => {
   const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
   const { db } = await import("@/db");
   const { sequence } = await import("@/db/schema");
@@ -77,7 +93,7 @@ test("the add guard admits the same contact", async () => {
   const result = await addMembersToSequence(bdId, s.id, [personId]);
   assert.ok(result.ok);
   assert.deepEqual(result.rejected, []);
-});
+}));
 
 test("the draft path writes the LATAM footer and does not hold the member", async () => {
   const { generateMemberDraft } = await import("@/lib/sequences/draftQueries");

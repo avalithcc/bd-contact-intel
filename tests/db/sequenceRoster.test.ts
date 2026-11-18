@@ -49,10 +49,17 @@ async function mkPerson(name: string, companyKey: string | null, over: Record<st
   return p.id;
 }
 
-async function mkSequence() {
+async function mkSequence(name = key("seq"), ownerBd = bdId) {
   const { db } = await import("@/db");
-  const { sequence } = await import("@/db/schema");
-  const [s] = await db.insert(sequence).values({ name: key("seq"), ownerBdId: bdId, emailAccountId: accountId, schedule: {} }).returning();
+  const { sequence, emailAccount } = await import("@/db/schema");
+  let account = accountId;
+  // email_account is keyed by bd_id: one per BD, created on first use for the other one.
+  if (ownerBd !== bdId) {
+    await db.insert(emailAccount).values({ bdId: ownerBd, emailAddress: `zz-other-sender-${run}@example.test` }).onConflictDoNothing();
+    const { eq } = await import("drizzle-orm");
+    account = (await db.select({ id: emailAccount.id }).from(emailAccount).where(eq(emailAccount.bdId, ownerBd)))[0].id;
+  }
+  const [s] = await db.insert(sequence).values({ name, ownerBdId: ownerBd, emailAccountId: account, schedule: {} }).returning();
   sequenceIds.push(s.id);
   return s.id;
 }
@@ -285,4 +292,89 @@ test("add: merged, email-less, opted-out and client Contacts are rejected on a d
   assert.ok(r.ok);
   assert.deepEqual(r.rejected, [{ personId: merged, reason: "unreachable" }, { personId: noEmail, reason: "unreachable" }, { personId: optedOut, reason: "suppressed" }, { personId: client, reason: "client" }]);
   assert.deepEqual(r.accepted, []);
+});
+
+// --- a contact already live in ANOTHER sequence --------------------------------------------------------------------------
+
+async function putIn(sequenceId: string, personId: string, state: string) {
+  const { db } = await import("@/db");
+  const { sequenceMember } = await import("@/db/schema");
+  const [m] = await db.insert(sequenceMember).values({ sequenceId, personId, state, ...(state === "discarded" ? { discardReason: "manual", discardedAt: new Date() } : {}) }).returning({ id: sequenceMember.id });
+  return m.id;
+}
+
+test("add: a contact live (drafted, approved or sent) in another BD's sequence is refused server-side, a closed one is free", async () => {
+  const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
+  const { MEMBER_STATES, CLOSED_STATES } = await import("@/lib/sequences/memberState");
+  const theirs = await mkSequence(`Florida + US · ${run}`, otherBdId);
+  const mine = await mkSequence();
+  const closed = CLOSED_STATES as readonly string[];
+  const people = new Map<string, string>();
+  for (const state of MEMBER_STATES) {
+    const p = await mkPerson(`ae-${state}`, await mkCompany(`ae-${state}`, null));
+    await putIn(theirs, p, state);
+    people.set(state, p);
+  }
+  const nobody = await mkPerson("ae-none", await mkCompany("ae-none", null));
+  const r = await addMembersToSequence(bdId, mine, [...people.values(), nobody]);
+  assert.ok(r.ok);
+  const live = MEMBER_STATES.filter((s) => !closed.includes(s));
+  assert.deepEqual(live, ["drafted", "approved", "sent"], "sent counts: the step 2 reminder is still coming");
+  assert.deepEqual(r.rejected, live.map((s) => ({ personId: people.get(s)!, reason: "in_active_sequence" })));
+  assert.deepEqual(r.accepted, [...MEMBER_STATES.filter((s) => closed.includes(s)).map((s) => people.get(s)!), nobody], "replied, no_reply and discarded are free; so is a contact in no sequence");
+});
+
+test("add: the viewer's OWN other live sequence blocks too, and a closed membership of the same contact does not", async () => {
+  const { addMembersToSequence } = await import("@/lib/sequences/rosterQueries");
+  const first = await mkSequence(key("own-first"));
+  const second = await mkSequence(key("own-second"));
+  const company = await mkCompany("own", null);
+  const held = await mkPerson("own-held", company);
+  const done = await mkPerson("own-done", company);
+  await putIn(first, held, "sent");
+  await putIn(first, done, "replied");
+  const r = await addMembersToSequence(bdId, second, [held, done]);
+  assert.ok(r.ok);
+  assert.deepEqual(r.rejected, [{ personId: held, reason: "in_active_sequence" }]);
+  assert.deepEqual(r.accepted, [done]);
+});
+
+test("reinstate: a discarded member cannot come back while the contact is live in another sequence", async () => {
+  const { reinstateSequenceMember } = await import("@/lib/sequences/rosterQueries");
+  const old = await mkSequence(key("re-old"));
+  const newer = await mkSequence(key("re-new"), otherBdId);
+  const person = await mkPerson("re-held", await mkCompany("re-held", null));
+  const memberId = await putIn(old, person, "discarded");
+  const liveId = await putIn(newer, person, "drafted");
+  assert.deepEqual(await reinstateSequenceMember(bdId, memberId), { ok: false, error: "in_active_sequence" });
+  const { db } = await import("@/db");
+  const { sequenceMember } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await db.update(sequenceMember).set({ state: "no_reply" }).where(eq(sequenceMember.id, liveId));
+  assert.deepEqual(await reinstateSequenceMember(bdId, memberId), { ok: true }, "once the other one is closed the contact is free");
+});
+
+test("picker: a contact live in another sequence is blocked with that sequence and its owner, the viewer's own without a name, closed ones free", async () => {
+  const { listPickerPage } = await import("@/lib/sequences/pageQueries");
+  const { DEFAULT_PICKER_QUERY } = await import("@/lib/sequences/pickerFilters");
+  const theirs = await mkSequence(`Florida + US · octubre ${run}`, otherBdId);
+  const mine = await mkSequence(`Mi lista ${run}`);
+  const company = await mkCompany("pkh", null);
+  const [other, own, closed, free] = await Promise.all(["pkh-other", "pkh-own", "pkh-closed", "pkh-free"].map((n) => mkPerson(n, company)));
+  await putIn(theirs, other, "sent");
+  await putIn(mine, own, "approved");
+  await putIn(theirs, closed, "no_reply");
+  const page = await listPickerPage({ ...DEFAULT_PICKER_QUERY, search: run, showBlocked: true }, bdId, "?");
+  const byId = new Map(page.contacts.map((c) => [c.personId, c]));
+  assert.equal(byId.get(other)?.block, "inActiveSequence");
+  assert.equal(byId.get(other)?.blockDetail, `Florida + US · octubre ${run}`);
+  assert.equal(byId.get(other)?.blockOwner, "ZZ Other");
+  assert.equal(byId.get(own)?.block, "inOwnActiveSequence");
+  assert.equal(byId.get(own)?.blockDetail, `Mi lista ${run}`);
+  assert.equal(byId.get(own)?.blockOwner, null);
+  assert.equal(byId.get(closed)?.block, null);
+  assert.equal(byId.get(free)?.block, null);
+  const hidden = await listPickerPage({ ...DEFAULT_PICKER_QUERY, search: run }, bdId, "?");
+  const shown = new Set(hidden.contacts.map((c) => c.personId));
+  assert.ok(!shown.has(other) && !shown.has(own) && shown.has(closed) && shown.has(free), "hidden unless the toggle is on");
 });

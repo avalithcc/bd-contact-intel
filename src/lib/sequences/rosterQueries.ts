@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { auditLog, emailAccount, sequence, sequenceDraft, sequenceMember } from "@/db/schema";
 import { sequenceAuditRow } from "./approvalAudit";
 import { validateDailySendCap, type CapRejection } from "./capValidation";
+import { activeMemberStateSql, type ActiveSequenceHold } from "./activeMembership";
 import { canTransition, type MemberState } from "./memberState";
 import { DEFAULT_SCHEDULE } from "./schedule";
 import { withResolvedCompanyName } from "@/lib/contacts/companyDisplayName";
@@ -73,6 +74,23 @@ async function activeCounts(tx: Tx, sequenceId: string): Promise<Map<string, num
   return new Map(rows.map((r) => [r.company_key, r.n]));
 }
 
+/**
+ * Which of these persons are live (not CLOSED_STATES) in a Sequence OTHER than `exceptSequenceId`, whoever owns it, with the
+ * Sequence and its owner. One statement for the whole batch. A person already in THIS sequence is left to the `duplicate` guard.
+ * `distinct on` keeps one hold per person, the oldest.
+ */
+async function activeElsewhere(tx: Tx, personIds: readonly string[], exceptSequenceId: string): Promise<Map<string, ActiveSequenceHold>> {
+  if (!personIds.length) return new Map();
+  const rows = rowsOf<{ person_id: string; sequence_name: string; owner_bd_id: string; owner_name: string }>(
+    await tx.execute(sql`
+      select distinct on (sm.person_id) sm.person_id::text as person_id, s.name as sequence_name, s.owner_bd_id::text as owner_bd_id, b.name as owner_name
+      from sequence_member sm join sequence s on s.id = sm.sequence_id join bd b on b.id = s.owner_bd_id
+      where sm.person_id in (${idList(personIds)}) and sm.sequence_id <> ${exceptSequenceId}::uuid and ${activeMemberStateSql("sm")}
+      order by sm.person_id, sm.created_at, sm.id`),
+  );
+  return new Map(rows.map((r) => [r.person_id, { sequenceName: r.sequence_name, ownerBdId: r.owner_bd_id, ownerName: r.owner_name }]));
+}
+
 /** Locks the Sequence row (serializes concurrent adds so the 2-per-company cap cannot be raced) iff `bdId` owns it. */
 async function lockOwnedSequence(tx: Tx, bdId: string, sequenceId: string) {
   const [row] = await tx.select().from(sequence).where(and(eq(sequence.id, sequenceId), eq(sequence.ownerBdId, bdId))).for("update");
@@ -116,6 +134,7 @@ export async function addMembersToSequence(bdId: string, sequenceId: string, per
       suppressionRules: rules,
       existingPersonIds: new Set(existing.map((e) => e.personId)),
       activeCountByCompany: await activeCounts(tx, sequenceId),
+      activeElsewhere: await activeElsewhere(tx, candidates.map((c) => c.personId), sequenceId),
     });
     const known = new Set(candidates.map((c) => c.personId));
     for (const id of ids) if (!known.has(id)) decision.rejected.push({ personId: id, reason: "unreachable" });
@@ -171,6 +190,7 @@ export async function reinstateSequenceMember(bdId: string, memberId: string): P
       suppressionRules: rules,
       existingPersonIds: new Set(),
       activeCountByCompany: await activeCounts(tx, fresh.sequenceId),
+      activeElsewhere: await activeElsewhere(tx, [fresh.personId], fresh.sequenceId),
     });
     if (decision.rejected.length) return { ok: false, error: decision.rejected[0].reason } as const;
     await tx.update(sequenceMember).set({ state: "drafted", discardReason: null, discardedByBdId: null, discardedAt: null, holdReason: null, holdAt: null }).where(eq(sequenceMember.id, memberId));

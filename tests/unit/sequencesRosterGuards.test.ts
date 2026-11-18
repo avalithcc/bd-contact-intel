@@ -6,6 +6,8 @@ import {
   type RosterCandidate,
   type RosterContext,
 } from "@/lib/sequences/rosterGuards";
+import { isActiveMemberState, type ActiveSequenceHold } from "@/lib/sequences/activeMembership";
+import { CLOSED_STATES, MEMBER_STATES } from "@/lib/sequences/memberState";
 
 const candidate = (id: string, over: Partial<RosterCandidate> = {}): RosterCandidate => ({
   personId: id,
@@ -22,6 +24,7 @@ const ctx = (over: Partial<RosterContext> = {}): RosterContext => ({
   suppressionRules: [],
   existingPersonIds: new Set(),
   activeCountByCompany: new Map(),
+  activeElsewhere: new Map(),
   ...over,
 });
 
@@ -126,4 +129,38 @@ test("a Contact with no compliance audience is refused, whatever the client aske
 test("the market never takes the place of an earlier reason: a client in an unmapped market is a client", () => {
   const r = evaluateRosterAdds([candidate("a", { marketMapped: false, clientStatus: "active" }), candidate("b", { marketMapped: false, emailStatus: "none" })], ctx());
   assert.deepEqual(reasons(r), { a: "client", b: "unreachable" });
+});
+
+// --- a contact live in ANOTHER sequence ------------------------------------------------------------------------------
+
+const hold = (over: Partial<ActiveSequenceHold> = {}): ActiveSequenceHold => ({ sequenceName: "Florida + US · octubre", ownerBdId: "bd-macarena", ownerName: "Macarena Dávila", ...over });
+
+test("a contact live in another sequence is rejected as in_active_sequence, whatever the client sent", () => {
+  const r = evaluateRosterAdds([candidate("held", { companyKey: null }), candidate("free", { companyKey: null })], ctx({ activeElsewhere: new Map([["held", hold()]]) }));
+  assert.deepEqual(r.accepted, ["free"]);
+  assert.deepEqual(r.rejected, [{ personId: "held", reason: "in_active_sequence" }]);
+});
+
+test("an active-elsewhere rejection does not consume a company slot, and an unreachable contact keeps its own reason", () => {
+  const r = evaluateRosterAdds(
+    [candidate("held"), candidate("a"), candidate("b"), candidate("dead", { emailStatus: "none" })],
+    ctx({ activeElsewhere: new Map([["held", hold()], ["dead", hold()]]) }),
+  );
+  assert.deepEqual(r.accepted, ["a", "b"], "the held contact must not take one of the two company slots");
+  assert.deepEqual(reasons(r), { held: "in_active_sequence", dead: "unreachable" });
+});
+
+test("only the states outside CLOSED_STATES are active, derived from the closed list rather than a copy of it", () => {
+  for (const s of MEMBER_STATES) assert.equal(isActiveMemberState(s), !(CLOSED_STATES as readonly string[]).includes(s), s);
+  for (const s of ["drafted", "approved", "sent"]) assert.equal(isActiveMemberState(s), true, `${s} must hold the contact`);
+  for (const s of CLOSED_STATES) assert.equal(isActiveMemberState(s), false, `${s} must free the contact`);
+});
+
+test("the planner never mutates its inputs: the same call twice gives the same answer", () => {
+  const candidates = [candidate("held", { companyKey: null }), candidate("free", { companyKey: null })];
+  const context = ctx({ activeElsewhere: new Map([["held", hold()]]) });
+  const first = evaluateRosterAdds(candidates, context);
+  const second = evaluateRosterAdds(candidates, context);
+  assert.deepEqual(second, first);
+  assert.deepEqual([...context.activeElsewhere.keys()], ["held"]);
 });

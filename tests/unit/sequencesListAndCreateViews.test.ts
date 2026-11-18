@@ -34,7 +34,7 @@ const list = renderToStaticMarkup(createElement(SequenceListView, { rows, labels
 
 const person = (id: string, key: string | null, over: Partial<PickerContact> = {}): PickerContact => ({
   personId: id, name: `Person ${id}`, jobTitle: "Lead", status: "new", company: key && `Co ${key}`, companyKey: key, florida: false, openIt: 2,
-  email: `${id}@x.example`, emailStatus: "verified", emailSource: null, block: null, blockDetail: null, survivorId: null, ...over,
+  email: `${id}@x.example`, emailStatus: "verified", emailSource: null, block: null, blockDetail: null, blockOwner: null, survivorId: null, ...over,
 });
 const pool = [
   person("a", "k1", { florida: true }), person("b", "k1"), person("c", "k1"), person("d", "k2", { emailStatus: "probable" }),
@@ -115,6 +115,20 @@ test("picker: rows, badges and reasons as the mockup draws them", () => {
   assert.ok(html.includes("4 disponibles · 2 que no se pueden agregar, con el motivo") && html.includes("Cupo por empresa: 2") && html.includes("Mostrar los que no se pueden agregar"));
 });
 
+test("picker: a contact live in another sequence names the sequence and its owner, in both languages; the viewer's own is not named", () => {
+  const other = person("o", "k8", { block: "inActiveSequence", blockDetail: "Florida + US · octubre", blockOwner: "Macarena Dávila" });
+  const mine = person("w", "k8", { block: "inOwnActiveSequence", blockDetail: "Mi lista", blockOwner: null });
+  const render = (labels: typeof es.sequences) =>
+    renderToStaticMarkup(createElement(RosterPicker, { contacts: [other, mine], hasMore: false, loadPage: noPage, initialShowBlocked: true, selection: new Map(), onChange: () => {}, labels, statusLabels: st }));
+  const esHtml = render(es.sequences);
+  assert.ok(esHtml.includes("Florida + US · octubre") && esHtml.includes("Macarena Dávila"), "Spanish names the sequence and its owner");
+  assert.ok(esHtml.includes("Mi lista") && !esHtml.includes("Yo Mismo"));
+  assert.ok(esHtml.includes('aria-label="No se puede elegir a Person o"'), "the row cannot be chosen");
+  const enHtml = render(en.sequences);
+  assert.ok(enHtml.includes("Florida + US · octubre") && enHtml.includes("Macarena Dávila") && enHtml.includes("Mi lista"));
+  assert.ok(!/\{(sequence|owner)\}/.test(esHtml + enHtml), "no placeholder is left unfilled");
+});
+
 test("picker: a contact with no compliance audience is blocked with its reason, hidden until the toggle, and cannot be chosen", () => {
   const unplaced = person("u", "k9", { block: "unmappedMarket" });
   const shown = picker([], [pool[1], unplaced]);
@@ -134,7 +148,7 @@ test("picker: 'Cargar más' appears only while the server has more, and an empty
 });
 
 test("every block reason is worded in both languages", () => {
-  const kinds = { client: 1, clientFormer: 1, suppressed: 1, member: 1, merged: 1, noEmail: 1, unreachable: 1, inferred: 1, noPosting: 1, unmappedMarket: 1, companyLimit: 1 } satisfies Record<BlockKind, 1>;
+  const kinds = { client: 1, clientFormer: 1, suppressed: 1, member: 1, merged: 1, noEmail: 1, unreachable: 1, inferred: 1, noPosting: 1, unmappedMarket: 1, companyLimit: 1, inActiveSequence: 1, inOwnActiveSequence: 1 } satisfies Record<BlockKind, 1>;
   for (const d of [es.sequences, en.sequences]) for (const k of Object.keys(kinds)) assert.ok(d.blockLabels[k as BlockKind] && d.blockWhy[k as BlockKind], k);
   assert.deepEqual(Object.keys(es.sequences).sort(), Object.keys(en.sequences).sort());
 });

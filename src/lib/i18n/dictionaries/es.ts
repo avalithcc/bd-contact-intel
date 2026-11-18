@@ -4024,6 +4024,7 @@ export const es: typeof en = {
       client: "La empresa figura como cliente.",
       suppressed: "La dirección está en la lista de no contactar.",
       duplicate: "Este contacto ya está en la secuencia.",
+      in_active_sequence: "Este contacto está en otra secuencia que sigue activa.",
     },
     toastSaved: "Borrador guardado.",
     toastApproved: "Aprobado. Sale en el próximo envío.",
@@ -4284,6 +4285,8 @@ export const es: typeof en = {
       // El nombre de la clave es histórico (anterior a la audiencia de cumplimiento); el motivo ahora es "no se puede ubicar al contacto en un país".
       unmappedMarket: "Ubicación desconocida o restringida",
       companyLimit: "Límite por empresa",
+      inActiveSequence: "En otra secuencia",
+      inOwnActiveSequence: "En otra secuencia tuya",
     },
     blockWhy: {
       client: "{company} es cliente activo de Avalith; no recibe prospección en frío.",
@@ -4297,6 +4300,8 @@ export const es: typeof en = {
       noPosting: "{company} no tiene vacantes IT abiertas en EE. UU.",
       unmappedMarket: "No podemos ubicar a este contacto en un país (falta el país o no es un nombre de país, y nada más lo ubica), o su país está bajo embargo. Cada correo debe llevar la dirección postal correcta, así que no se puede agregar.",
       companyLimit: "Ya elegiste {max} contactos de {company} ({names}). El máximo es {max} por empresa.",
+      inActiveSequence: "Ya está en la secuencia \"{sequence}\" de {owner}, que sigue activa. Dos secuencias en paralelo le mandarían dos hilos desde dos casillas; resolvelo con esa persona antes de sumarlo.",
+      inOwnActiveSequence: "Ya está en tu secuencia \"{sequence}\", que sigue activa. Dos secuencias en paralelo le mandarían dos hilos; esperá a que termine o quitalo de ahí antes de sumarlo.",
     },
     contextBadges: {
       drafted: "Borrador",

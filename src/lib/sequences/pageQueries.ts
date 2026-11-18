@@ -120,7 +120,7 @@ async function pickerCountryFacts(): Promise<CountryFacts> {
  */
 export async function listPickerPage(query: PickerQuery, meId: string, unnamed: string): Promise<PickerPage> {
   const reads = buildPickerReads(query, meId, await pickerCountryFacts());
-  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null; suppressed: boolean; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[]; roster_countries: unknown }>(
+  const rows = rowsOf<PickerDbRow & { companyCanonicalName: string | null; suppressed: boolean; person_country: string | null; mobile_phone: string | null; phone: string | null; company_country: string | null; posting_markets: string[]; roster_countries: unknown; held: { sequence: string; owner: string; ownerId: string } | null }>(
     await db.execute(reads.page),
   );
   const counts = reads.counts ? pickerCountsFromRows(rowsOf<CountsRow>(await db.execute(reads.counts))) : null;
@@ -129,7 +129,7 @@ export async function listPickerPage(query: PickerQuery, meId: string, unnamed: 
     const mapped = resolveComplianceAudience(audienceInputsFromRow(r)) !== null;
     // A suppressed address becomes a one-address rule, so the SAME isSuppressed() that guards the add decides the reason.
     const rules: SuppressionRule[] = r.suppressed && r.email ? [{ ruleKind: "address", value: normalizeSuppressionValue("address", r.email) }] : [];
-    return toPickerContact({ ...r, market_mapped: mapped }, rules, unnamed);
+    return toPickerContact({ ...r, market_mapped: mapped, held_sequence: r.held?.sequence ?? null, held_owner: r.held?.owner ?? null, held_by_viewer: r.held ? r.held.ownerId === meId : null }, rules, unnamed);
   });
   return { contacts, hasMore: rows.length > PICKER_PAGE_SIZE, industryCounts: counts?.industry ?? null, countryCounts: counts ? { ...counts.country, labels: countryLabelsEs(Object.keys(counts.country.byValue)) } : null, signalCounts: counts?.signals ?? null };
 }

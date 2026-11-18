@@ -92,7 +92,7 @@ test("a Cuban contact is HELD at every gate: no draft input, no roster add, no s
   assert.equal(buildSequenceDraftInput(ARGS, audience), null, "draft: the generator is unreachable");
   const roster = evaluateRosterAdds(
     [{ personId: "cu", email: "a@b.test", emailStatus: "verified", emailSource: "apollo", mergedIntoId: null, companyKey: null, clientStatus: null, marketMapped: audience !== null }],
-    { suppressionRules: [], existingPersonIds: new Set(), activeCountByCompany: new Map() },
+    { suppressionRules: [], existingPersonIds: new Set(), activeCountByCompany: new Map(), activeElsewhere: new Map() },
   );
   assert.deepEqual(roster.rejected, [{ personId: "cu", reason: "unmapped_market" }], "add guard");
   const footed = composeDraft({ subject: "s", body: "b" }, "miami", "en", URL_OK)!.body;

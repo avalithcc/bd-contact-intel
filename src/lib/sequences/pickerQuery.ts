@@ -30,6 +30,7 @@ import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { resolveComplianceAudience } from "./complianceAudience";
 import { PICKER_PAGE_SIZE, searchTokens, type PickerQuery } from "./pickerFilters";
 import { phoneCallingCodes } from "./phoneMarket";
+import { activeMemberStateSql } from "./activeMembership";
 import { canonicalCompanyJoinSql, companyNameColumnsSql, displayedCompanySql, firstFilledCountry, firstFilledText } from "./rosterQuery";
 
 /**
@@ -214,6 +215,17 @@ const phoneIsLocated = () => {
   return sql`(${phoneDigits("p.mobile_phone")} ~ ${pattern} or ${phoneDigits("p.phone")} ~ ${pattern})`;
 };
 
+/**
+ * The live sequence holding this person (see activeMembership.ts) as ONE json object (any one of them if there are several,
+ * and an unordered `limit 1` on purpose: the list/counts tests pin `order by` as the end of the shared pool); NULL when none. A correlated lookup on `sequence_member_person_idx`, in the select list only, so Postgres
+ * evaluates it for the rows of the page and the sort never reads it. The counts statement does not need it. The owner comes
+ * back as an id, so whether it is the viewer's is decided by the caller and the viewer's id is never a bind parameter here.
+ */
+const heldBySql = sql`(
+      select json_build_object('sequence', s.name, 'owner', b.name, 'ownerId', s.owner_bd_id::text)
+      from sequence_member sm join sequence s on s.id = sm.sequence_id join bd b on b.id = s.owner_bd_id
+      where sm.person_id = p.id and ${activeMemberStateSql("sm")} limit 1) as held`;
+
 function blockedSql(f: CountryFacts): SQL {
   // The person's own country decides alone. Without one the roster may (a strict majority of at least two colleagues with a
   // country): SQL cannot say "recognized", so it only knows the roster COULD decide (two or more colleagues filed a country)
@@ -226,7 +238,8 @@ function blockedSql(f: CountryFacts): SQL {
     or (p.email_source = 'pattern_inferred' and p.email_status <> 'verified')
     or ${clientStatus} is not null
     or ${suppressedSql}
-    or ${unmapped}), false)`;
+    or ${unmapped}
+    or exists (select 1 from sequence_member hm where hm.person_id = p.id and ${activeMemberStateSql("hm")})), false)`;
 }
 
 /**
@@ -295,7 +308,8 @@ export function buildPickerPageQuery(q: PickerQuery, meId: string, facts: Countr
            ${hireCount}::int as open_it, (${postingFlorida} or ${homeInFlorida(facts)}) as is_florida,
            ${suppressedSql} as suppressed, p.country as person_country, p.mobile_phone, p.phone, ${companyCountry} as company_country,
            array_remove(array[case when ${either("posts_us")} then 'us' end, case when ${either("posts_latam")} then 'latam' end], null) as posting_markets,
-           coalesce(rs.roster, '[]'::json) as roster_countries
+           coalesce(rs.roster, '[]'::json) as roster_countries,
+           ${heldBySql}
     ${buildPickerPoolSql(q, meId, facts)}
     order by ${blockedFirst}${displayedCompanySql}, p.last_name, p.first_name, p.id
     offset ${q.offset} limit ${PICKER_PAGE_SIZE + 1}`;
