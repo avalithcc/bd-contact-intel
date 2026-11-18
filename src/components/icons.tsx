@@ -134,6 +134,16 @@ export function DiscoveryIcon({ className }: { className?: string }) {
   );
 }
 
+// "Licitaciones" sidebar entry — a document with ruled lines (Lucide's file-text glyph), the tender's pliego.
+export function TendersIcon({ className }: { className?: string }) {
+  return (
+    <Svg className={className}>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z" />
+      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+    </Svg>
+  );
+}
+
 // "Guía de roles" sidebar entry (openspec/changes/bd-playbook) — an open-book
 // glyph, path copied 1:1 from bd-playbook.html's nav item.
 export function PlaybookIcon({ className }: { className?: string }) {
