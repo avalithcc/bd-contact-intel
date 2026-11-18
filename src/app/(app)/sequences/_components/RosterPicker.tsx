@@ -44,7 +44,7 @@ function Availability({ r, l }: { r: PickerRow; l: SequenceLabels }) {
   // Intl, not a literal " y ": a hardcoded conjunction bypasses the dictionary and prints Spanish inside the
   // English locale. The dictionary tests only assert that keys exist, so nothing else would catch it.
   const names = new Intl.ListFormat(l.dateLocale, { style: "long", type: "conjunction" }).format(r.limitNames);
-  const why = fill(l.blockWhy[kind], { company: c.company ?? "", sequence: c.blockDetail ?? "", max: MAX, names });
+  const why = fill(l.blockWhy[kind], { company: c.company ?? "", sequence: c.blockDetail ?? "", owner: c.blockOwner ?? "", max: MAX, names });
   return (
     <td>
       <span className="badge badge-danger">{l.blockLabels[kind]}</span>

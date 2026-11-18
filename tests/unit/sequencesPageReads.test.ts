@@ -143,3 +143,29 @@ test("our own footer quoted back in a reply does not raise the prompt", () => {
 test("the dictionary has the label the unnamed contact falls back to", () => {
   assert.ok(t("es").sequences.unnamed.length > 0);
 });
+
+// --- picker: a contact live in another sequence ----------------------------------------------------------------------
+
+test("a contact live in someone else's sequence is blocked, carrying the sequence and its owner", () => {
+  const c = toContact({ held_sequence: "Florida + US · octubre", held_owner: "Macarena Dávila", held_by_viewer: false });
+  assert.equal(c.block, "inActiveSequence");
+  assert.equal(c.blockDetail, "Florida + US · octubre");
+  assert.equal(c.blockOwner, "Macarena Dávila");
+});
+
+test("a contact live in the viewer's OWN other sequence is blocked without naming the viewer to themselves", () => {
+  const c = toContact({ held_sequence: "Mi lista", held_owner: "Yo Mismo", held_by_viewer: true });
+  assert.equal(c.block, "inOwnActiveSequence");
+  assert.equal(c.blockDetail, "Mi lista");
+  assert.equal(c.blockOwner, null);
+});
+
+test("an earlier reason keeps precedence over the sequence one, the same order the server judges", () => {
+  assert.equal(toContact({ client_status: "active", held_sequence: "S", held_owner: "O", held_by_viewer: false }).block, "client");
+});
+
+test("a contact held by no sequence has no block and no owner", () => {
+  const c = toContact({ held_sequence: null, held_owner: null, held_by_viewer: null });
+  assert.equal(c.block, null);
+  assert.equal(c.blockOwner, null);
+});

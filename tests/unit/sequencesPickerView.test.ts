@@ -10,7 +10,7 @@ import {
 // Synthetic people only: the approved mockups are invented too, but their data is not copied here.
 const contact = (id: string, companyKey: string | null, over: Partial<PickerContact> = {}): PickerContact => ({
   personId: id, name: `Person ${id}`, jobTitle: "Lead", status: "new", company: companyKey && `Co ${companyKey}`, companyKey,
-  florida: false, openIt: 2, email: `${id}@x.example`, emailStatus: "verified", emailSource: null, block: null, blockDetail: null, survivorId: null, ...over,
+  florida: false, openIt: 2, email: `${id}@x.example`, emailStatus: "verified", emailSource: null, block: null, blockDetail: null, blockOwner: null, survivorId: null, ...over,
 });
 const all: PickerFilter = { showBlocked: true };
 const sel = (...cs: PickerContact[]): Selection => new Map(cs.map((c) => [c.personId, c]));

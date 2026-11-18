@@ -71,6 +71,10 @@ export type PickerDbRow = {
   is_florida: boolean;
   /** resolveComplianceAudience(...) !== null, decided by the server read: false means the contact has no audience (no location, or embargoed). */
   market_mapped: boolean;
+  /** A live (not CLOSED_STATES) membership in some sequence: its name, its owner's name, and whether the viewer owns it. All null when none. */
+  held_sequence?: string | null;
+  held_owner?: string | null;
+  held_by_viewer?: boolean | null;
 };
 
 /**
@@ -94,10 +98,13 @@ export function toPickerContact(r: PickerDbRow, rules: readonly SuppressionRule[
     },
     { suppressionRules: rules, alreadyMemberPersonIds: new Set(), activeCountByCompany: new Map() },
   );
+  // The same order the server judges in (rosterGuards.evaluateRosterAdds): the static reasons first, then "live in another sequence".
+  const held = !block && r.held_sequence ? (r.held_by_viewer ? ("inOwnActiveSequence" as const) : ("inActiveSequence" as const)) : null;
   return {
     personId: r.person_id, name, jobTitle: r.job_title, status: r.status as LeadStatusKey, company: r.company, companyKey: r.company_key,
     florida: r.is_florida === true, openIt: Number(r.open_it), email: r.email, emailStatus: r.email_status, emailSource: r.email_source,
-    block, blockDetail: null, survivorId: block === "merged" ? r.merged_into_id : null,
+    block: block ?? held, blockDetail: held ? r.held_sequence! : null, blockOwner: held === "inActiveSequence" ? (r.held_owner ?? null) : null,
+    survivorId: block === "merged" ? r.merged_into_id : null,
   };
 }
 

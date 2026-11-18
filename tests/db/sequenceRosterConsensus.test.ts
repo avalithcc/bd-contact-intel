@@ -146,6 +146,12 @@ test("the add guard admits a contact only the roster can place, keeps a dissente
 });
 
 test("the picker agrees with the add guard: never hides what the roster mails, always badges what it holds", async () => {
+  // The earlier tests put the targets into the fixture sequence. A contact live in another sequence is blocked by design and
+  // would mask the market rule pinned here, so close those memberships first.
+  const { db } = await import("@/db");
+  const { sequenceMember } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await db.update(sequenceMember).set({ state: "no_reply" }).where(eq(sequenceMember.sequenceId, sequenceId));
   const { listPickerPage } = await import("@/lib/sequences/pageQueries");
   const { DEFAULT_PICKER_QUERY } = await import("@/lib/sequences/pickerFilters");
   const visible = new Map((await listPickerPage({ ...DEFAULT_PICKER_QUERY, search: `ros- ${run}` }, ownerId, "-")).contacts.map((c) => [c.personId, c.block]));

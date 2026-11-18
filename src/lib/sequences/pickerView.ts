@@ -16,7 +16,7 @@ import type { LeadStatusKey } from "@/lib/leads/types";
 
 // `unmappedMarket` is a historical name: it predates the compliance audience. It now means "the contact cannot be placed
 // (no location signal, or an embargoed country)", not "this region has no legal footer". Renaming it touches eight files for no behaviour.
-export type BlockKind = "client" | "clientFormer" | "suppressed" | "member" | "merged" | "noEmail" | "unreachable" | "inferred" | "noPosting" | "unmappedMarket" | "companyLimit";
+export type BlockKind = "client" | "clientFormer" | "suppressed" | "member" | "merged" | "noEmail" | "unreachable" | "inferred" | "noPosting" | "unmappedMarket" | "companyLimit" | "inActiveSequence" | "inOwnActiveSequence";
 export type EmailBadge = "verified" | "probable" | "inferred" | "none";
 
 export type PickerContact = {
@@ -33,8 +33,10 @@ export type PickerContact = {
   emailSource: string | null;
   /** Why this contact cannot be added, decided by the server read with `staticBlock`; the company limit is not here. */
   block: BlockKind | null;
-  /** The Sequence a `member` is already in. */
+  /** The Sequence a `member` is already in, or the name of the other live Sequence holding an `inActiveSequence` / `inOwnActiveSequence` contact. */
   blockDetail: string | null;
+  /** Who owns that other live Sequence (`inActiveSequence` only). Null for the viewer's own: nobody is named to themselves. */
+  blockOwner: string | null;
   /** The current record of a `merged` contact. */
   survivorId: string | null;
 };
