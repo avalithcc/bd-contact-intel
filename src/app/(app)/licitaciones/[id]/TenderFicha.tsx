@@ -41,6 +41,8 @@ function eventText(e: TenderEventView, l: Dictionary["tenderDetail"], triage: Re
       return fillTemplate(l.eventDocument, { filename: e.detail.filename ?? "" });
     case "analysis":
       return fillTemplate(l.eventAnalysis, { filename: e.detail.filename ?? "" });
+    case "relevance":
+      return e.detail.to === "relevant" ? l.eventRelevanceRelevant : e.detail.to === "irrelevant" ? l.eventRelevanceIrrelevant : l.eventRelevanceAuto;
   }
 }
 

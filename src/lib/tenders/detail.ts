@@ -15,7 +15,7 @@ export interface TenderDocumentView {
   analyzedBy: string | null;
 }
 
-export type TenderEventKind = "triage" | "note" | "document" | "analysis";
+export type TenderEventKind = "triage" | "note" | "document" | "analysis" | "relevance";
 
 export interface TenderEventView {
   id: string;

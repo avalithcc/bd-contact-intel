@@ -37,6 +37,9 @@ async function seedBd(tx: Tx) {
 }
 
 // The workbook builder is a test-support module, so the guard allows it only through a dynamic import.
+/** These tests are about the import, not the model: no classifier, so nothing here may reach the gateway. */
+const noClassifier = async () => new Map<string, { relevant: boolean; reason: string }>();
+
 const workbook = () => import("../support/tendersWorkbook");
 
 async function file() {
@@ -53,10 +56,10 @@ test("importing the same file twice creates nothing the second time and reports 
   const { like, eq } = await import("drizzle-orm");
   await inRolledBackTransaction(async (tx) => {
     const actor = await seedBd(tx);
-    const first = await importTenderFile(await file(), actor, tx as never);
+    const first = await importTenderFile(await file(), actor, tx as never, noClassifier);
     assert.deepEqual([first.created, first.updated, first.unchanged], [2, 0, 0]);
 
-    const second = await importTenderFile(await file(), actor, tx as never);
+    const second = await importTenderFile(await file(), actor, tx as never, noClassifier);
     assert.deepEqual([second.created, second.updated, second.unchanged], [0, 0, 2]);
 
     const rows = await tx.select().from(tender).where(like(tender.processNumber, "ZZ-%"));
@@ -76,7 +79,7 @@ test("a changed title updates the same row in place and an import never touches 
   const { buildXls, portalRow } = await workbook();
   await inRolledBackTransaction(async (tx) => {
     const actor = await seedBd(tx);
-    await importTenderFile(buildXls([portalRow({ 0: "ZZ-010-LPR26" })]), actor, tx as never);
+    await importTenderFile(buildXls([portalRow({ 0: "ZZ-010-LPR26" })]), actor, tx as never, noClassifier);
     const [before] = await tx.select().from(tender).where(eq(tender.processNumber, "ZZ-010-LPR26"));
     await setTenderTriage(before!.id, "vamos", tx as never);
     await tx.update(tender).set({ note: "call the buyer" }).where(eq(tender.id, before!.id));
@@ -85,6 +88,7 @@ test("a changed title updates the same row in place and an import never touches 
       buildXls([portalRow({ 0: "ZZ-010-LPR26", 2: "Servicio de desarrollo - circular 1" })]),
       actor,
       tx as never,
+      noClassifier,
     );
     assert.deepEqual([report.created, report.updated, report.unchanged], [0, 1, 0]);
 
@@ -105,7 +109,7 @@ test("the process number is unique at the database, not only in the planner", as
   });
 });
 
-test("the list is soonest-opening first, closed tenders last and still present", async () => {
+test("the full list puts the furthest opening first, closed tenders last and still present", async () => {
   const { listTenders } = await import("@/lib/tenders/queries");
   const { tender } = await import("@/db/schema");
   const now = new Date("2026-11-18T15:00:00.000Z");
@@ -118,13 +122,13 @@ test("the list is soonest-opening first, closed tenders last and still present",
       { processNumber: "ZZ-L-RECENT", name: "recent", openingAt: d("2026-11-17T13:00:00Z") },
     ]);
     // The list runs on the transaction, so it sees the rows written above without committing them.
-    const list = await listTenders(now, 500, tx as never);
+    const list = await listTenders("all", now, 500, tx as never);
     const mine = list.rows.filter((r) => r.processNumber.startsWith("ZZ-L-"));
     assert.deepEqual(
       mine.map((r) => [r.processNumber, r.daysLeft, r.closed]),
       [
-        ["ZZ-L-NEAR", 1, false],
         ["ZZ-L-FAR", 22, false],
+        ["ZZ-L-NEAR", 1, false],
         ["ZZ-L-RECENT", -1, true],
         ["ZZ-L-OLD", -17, true],
       ],

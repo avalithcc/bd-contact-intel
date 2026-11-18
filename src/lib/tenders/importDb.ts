@@ -2,7 +2,8 @@ import { inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLog, tender } from "@/db/schema";
 import { isUuid } from "@/lib/uuid";
-import type { TenderInput } from "./parse";
+import type { StoredRelevance, TenderVerdicts } from "./classify";
+import { tenderKey, type TenderInput } from "./parse";
 import { indexTendersByKey, planTenderImport, type StoredTender } from "./plan";
 import { isTenderTriage, type TenderTriage } from "./triage";
 
@@ -19,6 +20,23 @@ export interface TenderImportResult {
   created: number;
   updated: number;
   unchanged: number;
+  /** Rows that got a model verdict in this import. */
+  classified: number;
+}
+
+/** One read of the relevance state of the file's rows, so the importer knows which ones are worth a model call. */
+export async function loadRelevanceState(
+  numbers: readonly string[],
+  database: Pick<typeof db, "select"> = db,
+): Promise<Map<string, StoredRelevance>> {
+  const out = new Map<string, StoredRelevance>();
+  if (numbers.length === 0) return out;
+  const rows = await database
+    .select({ processNumber: tender.processNumber, name: tender.name, aiRelevant: tender.aiRelevant, relevanceOverride: tender.relevanceOverride })
+    .from(tender)
+    .where(inArray(tender.processNumber, [...numbers]));
+  for (const r of rows) out.set(tenderKey(r.processNumber), r);
+  return out;
 }
 
 function chunks<T>(rows: readonly T[], size: number): T[][] {
@@ -26,6 +44,10 @@ function chunks<T>(rows: readonly T[], size: number): T[][] {
   for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
   return out;
 }
+
+/** A fresh verdict wins; with none, the old one stays unless the title changed (then it no longer applies). */
+const verdictColumn = (column: string) =>
+  sql.raw(`case when excluded.${column} is not null then excluded.${column} when excluded.name <> tender.name then null else tender.${column} end`);
 
 const portalColumns = (t: TenderInput) => ({
   processNumber: t.processNumber,
@@ -40,32 +62,44 @@ const portalColumns = (t: TenderInput) => ({
 
 /**
  * Upserts tenders by process number in ONE transaction: one read of the existing rows, batched upserts, one audit_log row.
- * Only the portal's columns are written; `triage_status` and `note` are never in the SET list, so re-importing cannot undo a
- * decision. Revert: `audit_log.metadata.createdNumbers` are the rows to delete, `metadata.updatedBefore` holds the previous
- * portal columns of every updated row.
+ * Only the portal's columns and the model's verdict are written; `triage_status`, `note` and `relevance_override` are never in
+ * the SET list, so re-importing cannot undo a human decision. A row with no verdict keeps its old one, unless its title
+ * changed (the old verdict judged a different title, so it goes back to unclassified, which is shown).
+ * Revert: `audit_log.metadata.createdNumbers` are the rows to delete, `metadata.updatedBefore` holds the previous portal
+ * columns of every updated row, and `metadata.classifiedNumbers` are the rows whose verdict can be reset with
+ * `update tender set ai_relevant = null, ai_reason = null, ai_classified_at = null where process_number = any(...)`.
  */
 export async function importTenders(
   tenders: readonly TenderInput[],
   actorBdId: string,
   database: Database = db,
+  verdicts: TenderVerdicts = new Map(),
 ): Promise<TenderImportResult> {
   if (!isUuid(actorBdId)) throw new Error("importTenders: actorBdId must be a uuid");
   if (tenders.length > MAX_TENDERS_PER_IMPORT) {
     throw new Error(`importTenders: ${tenders.length} rows exceeds the cap of ${MAX_TENDERS_PER_IMPORT}`);
   }
-  if (tenders.length === 0) return { created: 0, updated: 0, unchanged: 0 };
+  if (tenders.length === 0) return { created: 0, updated: 0, unchanged: 0, classified: 0 };
 
   return database.transaction(async (tx) => {
     const numbers = tenders.map((t) => t.processNumber);
     const rows = await tx.select().from(tender).where(inArray(tender.processNumber, numbers));
     const existing = indexTendersByKey<StoredTender>(rows);
-    const plan = planTenderImport(tenders, existing);
+    const plan = planTenderImport(tenders, existing, verdicts);
 
-    const writes = [...plan.create, ...plan.update];
+    const writes = [...plan.create, ...plan.update, ...plan.verdictOnly];
+    const classifiedAt = new Date();
+    let classified = 0;
     for (const batch of chunks(writes, WRITE_BATCH)) {
       await tx
         .insert(tender)
-        .values(batch.map(portalColumns))
+        .values(
+          batch.map((t) => {
+            const v = verdicts.get(tenderKey(t.processNumber));
+            if (v) classified += 1;
+            return { ...portalColumns(t), aiRelevant: v?.relevant ?? null, aiReason: v?.reason ?? null, aiClassifiedAt: v ? classifiedAt : null };
+          }),
+        )
         .onConflictDoUpdate({
           target: tender.processNumber,
           set: {
@@ -76,6 +110,9 @@ export async function importTenders(
             portalStatus: sql`excluded.portal_status`,
             executingUnit: sql`excluded.executing_unit`,
             financialAdminService: sql`excluded.financial_admin_service`,
+            aiRelevant: verdictColumn("ai_relevant"),
+            aiReason: verdictColumn("ai_reason"),
+            aiClassifiedAt: verdictColumn("ai_classified_at"),
             updatedAt: sql`now()`,
           },
         });
@@ -89,6 +126,8 @@ export async function importTenders(
           created: plan.create.length,
           updated: plan.update.length,
           unchanged: plan.unchanged,
+          classified,
+          classifiedNumbers: [...verdicts.keys()].slice(0, AUDIT_LIST_CAP),
           createdNumbers: plan.create.slice(0, AUDIT_LIST_CAP).map((t) => t.processNumber),
           updatedBefore: plan.update.slice(0, AUDIT_LIST_CAP).map((t) => {
             const before = existing.get(t.processNumber)!;
@@ -97,7 +136,7 @@ export async function importTenders(
         },
       });
     }
-    return { created: plan.create.length, updated: plan.update.length, unchanged: plan.unchanged };
+    return { created: plan.create.length, updated: plan.update.length, unchanged: plan.unchanged, classified };
   });
 }
 

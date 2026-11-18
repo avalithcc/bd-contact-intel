@@ -62,7 +62,7 @@ test("rows that cannot be imported are reported, never dropped silently", () => 
 });
 
 function stored(t: ReturnType<typeof parseTenderSheet>["tenders"][number], id: string): StoredTender {
-  return { id, ...t };
+  return { id, ...t, aiRelevant: null, relevanceOverride: null };
 }
 
 test("importing the same file twice creates nothing the second time and reports every row unchanged", () => {

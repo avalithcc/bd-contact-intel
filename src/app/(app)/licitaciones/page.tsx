@@ -2,11 +2,14 @@ import Link from "next/link";
 import { getCurrentBd } from "@/lib/queries";
 import { getDictionary } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/i18n/server";
-import { listTenders } from "@/lib/tenders/queries";
+import { listTenders, type TenderListRow } from "@/lib/tenders/queries";
+import type { Dictionary } from "@/lib/i18n/dictionaries";
 import { isTenderTriage, type TenderTriage } from "@/lib/tenders/triage";
 import { formatArgentinaDayMonthTime } from "@/lib/i18n/format";
 import { TenderImportForm } from "./TenderImportForm";
-import { setTenderTriageAction } from "./actions";
+import { setTenderRelevanceAction, setTenderTriageAction } from "./actions";
+import { TenderRelevanceSelect } from "./TenderRelevanceSelect";
+import { choiceFromOverride, tenderRelevance } from "@/lib/tenders/relevance";
 import { TenderTriageSelect } from "./TenderTriageSelect";
 
 // The session decides who may see the page, and the day count depends on "now": neither can be cached.
@@ -15,16 +18,19 @@ export const dynamic = "force-dynamic";
 /** Open tenders inside this many days get the warning colour. */
 const SOON_DAYS = 3;
 
-export default async function TendersPage() {
+/** `?ver=todas` is the one-click way to everything, discarded and closed included; anything else is the default view. */
+export default async function TendersPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+  const view = (await searchParams).ver === "todas" ? "all" : "relevant";
   // Anyone signed in sees every tender; getCurrentBd is the session gate, not an owner filter.
   await getCurrentBd();
   const [dict, locale] = await Promise.all([getDictionary(), getLocale()]);
   const l = dict.tendersPage;
   // One round trip: the rows and the total ride on the same statement.
-  const { rows, total } = await listTenders();
+  const { rows, total, all } = await listTenders(view);
   const open = rows.filter((r) => !r.closed).length;
 
   const triageLabels: Record<TenderTriage, string> = l.triage;
+  const hidden = Math.max(0, all - total);
   const daysText = (daysLeft: number, closed: boolean) =>
     closed
       ? l.closedAgo(Math.max(1, -daysLeft))
@@ -49,9 +55,19 @@ export default async function TendersPage() {
 
       <TenderImportForm locale={locale} />
 
+      <div className="legacy-row mb-lg">
+        <Link className={`btn btn-sm ${view === "relevant" ? "btn-primary" : "btn-secondary"}`} href="/licitaciones" aria-current={view === "relevant" ? "page" : undefined}>
+          {l.viewRelevant}
+        </Link>
+        <Link className={`btn btn-sm ${view === "all" ? "btn-primary" : "btn-secondary"}`} href="/licitaciones?ver=todas" aria-current={view === "all" ? "page" : undefined}>
+          {l.viewAll(all)}
+        </Link>
+        {view === "relevant" && hidden > 0 && <span className="meta">{l.hiddenNote(hidden)}</span>}
+      </div>
+
       {rows.length === 0 ? (
         <div className="empty">
-          <p>{l.empty}</p>
+          <p>{all > 0 && view === "relevant" ? l.emptyRelevant(all) : l.empty}</p>
         </div>
       ) : (
         <div className="table-wrap mb-lg">
@@ -62,6 +78,7 @@ export default async function TendersPage() {
                 <th>{l.colProcess}</th>
                 <th>{l.colTitle}</th>
                 <th>{l.colAgency}</th>
+                <th>{l.colRelevance}</th>
                 <th>{l.colPortalState}</th>
                 <th>{l.colTriage}</th>
                 <th>
@@ -99,6 +116,9 @@ export default async function TendersPage() {
                     {r.financialAdminService && <div className="meta">{r.financialAdminService}</div>}
                   </td>
                   <td>
+                    <RelevanceCell row={r} labels={l} />
+                  </td>
+                  <td>
                     <span className="badge badge-neutral no-dot">{r.portalStatus || "—"}</span>
                   </td>
                   <td>
@@ -126,5 +146,28 @@ export default async function TendersPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function RelevanceCell({ row, labels: l }: { row: TenderListRow; labels: Dictionary["tendersPage"] }) {
+  const rel = tenderRelevance(row);
+  const badge = rel.state === "relevant" ? "badge-success" : rel.state === "irrelevant" ? "badge-discarded" : "badge-warn";
+  const text = rel.state === "relevant" ? l.relevanceRelevant : rel.state === "irrelevant" ? l.relevanceIrrelevant : l.relevanceUnclassified;
+  return (
+    <div className="stack-sm">
+      <div>
+        <span className={`badge no-dot ${badge}`}>{text}</span>
+        {rel.source === "human" && <span className="meta"> {l.relevanceByHuman}</span>}
+      </div>
+      {rel.state === "unclassified" ? <div className="meta">{l.relevanceUnclassifiedHint}</div> : rel.reason && <div className="meta">{rel.reason}</div>}
+      <TenderRelevanceSelect
+        id={row.id}
+        value={choiceFromOverride(row.relevanceOverride)}
+        labels={l.relevanceChoices}
+        ariaLabel={l.relevanceAria(row.processNumber)}
+        errorLabel={l.relevanceError}
+        setRelevance={setTenderRelevanceAction}
+      />
+    </div>
   );
 }
