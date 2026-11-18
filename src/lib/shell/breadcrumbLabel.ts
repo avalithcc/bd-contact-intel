@@ -53,6 +53,7 @@ const ROUTE_LABELS: ReadonlyArray<readonly [string, BreadcrumbKey]> = [
   ["/whats-new", "whatsNew"],
   ["/hiring", "hiring"],
   ["/tasks", "tasks"],
+  ["/licitaciones", "tenders"],
   // "/" is the legacy contacts home (its own title is "base de contactos"), so
   // "Contactos" is its real name, not the old fallback. Safe anywhere in this
   // list: the matcher needs an exact hit or a `/`-delimited segment, and no

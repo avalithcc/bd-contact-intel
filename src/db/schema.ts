@@ -2224,3 +2224,39 @@ export const lushaReveal = pgTable(
 
 export type LushaReveal = typeof lushaReveal.$inferSelect;
 export type NewLushaReveal = typeof lushaReveal.$inferInsert;
+
+/**
+ * A public tender from COMPR.AR (the national procurement portal), tracked from "worth a look" to "we bid / we pass".
+ * Company-wide on purpose: no owner column, every signed-in BD sees every tender.
+ *
+ * `process_number` ("Número de Proceso", e.g. 487-0018-LPR26) is the natural key and UNIQUE, so re-importing the portal's
+ * Excel updates a row instead of duplicating it. The columns up to `financial_admin_service` mirror the export and are the
+ * only ones an import may write; `triage_status` and `note` are ours and an import never touches them.
+ * `triage_status`: 'a_revisar' | 'en_analisis' | 'vamos' | 'descartada' — validated by the app (src/lib/tenders/triage.ts),
+ * no CHECK, same convention as sequence_draft.language. Days left is derived from `opening_at` on read, never stored.
+ */
+export const tender = pgTable(
+  "tender",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    processNumber: text("process_number").notNull(),
+    fileNumber: text("file_number").notNull().default(""),
+    name: text("name").notNull(),
+    processType: text("process_type").notNull().default(""),
+    openingAt: timestamp("opening_at", { withTimezone: true }).notNull(),
+    portalStatus: text("portal_status").notNull().default(""),
+    executingUnit: text("executing_unit").notNull().default(""),
+    financialAdminService: text("financial_admin_service").notNull().default(""),
+    triageStatus: text("triage_status").notNull().default("a_revisar"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    processNumberUnique: uniqueIndex("tender_process_number_unique").on(t.processNumber),
+    byOpeningAt: index("tender_opening_at_idx").on(t.openingAt),
+  }),
+);
+
+export type Tender = typeof tender.$inferSelect;
+export type NewTender = typeof tender.$inferInsert;

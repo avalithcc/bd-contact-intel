@@ -16,6 +16,7 @@ import {
   ContactsIcon,
   CompaniesIcon,
   TasksIcon,
+  TendersIcon,
   FollowUpIcon,
   OutreachIcon,
   HiringIcon,
@@ -90,6 +91,7 @@ export const NAVIGATION: SidebarSection[] = [
       { labelKey: "hiring", href: "/hiring", icon: HiringIcon },
       { labelKey: "whatsNew", href: "/whats-new", icon: WhatsNewIcon },
       { labelKey: "discovery", href: "/discovery", icon: DiscoveryIcon },
+      { labelKey: "tenders", href: "/licitaciones", icon: TendersIcon },
     ],
   },
 ];
