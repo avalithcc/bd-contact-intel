@@ -27,27 +27,30 @@ export async function getClosingTendersForDigest(now: Date, limit = 500, executo
       ownerId: bd.id,
       ownerEmail: bd.email,
       ownerName: bd.name,
+      ownerRole: bd.role,
     })
     .from(tender)
     .leftJoin(bd, eq(bd.id, tender.ownerBdId))
     .where(and(sql`${tender.openingAt} >= ${nowIso}::timestamptz`, sql`${tender.openingAt} < ${nowIso}::timestamptz + interval '16 days'`, tenderNotDecidedNoSql))
     .orderBy(asc(tender.openingAt))
     .limit(limit);
-  return rows.map(({ ownerId, ownerEmail, ownerName, ...t }) => ({
+  return rows.map(({ ownerId, ownerEmail, ownerName, ownerRole, ...t }) => ({
     ...t,
-    owner: ownerId && ownerEmail && ownerName ? { bdId: ownerId, bdEmail: ownerEmail, bdName: ownerName } : null,
+    owner: ownerId && ownerEmail && ownerName && ownerRole ? { bdId: ownerId, bdEmail: ownerEmail, bdName: ownerName, bdRole: ownerRole } : null,
   }));
 }
 
 /**
- * The BDs who hear about a tender nobody owns. Same switch the Gmail reminder cron honours (`email_reminders_enabled`), which
- * is off for the e2e accounts, so a test mailbox never turns a run into a failed send. A tender's OWNER is warned regardless.
+ * The BDs who hear about a tender nobody owns: every admin. Deliberately NOT filtered by `email_reminders_enabled`: that switch
+ * exists to quiet BD task reminders (and keeps the e2e mailboxes quiet, which are not admins), and a public-tender deadline is
+ * not that noise. With no admin at all nobody is warned; that is a data problem to see, not a reason to mail BDs who cannot
+ * open the section. A tender's admin OWNER is warned regardless.
  */
 export async function getTenderDigestRecipients(limit = 500, executor: Pick<typeof db, "select"> = db): Promise<DigestBd[]> {
   return executor
-    .select({ bdId: bd.id, bdEmail: bd.email, bdName: bd.name })
+    .select({ bdId: bd.id, bdEmail: bd.email, bdName: bd.name, bdRole: bd.role })
     .from(bd)
-    .where(eq(bd.emailRemindersEnabled, true))
+    .where(eq(bd.role, "admin"))
     .orderBy(asc(bd.name))
     .limit(limit);
 }

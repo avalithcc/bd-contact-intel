@@ -91,7 +91,6 @@ export const NAVIGATION: SidebarSection[] = [
       { labelKey: "hiring", href: "/hiring", icon: HiringIcon },
       { labelKey: "whatsNew", href: "/whats-new", icon: WhatsNewIcon },
       { labelKey: "discovery", href: "/discovery", icon: DiscoveryIcon },
-      { labelKey: "tenders", href: "/licitaciones", icon: TendersIcon },
     ],
   },
 ];
@@ -324,6 +323,16 @@ export function Sidebar({
           >
             <EyeIcon className="icon" />
             {labels.auditLog}
+          </Link>
+          {/* Public tenders are a business decision, so the entry lives here and not in NAVIGATION (rendered for every BD). */}
+          <Link
+            href="/licitaciones"
+            className={`nav-item${isActive("/licitaciones") ? " active" : ""}`}
+            aria-current={isActive("/licitaciones") ? "page" : undefined}
+            onClick={markPending("/licitaciones")}
+          >
+            <TendersIcon className="icon" />
+            {labels.tenders}
           </Link>
           <Link
             href="/admin/lusha"

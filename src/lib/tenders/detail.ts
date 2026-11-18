@@ -33,7 +33,7 @@ export interface BdOption {
 
 export interface TenderDetail {
   tender: Tender & TenderTiming;
-  /** Every BD, by name, for the owner picker. */
+  /** Every admin, by name, for the owner picker: only an admin can open the section, so only an admin can own a tender. */
   bdOptions: BdOption[];
   /** Newest first. */
   documents: TenderDocumentView[];

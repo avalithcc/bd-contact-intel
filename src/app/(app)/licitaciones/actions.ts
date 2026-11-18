@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
-import { getCurrentBd } from "@/lib/queries";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { importTenderFile, type TenderImportReport } from "@/lib/tenders/importFile";
 import { MAX_TENDERS_PER_IMPORT, setTenderTriage } from "@/lib/tenders/importDb";
 import { matchesMagic } from "@/lib/email/attachments/magic";
@@ -25,8 +25,8 @@ export type ImportTendersState =
   | null;
 
 export async function importTendersAction(_prev: ImportTendersState, formData: FormData): Promise<ImportTendersState> {
-  // Same session check as every other action: the file and the actor come from the request, the authority from the session.
-  const me = await getCurrentBd();
+  // Admin-only like the whole section: the file and the actor come from the request, the authority from the session. A non-admin gets AdminRequiredError, never a report.
+  const me = await requireAdmin();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "missingFile" };
   if (file.size > MAX_FILE_BYTES) return { ok: false, error: "tooBig" };
@@ -45,9 +45,9 @@ export async function importTendersAction(_prev: ImportTendersState, formData: F
   }
 }
 
-/** A normal action: any signed-in BD may change any tender's triage state (tenders are company-wide, not per BD). */
+/** Admin-only (the whole Licitaciones section is). Tenders are company-wide, not per BD. */
 export async function setTenderTriageAction(id: string, status: string): Promise<void> {
-  const me = await getCurrentBd();
+  const me = await requireAdmin();
   if (!isTenderTriage(status)) throw new Error("Unknown tender state");
   const found = await setTenderTriage(id, status, undefined, me.id);
   if (!found) throw new Error("Tender not found");
@@ -55,9 +55,9 @@ export async function setTenderTriageAction(id: string, status: string): Promise
   revalidatePath(`/licitaciones/${id}`);
 }
 
-/** Any signed-in BD may overrule the model on one tender ("auto" gives the decision back to it); the move is logged with who made it. */
+/** An admin may overrule the model on one tender ("auto" gives the decision back to it); the move is logged with who made it. */
 export async function setTenderRelevanceAction(id: string, choice: string): Promise<void> {
-  const me = await getCurrentBd();
+  const me = await requireAdmin();
   if (!isRelevanceChoice(choice)) throw new Error("Unknown relevance choice");
   const found = await setTenderRelevance(id, choice, undefined, me.id);
   if (!found) throw new Error("Tender not found");
@@ -65,18 +65,18 @@ export async function setTenderRelevanceAction(id: string, choice: string): Prom
   revalidatePath(`/licitaciones/${id}`);
 }
 
-/** Any signed-in BD may assign any tender to any BD, or release it with an empty value; the move is logged with who made it. */
+/** An admin may assign a tender to an admin, or release it with an empty value (the write refuses a non-admin owner); the move is logged with who made it. */
 export async function setTenderOwnerAction(id: string, ownerBdId: string): Promise<void> {
-  const me = await getCurrentBd();
+  const me = await requireAdmin();
   const found = await setTenderOwner(id, ownerBdId === "" ? null : ownerBdId, me.id);
   if (!found) throw new Error("Tender or BD not found");
   revalidatePath("/licitaciones");
   revalidatePath(`/licitaciones/${id}`);
 }
 
-/** Any signed-in BD may edit the one shared note; the change is logged with who made it. */
+/** An admin may edit the one shared note; the change is logged with who made it. */
 export async function saveTenderNoteAction(id: string, text: string): Promise<boolean> {
-  const me = await getCurrentBd();
+  const me = await requireAdmin();
   const found = await saveTenderNote(id, typeof text === "string" ? text : "", me.id);
   if (found) revalidatePath(`/licitaciones/${id}`);
   return found;
@@ -87,7 +87,7 @@ export async function saveTenderNoteAction(id: string, text: string): Promise<bo
  * are re-checked and the path must sit inside the caller's own folder, as for the email attachments.
  */
 export async function registerTenderDocumentAction(input: { tenderId: string; storagePath: string; filename: string; size: number }): Promise<{ ok: boolean }> {
-  const me = await getCurrentBd();
+  const me = await requireAdmin();
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user || typeof input?.storagePath !== "string" || !tenderDocumentPathBelongsTo(input.storagePath, data.user.id)) return { ok: false };
@@ -103,10 +103,10 @@ export type AnalyseTenderResult = { ok: true } | { ok: false; error: "noDocument
 /**
  * Reads the tender's CURRENT pliego and stores the reading on that document. With no document there is nothing to read and
  * the answer is "noDocument": the reading is never made from the title. The file is downloaded with the caller's own
- * session (the bucket lets any signed-in BD read), and its first bytes are checked to really be a PDF.
+ * session (the bucket lets any signed-in user read, but only an admin reaches this action), and its first bytes are checked to really be a PDF.
  */
 export async function analyseTenderAction(tenderId: string): Promise<AnalyseTenderResult> {
-  const me = await getCurrentBd();
+  const me = await requireAdmin();
   if (!isUuid(tenderId)) return { ok: false, error: "noDocument" };
   const doc = await getCurrentTenderDocument(tenderId);
   if (!doc) return { ok: false, error: "noDocument" };

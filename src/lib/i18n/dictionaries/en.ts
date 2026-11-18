@@ -2061,6 +2061,7 @@ export const en = {
     ownerLabel: "Owner",
     ownerNone: "No owner",
     ownerError: "Could not assign the tender. Try again.",
+    ownerAdminsOnly: "Only admins can be owners: the Tenders section is admin-only.",
     eventOwnerSet: "Assigned the tender to {who}",
     eventOwnerCleared: "Left the tender without an owner",
     analysisPending: "This document has not been analysed yet.",

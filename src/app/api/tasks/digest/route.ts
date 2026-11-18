@@ -87,10 +87,10 @@ export async function GET(request: Request) {
   const followUpsByBd = new Map<string, typeof followUpRows>();
   for (const r of followUpRows) followUpsByBd.set(r.bdId, [...(followUpsByBd.get(r.bdId) ?? []), r]);
 
-  // Tender deadlines. Unowned ones go to every BD, so the BD list is read only when one exists. The loop below runs over the
+  // Tender deadlines, admin-only like the section. Unowned ones (and those owned by a non-admin) go to every admin, so the admin list is read only when there is a tender. The loop below runs over the
   // union of all three sources: a BD with no tasks and a closing tender is exactly who must not be skipped.
   const closingTenders = await getClosingTendersForDigest(now);
-  const everyone = closingTenders.some((t) => t.owner === null) ? await getTenderDigestRecipients() : [];
+  const everyone = closingTenders.length > 0 ? await getTenderDigestRecipients() : [];
   const tenderPlan = planTenderDigest(closingTenders, everyone, now);
 
   const recipients = buildDigestRecipients(byBd, followUpsByBd, tenderPlan);

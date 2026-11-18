@@ -49,7 +49,7 @@ const eventsJson = sql`(
     limit ${TENDER_EVENT_LIMIT}
   ) y)`;
 
-const bdOptionsJson = sql`(select coalesce(json_agg(json_build_object('id', b.id, 'name', b.name) order by b.name), '[]'::json) from bd b)`;
+const bdOptionsJson = sql`(select coalesce(json_agg(json_build_object('id', b.id, 'name', b.name) order by b.name), '[]'::json) from bd b where b.role = 'admin')`;
 
 /**
  * Everything the ficha shows in ONE round trip: the tender row with its documents and its log as two json subqueries.
@@ -154,14 +154,15 @@ export async function saveTenderAnalysis(documentId: string, analysis: TenderAna
 /**
  * Assigns the tender to a BD, or releases it with `null`, and logs who did it in ONE statement. The log keeps the owner's NAME
  * as it was then, so the history survives a rename or a deleted BD. Choosing the current owner writes nothing and logs nothing.
- * False when the tender does not exist or the BD does not.
+ * False when the tender does not exist, or the BD does not or is not an admin (the section is admin-only, so a non-admin owner
+ * would hold a tender they cannot open).
  */
 export async function setTenderOwner(id: string, ownerBdId: string | null, actorBdId: string, database: Pick<typeof db, "execute"> = db): Promise<boolean> {
   if (!isUuid(id) || (ownerBdId !== null && !isUuid(ownerBdId))) return false;
   const rows = rowsOf<{ found: number }>(
     await database.execute(sql`
       with old as (select owner_bd_id from tender where id = ${id}::uuid),
-      who as (select name from bd where id = ${ownerBdId}::uuid),
+      who as (select name from bd where id = ${ownerBdId}::uuid and role = 'admin'),
       upd as (
         update tender set owner_bd_id = ${ownerBdId}::uuid, updated_at = now()
         where id = ${id}::uuid and (${ownerBdId}::uuid is null or exists (select 1 from who)) returning id

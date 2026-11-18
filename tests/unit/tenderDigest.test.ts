@@ -43,8 +43,10 @@ import { buildDigestRecipients, groupDigestTaskRowsByBd } from "@/lib/tasks/dige
 
 
 const NOW = new Date("2026-11-18T11:30:00Z"); // 08:30 in Buenos Aires
-const ANA: DigestBd = { bdId: "bd-ana", bdEmail: "ana@example.test", bdName: "Ana Perez" };
-const LUIS: DigestBd = { bdId: "bd-luis", bdEmail: "luis@example.test", bdName: "Luis Gomez" };
+const ANA: DigestBd = { bdId: "bd-ana", bdEmail: "ana@example.test", bdName: "Ana Perez", bdRole: "admin" };
+const LUIS: DigestBd = { bdId: "bd-luis", bdEmail: "luis@example.test", bdName: "Luis Gomez", bdRole: "admin" };
+/** A BD who is not an admin: the tender section is not theirs to see. */
+const NORA: DigestBd = { bdId: "bd-nora", bdEmail: "nora@example.test", bdName: "Nora Diaz", bdRole: "bd" };
 const EVERYONE = [ANA, LUIS];
 
 /** A tender whose opening day is `days` Argentina days from NOW, at 14:00 ART. */
@@ -126,4 +128,57 @@ test("a BD with tasks keeps them when tenders are merged in, and one with only u
   assert.deepEqual([...recipients.keys()].sort(), ["bd-ana", "bd-luis"]);
   assert.equal(recipients.get("bd-ana")!.tasks.length, 1);
   assert.equal(recipients.get("bd-luis")!.tasks.length, 0);
+});
+
+// ---- tenders are admin-only: the digest follows the screen ------------------------------------------------------------------
+
+test("a non-admin who OWNS a closing tender gets no tender line; the admins are warned of it as an unowned one", () => {
+  const plan = planTenderDigest([tender("1", 3, { owner: NORA })], [ANA, LUIS], NOW);
+  assert.ok(!plan.has("bd-nora"), "a non-admin never appears in the tender plan");
+  for (const id of ["bd-ana", "bd-luis"]) {
+    assert.deepEqual(plan.get(id)!.tenders.mine, []);
+    assert.deepEqual(ids(plan.get(id)!.tenders.unowned), ["1"]);
+  }
+});
+
+test("a non-admin owner leaves nobody to warn when there is no admin at all, and nothing throws", () => {
+  assert.equal(planTenderDigest([tender("1", 3, { owner: NORA })], [], NOW).size, 0);
+});
+
+test("the unowned half goes to admins only, even if the caller hands the planner a non-admin among the recipients", () => {
+  const plan = planTenderDigest([tender("1", 10)], [ANA, NORA, LUIS], NOW);
+  assert.deepEqual([...plan.keys()].sort(), ["bd-ana", "bd-luis"]);
+  assert.ok(!plan.has("bd-nora"));
+});
+
+test("an admin owner keeps the owned half, and the other admins do not see that tender", () => {
+  const plan = planTenderDigest([tender("1", 3, { owner: ANA })], [ANA, LUIS], NOW);
+  assert.deepEqual(ids(plan.get("bd-ana")!.tenders.mine), ["1"]);
+  assert.ok(!plan.has("bd-luis"));
+});
+
+test("an admin is warned whatever their reminder preference: the plan depends on role, never on email_reminders_enabled", () => {
+  // The preference exists to quiet BD task reminders; a tender deadline is not that. The planner has no such input, and the
+  // recipient read (digestQueries) filters on role only: that half is pinned in tests/db/tenderClock.test.ts.
+  assert.ok(!("emailRemindersEnabled" in ANA));
+  assert.deepEqual(ids(planTenderDigest([tender("1", 3)], [ANA], NOW).get("bd-ana")!.tenders.unowned), ["1"]);
+});
+
+test("the recipient list never gains a non-admin from tenders alone, and a non-admin with tasks keeps tasks and no tender", () => {
+  const plan = planTenderDigest([tender("1", 3, { owner: NORA }), tender("2", 10)], [ANA, NORA], NOW);
+  const taskRow = {
+    id: "t1", title: "Call", dueAt: new Date("2026-11-18T00:00:00Z"), personId: null, companyKey: null,
+    subjectPersonFirstName: null, subjectPersonLastName: null, subjectPersonCompany: null, subjectCompanyName: null,
+    bdId: "bd-nora", bdEmail: NORA.bdEmail, bdName: NORA.bdName,
+  };
+  const recipients = buildDigestRecipients(groupDigestTaskRowsByBd([taskRow]), new Map(), plan);
+  assert.deepEqual(recipients.get("bd-nora")!.tenders, { mine: [], unowned: [] });
+  assert.equal(recipients.get("bd-nora")!.tasks.length, 1);
+  assert.deepEqual([...recipients.keys()].sort(), ["bd-ana", "bd-nora"]);
+});
+
+test("the planner with a non-admin owner is repeatable and leaves its input alone", () => {
+  const rows = Object.freeze([Object.freeze(tender("1", 3, { owner: NORA }))]);
+  const everyone = Object.freeze([ANA, NORA]);
+  assert.deepEqual([...planTenderDigest(rows, everyone, NOW)], [...planTenderDigest(rows, everyone, NOW)]);
 });

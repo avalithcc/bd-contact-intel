@@ -2045,6 +2045,7 @@ export const es: typeof en = {
     ownerLabel: "Responsable",
     ownerNone: "Sin responsable",
     ownerError: "No se pudo asignar la licitación. Probá de nuevo.",
+    ownerAdminsOnly: "Solo los administradores pueden ser responsables: la sección Licitaciones es solo para ellos.",
     eventOwnerSet: "Asignó la licitación a {who}",
     eventOwnerCleared: "Dejó la licitación sin responsable",
     analysisPending: "Todavía no se analizó este pliego.",
