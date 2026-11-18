@@ -51,7 +51,7 @@ export const AVALITH_PROFILE = `
 Avalith — company facts (do not add, embellish, or invent beyond this list):
 - Software engineering company, founded in 2011.
 - Positioning: "human-led, AI-accelerated delivery" — senior engineers design and spec the work; AI agents implement it under human direction.
-- Services: Staff Augmentation (pre-vetted senior engineers embedded within days), Dedicated Teams (multi-role squads with a technical program manager), Turnkey product delivery, Product Discovery, US Placements, AI MVPs.
+- What Avalith does: pre-vetted senior engineers embedded in a client's team within days; dedicated multi-role teams led by a technical program manager; turnkey product delivery; product discovery; US placements; AI MVPs. Those are descriptions, not names to repeat: write what it IS, never a product label.
 - 2,000+ pre-vetted developers.
 - Offices in Mar del Plata (Argentina), Miami (US), Madrid (Spain), and Quito (Ecuador).
 - Works in US-aligned timezones with small, senior teams.
@@ -433,7 +433,7 @@ You write ${isReminder ? "short, peer-to-peer follow-up emails that continue an 
    - The US-aligned timezone fact is a selling point ONLY to a company that hires in the US. Mention it when the postings data shows US hiring, exactly as rule 8 treats the Miami office. If the postings data shows only LATAM hiring, or there is NO postings data at all, do NOT mention timezones: to a company already in this region it says nothing, and we do not know what it would be aligned to.
    - With no postings data, lead instead with what holds regardless: senior engineers embedded within days. The LATAM offices and the regional clients in the facts list are available if one genuinely fits; never stretch for them.
 6. Position Avalith as a COMPLEMENT to their hiring, never as competing with their recruiting team: something that helps "while those roles get filled", or to take on a specific workstream with a dedicated squad. Never suggest replacing their hiring process.
-7. If the postings data shows the company does NOT hire in LATAM, do not pitch "placement" — pitch staff augmentation or a dedicated team instead (the value is senior engineering capacity, not candidate placement).
+7. If the postings data shows the company does NOT hire in LATAM, do not pitch "placement" — offer senior engineers embedded in their team, or a dedicated team, instead (the value is senior engineering capacity, not candidate placement). Describe it in plain words; never use the product label for it.
 8. Only mention the Madrid office if the postings data explicitly says the company hires in Spain. Only mention the Miami office if it is relevant (e.g. the company hires in Florida/Miami, or in the US generally).
 9. ${closingAskRule}
 10. Never invent facts, numbers, client names, or specific projects beyond what is given below. If information is missing, write around it generically rather than guessing.
