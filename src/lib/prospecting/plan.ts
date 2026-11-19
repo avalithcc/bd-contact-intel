@@ -115,9 +115,23 @@ export function candidateFromRow(r: CandidateRawRow): ProspectCandidate {
   };
 }
 
-/** Gate 1 and gate 3 for one contact: the first thing that keeps them out, or null. Verified only, never probable. */
+/**
+ * The email statuses this path may DRAFT to. Owner's decision, 2026-11-19: "probable" is enough to write a draft,
+ * and it is NOT enough to send one.
+ *
+ * The original rule was verified-only, on the argument that at scale a bounce burns the domain the whole team sells
+ * from. What changed is not the appetite for risk, it is that the structure now carries it: an automatic draft lands
+ * in a Sequence with reviewed_at, approved_at and scheduled_for null, and `bulkApprovalGate` refuses it server-side
+ * until a human has opened it. The old rule protected against mail nobody read; the gate does that now.
+ *
+ * So this list is safe ONLY while a human stands between the draft and the send. **Anything that sends without that
+ * review must re-require "verified" rather than reusing this constant** - see the test that pins both halves.
+ */
+export const DRAFTABLE_EMAIL_STATUSES = ["verified", "probable"] as const;
+
+/** Gate 1 and gate 3 for one contact: the first thing that keeps them out, or null. */
 function blocker(c: ProspectCandidate, now: Date): RefusalReason | null {
-  if (c.emailStatus !== "verified") return "email_not_verified";
+  if (!(DRAFTABLE_EMAIL_STATUSES as readonly string[]).includes(c.emailStatus ?? "")) return "email_not_verified";
   if (c.inActiveSequence) return "in_active_sequence";
   if (c.openFollowUp) return "open_follow_up";
   if (c.alreadyDrafted) return "already_drafted";

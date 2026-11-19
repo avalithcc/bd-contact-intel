@@ -19,11 +19,16 @@ export const AUTO_PROSPECTING_SIGNALS_ACTION = "auto_prospecting_signals";
 
 const roleList = () => sql.join(LEADERSHIP_ROLE_GROUPS.map((g) => sql`${g}`), sql`, `);
 
-/** A verified-email decision-maker at the target company `ck`, matched through aliases like getCompanyPostingsForKey does. */
+/**
+ * A reachable decision-maker at the target company `ck`, matched through aliases like getCompanyPostingsForKey does.
+ * "Reachable" is DRAFTABLE_EMAIL_STATUSES (see plan.ts): verified or probable, because a human reviews every draft
+ * before it can be sent. It must stay in step with the planner's gate 1 - a signal produced for someone the planner
+ * will then refuse is wasted work, and the reverse silently hides opportunities.
+ */
 export const verifiedLeaderAtSql = (p: string, ck: string) => {
   const person = sql.raw(p);
   const key = sql.raw(ck);
-  return sql`${person}.merged_into_id is null and ${person}.email_status = 'verified' and ${person}.role_group in (${roleList()})
+  return sql`${person}.merged_into_id is null and ${person}.email_status in ('verified', 'probable') and ${person}.role_group in (${roleList()})
     and (${person}.company_key = ${key} or exists (select 1 from company_alias ca where ca.alias_key = ${person}.company_key and ca.company_key = ${key}))`;
 };
 
