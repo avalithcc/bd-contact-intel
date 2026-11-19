@@ -498,6 +498,13 @@
       "when": 1795551600000,
       "tag": "0070_auto_prospecting",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1795638000000,
+      "tag": "0071_auto_prospecting_into_sequences",
+      "breakpoints": true
     }
   ]
 }

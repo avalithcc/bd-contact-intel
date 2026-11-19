@@ -16,6 +16,9 @@ export interface ProspectListRow {
   body: string | null;
   language: string | null;
   createdAt: Date;
+  /** The Sequence holding the draft (null for a refusal and for drafts written before drizzle/0071, which carry their own text). */
+  sequenceId: string | null;
+  sequenceName: string | null;
   personName: string;
   jobTitle: string | null;
   companyName: string | null;
@@ -33,6 +36,8 @@ type RawRow = {
   body: string | null;
   language: string | null;
   created_at: Date | string;
+  sequence_id: string | null;
+  sequence_name: string | null;
   first_name: string | null;
   last_name: string | null;
   job_title: string | null;
@@ -45,12 +50,16 @@ type RawRow = {
 
 export async function listProspectDrafts(limit = PROSPECT_LIST_LIMIT): Promise<{ rows: ProspectListRow[]; drafted: number; refused: number }> {
   const result = await db.execute<RawRow>(sql`
-    select pd.id::text as id, pd.outcome, pd.reason, pd.subject, pd.body, pd.language, pd.created_at,
+    select pd.id::text as id, pd.outcome, pd.reason, coalesce(sd.subject, pd.subject) as subject, coalesce(sd.body, pd.body) as body, pd.language, pd.created_at,
+      sq.id::text as sequence_id, sq.name as sequence_name,
       p.first_name, p.last_name, p.job_title, coalesce(co.display_name, p.company) as company_name, b.name as bd_name, s.data as signal_data,
       (count(*) filter (where pd.outcome = 'drafted') over ())::int as drafted_total,
       (count(*) filter (where pd.outcome = 'refused') over ())::int as refused_total
     from prospect_draft pd
     join signal s on s.id = pd.signal_id
+    left join sequence_member sm on sm.id = pd.sequence_member_id
+    left join sequence sq on sq.id = sm.sequence_id
+    left join sequence_draft sd on sd.sequence_member_id = sm.id and sd.step = 1
     left join person p on p.id = pd.person_id
     left join company co on co.company_key = s.company_key
     left join bd b on b.id = pd.bd_id
@@ -69,6 +78,8 @@ export async function listProspectDrafts(limit = PROSPECT_LIST_LIMIT): Promise<{
       body: r.body,
       language: r.language,
       createdAt: parseDbTimestamp(r.created_at),
+      sequenceId: r.sequence_id,
+      sequenceName: r.sequence_name,
       personName: [r.first_name, r.last_name].filter(Boolean).join(" "),
       jobTitle: r.job_title,
       companyName: r.company_name,

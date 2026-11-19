@@ -1938,6 +1938,8 @@ export const en = {
     bd: "BD",
     subject: "Subject",
     readOnly: "Read-only: there is no send or schedule button on this screen.",
+    sequence: "Sequence",
+    inSequences: "Drafts are written into each BD's own \"Descubrimiento automático\" sequence, un-reviewed: open them there. They only send once a person reviews and approves them.",
     reasons: {
       email_not_verified: "The email is not verified",
       in_active_sequence: "In an active sequence",
@@ -1950,6 +1952,8 @@ export const en = {
       invalid_model_output: "The model returned something unusable",
       banned_vocabulary: "The draft used banned vocabulary",
       language_unknown: "The person has no country, or a country outside the language lists: fill in the country to write to them",
+      unmapped_market: "The person's country maps to no market, so there is no legal footer to write",
+      sequence_rejected: "The Sequences rules refused to add this person (suppression, company limit or already in another sequence)",
     },
   },
   tendersPage: {

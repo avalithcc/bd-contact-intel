@@ -104,14 +104,17 @@ export type CreateSequenceResult =
   | { ok: true; sequenceId: string; capWarning: boolean }
   | { ok: false; error: "name_required" | "account_not_owned" | CapRejection };
 
-export async function createSequenceRow(bdId: string, input: { name: string; emailAccountId: string; dailySendCap?: unknown }): Promise<CreateSequenceResult> {
+/** The two statements a Sequence creation needs; `db` or a transaction, so a caller can create one inside its own. */
+type Conn = Pick<typeof db, "select" | "insert">;
+
+export async function createSequenceRow(bdId: string, input: { name: string; emailAccountId: string; dailySendCap?: unknown }, conn: Conn = db): Promise<CreateSequenceResult> {
   const name = input.name?.trim();
   if (!name) return { ok: false, error: "name_required" };
   const cap = validateDailySendCap(input.dailySendCap);
   if (!cap.ok) return { ok: false, error: cap.reason };
-  const [account] = await db.select({ id: emailAccount.id }).from(emailAccount).where(and(eq(emailAccount.id, input.emailAccountId), eq(emailAccount.bdId, bdId)));
+  const [account] = await conn.select({ id: emailAccount.id }).from(emailAccount).where(and(eq(emailAccount.id, input.emailAccountId), eq(emailAccount.bdId, bdId)));
   if (!account) return { ok: false, error: "account_not_owned" };
-  const [row] = await db
+  const [row] = await conn
     .insert(sequence)
     .values({ name, ownerBdId: bdId, emailAccountId: account.id, dailySendCap: cap.value, schedule: DEFAULT_SCHEDULE })
     .returning({ id: sequence.id });
@@ -121,28 +124,31 @@ export async function createSequenceRow(bdId: string, input: { name: string; ema
 export type AddMembersResult = ({ ok: true } & RosterDecision) | { ok: false; error: "not_found" };
 
 export async function addMembersToSequence(bdId: string, sequenceId: string, personIds: readonly string[]): Promise<AddMembersResult> {
-  const ids = [...new Set(personIds)];
   const rules = await listSuppressionRules();
-  return db.transaction(async (tx) => {
-    if (!(await lockOwnedSequence(tx, bdId, sequenceId))) return { ok: false, error: "not_found" } as const;
-    const existing = await tx.select({ personId: sequenceMember.personId }).from(sequenceMember).where(eq(sequenceMember.sequenceId, sequenceId));
-    // A requested id that matches no person is reported, never dropped: loadCandidates simply omits it.
-    const loaded = new Map((await loadCandidates(tx, ids, true)).map((c) => [c.personId, c]));
-    // Evaluate in request order, so which Contacts win the company limit is deterministic.
-    const candidates = ids.flatMap((id) => loaded.get(id) ?? []);
-    const decision = evaluateRosterAdds(candidates, {
-      suppressionRules: rules,
-      existingPersonIds: new Set(existing.map((e) => e.personId)),
-      activeCountByCompany: await activeCounts(tx, sequenceId),
-      activeElsewhere: await activeElsewhere(tx, candidates.map((c) => c.personId), sequenceId),
-    });
-    const known = new Set(candidates.map((c) => c.personId));
-    for (const id of ids) if (!known.has(id)) decision.rejected.push({ personId: id, reason: "unreachable" });
-    if (decision.accepted.length) {
-      await tx.insert(sequenceMember).values(decision.accepted.map((personId) => ({ sequenceId, personId, state: "drafted" })));
-    }
-    return { ok: true, ...decision } as const;
+  return db.transaction((tx) => addMembersInTx(tx, bdId, sequenceId, personIds, rules));
+}
+
+/** The add, inside the caller's transaction: every roster rule runs here, so a caller that adds in its own transaction cannot skip one. */
+export async function addMembersInTx(tx: Tx, bdId: string, sequenceId: string, personIds: readonly string[], rules: Awaited<ReturnType<typeof listSuppressionRules>>): Promise<AddMembersResult> {
+  const ids = [...new Set(personIds)];
+  if (!(await lockOwnedSequence(tx, bdId, sequenceId))) return { ok: false, error: "not_found" } as const;
+  const existing = await tx.select({ personId: sequenceMember.personId }).from(sequenceMember).where(eq(sequenceMember.sequenceId, sequenceId));
+  // A requested id that matches no person is reported, never dropped: loadCandidates simply omits it.
+  const loaded = new Map((await loadCandidates(tx, ids, true)).map((c) => [c.personId, c]));
+  // Evaluate in request order, so which Contacts win the company limit is deterministic.
+  const candidates = ids.flatMap((id) => loaded.get(id) ?? []);
+  const decision = evaluateRosterAdds(candidates, {
+    suppressionRules: rules,
+    existingPersonIds: new Set(existing.map((e) => e.personId)),
+    activeCountByCompany: await activeCounts(tx, sequenceId),
+    activeElsewhere: await activeElsewhere(tx, candidates.map((c) => c.personId), sequenceId),
   });
+  const known = new Set(candidates.map((c) => c.personId));
+  for (const id of ids) if (!known.has(id)) decision.rejected.push({ personId: id, reason: "unreachable" });
+  if (decision.accepted.length) {
+    await tx.insert(sequenceMember).values(decision.accepted.map((personId) => ({ sequenceId, personId, state: "drafted" })));
+  }
+  return { ok: true, ...decision } as const;
 }
 
 export type RemoveMembersResult =

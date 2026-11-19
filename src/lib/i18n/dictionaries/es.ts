@@ -1922,6 +1922,8 @@ export const es: typeof en = {
     bd: "BD",
     subject: "Asunto",
     readOnly: "Solo lectura: no hay botón de envío ni de programación en esta pantalla.",
+    sequence: "Secuencia",
+    inSequences: "Los borradores se escriben en la secuencia \"Descubrimiento automático\" de cada BD, sin revisar: abrilos ahí. Solo salen cuando una persona los revisa y los aprueba.",
     reasons: {
       email_not_verified: "El email no está verificado",
       in_active_sequence: "Está en una secuencia activa",
@@ -1934,6 +1936,8 @@ export const es: typeof en = {
       invalid_model_output: "El modelo devolvió algo inutilizable",
       banned_vocabulary: "El borrador usaba vocabulario prohibido",
       language_unknown: "La persona no tiene país, o su país no está en la lista de idiomas: completá el país para poder escribirle",
+      unmapped_market: "El país de la persona no corresponde a ningún mercado, así que no hay pie legal que escribir",
+      sequence_rejected: "Las reglas de Secuencias rechazaron sumar a esta persona (supresión, límite por empresa o ya está en otra secuencia)",
     },
   },
   tendersPage: {

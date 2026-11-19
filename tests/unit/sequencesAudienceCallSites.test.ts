@@ -47,6 +47,7 @@ const CALL = /\b(resolveComplianceAudience|explainComplianceAudience|unsubscribe
 const PURE = new Set(["lib/sequences/complianceAudience.ts", "lib/sequences/unsubscribePageAudience.ts", "lib/sequences/audienceView.ts"]);
 /** Every file under src/ that asks for an audience, found by scan. A new caller must be added here ON PURPOSE. */
 const DB_CALLERS = [
+  "lib/prospecting/consumer.ts",
   "lib/sequences/approvalQueries.ts",
   "lib/sequences/detailQueries.ts",
   "lib/sequences/draftQueries.ts",

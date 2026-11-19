@@ -28,11 +28,11 @@ export async function findTokenByHash(tokenHash: string): Promise<{ email: strin
 /**
  * Issues a NEW token for one send and returns the raw value: the only moment it exists in clear. Called once per
  * message (step 1, then again for the reminder), never reused, because only the hash is stored. The old link keeps
- * working for as long as its row exists.
+ * working for as long as its row exists. `conn` is a transaction when the member it points at is not committed yet.
  */
-export async function issueUnsubscribeToken(input: { sequenceMemberId: string; email: string }): Promise<string> {
+export async function issueUnsubscribeToken(input: { sequenceMemberId: string; email: string }, conn: Pick<typeof db, "insert"> = db): Promise<string> {
   const token = generateUnsubscribeToken();
-  await db.insert(sequenceUnsubscribeToken).values({
+  await conn.insert(sequenceUnsubscribeToken).values({
     tokenHash: hashUnsubscribeToken(token),
     sequenceMemberId: input.sequenceMemberId,
     emailNormalized: normalizeSuppressionValue("address", input.email),

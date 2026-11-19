@@ -38,6 +38,7 @@ function raw(over: Partial<CandidateRawRow> = {}): CandidateRawRow {
     bd_name: "Bea",
     bd_signature_html: null,
     bd_enabled: true,
+    bd_has_mailbox: true,
     in_active_sequence: false,
     open_follow_up: false,
     already_drafted: false,
@@ -222,5 +223,21 @@ describe("this path cannot send", () => {
       }
       assert.doesNotMatch(text, /generateMissingDrafts|sendMail|sendEmail|sendGmail/, `${file} references a send or bulk-generate path`);
     }
+  });
+});
+
+describe("the dedicated Sequence needs a mailbox", () => {
+  it("defers, without refusing or consuming, a BD with no connected mailbox", () => {
+    const [d] = plan([raw({ bd_has_mailbox: false })]);
+    assert.deepEqual([d!.kind, d!.kind === "defer" ? d!.reason : null], ["defer", "no_mailbox"]);
+  });
+
+  it("planning twice from the same input gives the same answer", () => {
+    const candidates = [raw(), raw({ signal_id: "s2", person_id: "person-2", bd_has_mailbox: false })].map(candidateFromRow);
+    const before = JSON.stringify(candidates);
+    const drafted = new Map([["bd-1", 1]]);
+    assert.deepEqual(planProspectRun(candidates, drafted, NOW), planProspectRun(candidates, drafted, NOW));
+    assert.equal(JSON.stringify(candidates), before);
+    assert.deepEqual([...drafted], [["bd-1", 1]]);
   });
 });
