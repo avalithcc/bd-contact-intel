@@ -99,7 +99,7 @@ test("ambiguous bare 'distribution manager' stays out (logistics false positive)
 test("earlier groups still win over the new rule", () => {
   assert.equal(classifyPosition("Chief Revenue Officer"), "c_level_business");
   assert.equal(classifyPosition("CTO and Revenue Manager"), "c_level_tech");
-  assert.equal(classifyPosition("VP Revenue Management"), "eng_leadership");
+  assert.equal(classifyPosition("VP Revenue Management"), "hospitality_revenue");
   assert.equal(classifyPosition("Revenue Systems Engineer"), "developers");
   assert.equal(classifyPosition("Revenue Manager and Recruiter"), "hr_recruiting");
 });
