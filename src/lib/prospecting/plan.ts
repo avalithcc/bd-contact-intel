@@ -9,8 +9,17 @@ import { resolveProspectLanguage } from "@/lib/prospecting/language";
 import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
 import type { OutreachMessageCompany } from "@/lib/outreach/messagePrompt";
 
-/** Drafts per BD per Argentina day. Deliberately low: the owner reads every one of them before anything is allowed to send. */
-export const AUTO_PROSPECTING_DAILY_CAP = 5;
+/**
+ * Drafts per BD per Argentina day, and the dedicated Sequence's own send cap. Raised 5 -> 8 by the owner on
+ * 2026-11-19, to match the 8 his four hand-made Sequences already send at - DAILY_SEND_CAP_WARN_ABOVE, the top of
+ * the range the product considers comfortable.
+ *
+ * Generating fewer than the Sequence can send is a bottleneck with no upside: the queue drains at the slower of
+ * the two, so the gap only delays work the owner has already approved. Keeping ONE constant for both is what
+ * stops them drifting apart again - the automatic Sequence was about to be created at 5 while every other one
+ * sent 8, which nobody would have noticed until a week of half-speed output.
+ */
+export const AUTO_PROSPECTING_DAILY_CAP = 8;
 
 /**
  * Owner's number, 2026-11-19: 90 days before this path writes to someone again.
