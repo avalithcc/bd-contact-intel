@@ -4,7 +4,6 @@
  * Nothing here sends. Each gate stands in for a human reading the draft, so each is a REFUSAL that is recorded with its reason, never
  * a warning: the owner learns whether a gate works by reading the refusals.
  */
-import { FOLLOW_UP_ENTRY_DAYS } from "@/lib/followUp/cycle";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import type { OutreachMessageCompany } from "@/lib/outreach/messagePrompt";
 
@@ -12,10 +11,15 @@ import type { OutreachMessageCompany } from "@/lib/outreach/messagePrompt";
 export const AUTO_PROSPECTING_DAILY_CAP = 5;
 
 /**
- * No outreach cooldown exists in the codebase; the only recency rule on a person's last touch is the follow-up queue's: a contact is
- * not "due" until FOLLOW_UP_ENTRY_DAYS after their last touch. Reused rather than invented (the owner can change it in one place).
+ * Owner's number, 2026-11-19: 90 days before this path writes to someone again.
+ *
+ * It is NOT the follow-up queue's FOLLOW_UP_ENTRY_DAYS (5), which was the placeholder here, because the two answer
+ * different questions. That one asks "has this conversation gone quiet enough to chase?" about someone already in a
+ * conversation. This one asks "is it acceptable to cold-email this person again?", and nobody writes unprompted to the
+ * same stranger twice in a week. The gap matters most precisely where this path is weakest: no human reads the draft,
+ * so a too-short cooldown turns a silent prospect into a recipient of repeated unanswered mail.
  */
-export const AUTO_PROSPECTING_COOLDOWN_DAYS = FOLLOW_UP_ENTRY_DAYS;
+export const AUTO_PROSPECTING_COOLDOWN_DAYS = 90;
 
 export type RefusalReason =
   | "email_not_verified"
