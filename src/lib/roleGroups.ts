@@ -68,6 +68,9 @@ function w(...patterns: string[]): RegExp {
   return new RegExp(`(?<![${WORD_CHAR}])(?:${alt})(?![${WORD_CHAR}])`, "iu");
 }
 
+const VP = "vp|svp|evp|vice ?president";
+const VP_DOMAIN = `(?<![${WORD_CHAR}])(?:engineering|software|technology|tech|it|platform|infrastructure|ingenier[ií]a|tecnolog[ií]a)(?![${WORD_CHAR}])`;
+
 type Rule = [Exclude<RoleGroupKey, "other" | "no_position">, RegExp];
 
 // Priority-ordered rules — first match wins. Faithfully ported from the
@@ -99,16 +102,20 @@ const RULES: Rule[] = [
       "fundador\\w*",
       "co-?fundador\\w*",
       "cofundador\\w*",
-      "president\\w*",
+      "(?<!vice[ -])president\\w*",
       "presidente",
-      "owner",
+      // "Product Owner" / "Scrum Owner" are not business owners.
+      "(?<!product |scrum |process )owner",
       "due[ñn]o",
       "managing (?:director|partner)",
       "general manager",
       "gerente general",
       "country manager",
       "socio\\w*",
-      "partner",
+      // Only a partner AT THE HEAD: bare "Partner", "Partner at X", "Founding
+      // Partner". "Partner Engineer" / "Partner Manager" are not.
+      "^partner(?:\\s+(?:at|en|@)\\s.*)?$",
+      "(?:founding|general|equity|senior|name|venture) partner",
       "board member",
       // General management / ownership / board in Spanish, Italian and German
       // (same job as "general manager"; seen on the hotel import).
@@ -152,17 +159,33 @@ const RULES: Rule[] = [
     ),
   ],
   [
+    // A commercial qualifier before "development" makes it a sales title:
+    // "Business Development Manager", "Broker Development Manager", "VP of
+    // Global Business Development". It sits ahead of every engineering rule
+    // because those match "vp", "development manager" and "development lead"
+    // wherever they appear. Plain "Development Manager" has no qualifier and
+    // stays engineering_manager. Spanish: "desarrollo de negocios/comercial".
+    "sales_bd",
+    w(
+      "(?:business|broker|sales|partner|channel|market|client|customer|account) development",
+      "business developer",
+      "desarrollo (?:de negocios?|comercial)",
+    ),
+  ],
+  [
     "eng_leadership",
     w(
-      "vp",
-      "vice ?president",
-      "svp",
-      "evp",
+      // A VP is engineering leadership only with an engineering domain anywhere
+      // in the title; a bare "VP" says nothing about the function (VP Sales).
+      // Non-engineering VPs fall to their function, or to the last rule.
+      `(?:${VP})(?=.*${VP_DOMAIN})`,
+      `(?<=${VP_DOMAIN}.*)(?:${VP})`,
       "head of (?:engineering|technology|software|tech|development|it|platform|data|infrastructure)",
       // The comma form ("Director, Software Engineering") is how LinkedIn
       // renders many US titles, and without it these fall through to developers.
       "(?:director|directora),?(?: of| de)? (?:engineering|software|technology|tecnolog[ií]a|it|ti|sistemas|desarrollo|ingenier[ií]a|platform|technical)",
       "engineering director",
+      "engineering head",
       "technical director",
       "it director",
       "gerente de (?:tecnolog[ií]a|sistemas|desarrollo|it|ingenier[ií]a)",
@@ -194,6 +217,9 @@ const RULES: Rule[] = [
     "tech_lead_architect",
     w(
       "tech(?:nical)? lead(?:er)?",
+      // "Engineering Lead" reads the same as "Lead Engineer" below; only the
+      // second used to match.
+      "(?:engineering|technology) lead(?:er)?",
       "team lead(?:er)?",
       "lead (?:software |backend |frontend |full ?stack )?(?:engineer|developer)",
       // "Lead" also appears as a suffix ("QA Lead", "Frontend Lead") and with
@@ -214,6 +240,7 @@ const RULES: Rule[] = [
     w(
       "product (?:manager|owner|lead|director|designer)",
       "head of product",
+      "(?:vp|vice ?president),? (?:of )?product",
       "po",
       "director of product",
       "vp of product",
@@ -252,6 +279,10 @@ const RULES: Rule[] = [
       "data scientist",
       "analista programador",
       "software",
+      "member of (?:the )?technical staff",
+      // Software disciplines only. Bare "engineering" would pull in mechanical
+      // and electrical engineering, which are not IT.
+      "(?:data|software|machine learning|ml|ai|platform|security|cloud|devops|site reliability|forward deployed|solutions?|systems?|quality|test|infrastructure|mobile|frontend|backend|full ?stack|analytics|database|reliability) engineering",
     ),
   ],
   [
@@ -320,7 +351,43 @@ const RULES: Rule[] = [
       "director of events?",
     ),
   ],
+  // Last resort: an executive "VP ..." whose function matched nothing above.
+  ["c_level_business", w("vp", "svp", "evp", "vice ?president")],
 ];
+
+// --- Head of the title -------------------------------------------------------
+// The rules above are substring patterns, so any incidental word ("Partner" in a
+// parenthetical, "Vice President" inside "Vice President of Engineering") used to
+// win by list order. Classification therefore works on the title's STRUCTURE:
+// parenthetical qualifiers and seniority words are dropped, and a leader-first
+// title ("Manager, Field Engineering", "Director - Engineering") is rewritten to
+// the "<domain> <leader>" form the rules already know. A VP or a partner only
+// counts as such when the rules say so at the head (see the patterns above).
+
+const SENIORITY = /(?<![\p{L}\p{N}_])(?:senior|sr\.?|global|associate|regional|interim)(?![\p{L}\p{N}_])/giu;
+const BARE_LEADER = /^(?:manager|director|head|lead(?:er)?|vp|svp|evp|vice president)$/iu;
+// A technical architecture reads as engineering for the leader-first rewrite, so "VP, Solution Architecture"
+// lands in engineering rather than falling through to c_level_business. Qualified on purpose: a bare
+// "architecture" would also swallow "Brand Architecture" and "Information Architecture" (design, not code).
+const SOFTWARE_ENGINEERING =
+  /engineering|software|ingenier[ií]a|(?:solutions?|software|enterprise|data|cloud|security|technical|systems?|platform) architecture/iu;
+const NON_SOFTWARE_ENGINEERING = /mechanical|electrical|civil|chemical|industrial|manufacturing|structural|hardware|petroleum|aerospace|biomedical/iu;
+
+function classifyText(text: string): RoleGroupKey {
+  for (const [key, rx] of RULES) {
+    if (rx.test(text)) return key;
+  }
+  return "other";
+}
+
+/** "Manager, Field Engineering" / "Director - Engineering" read as "<domain> <leader>". */
+function invertLeaderFirst(segments: string[]): string | null {
+  if (segments.length < 2 || !BARE_LEADER.test(segments[0])) return null;
+  const rest = segments.slice(1);
+  const software = rest.find((r) => SOFTWARE_ENGINEERING.test(r));
+  if (software && NON_SOFTWARE_ENGINEERING.test(software)) return null;
+  return `${software ? "engineering" : rest[0]} ${segments[0]}`;
+}
 
 /**
  * Classify a contact's `position` string into a role group.
@@ -330,8 +397,12 @@ const RULES: Rule[] = [
 export function classifyPosition(position: string | null | undefined): RoleGroupKey {
   const p = position?.trim();
   if (!p) return "no_position";
-  for (const [key, rx] of RULES) {
-    if (rx.test(p)) return key;
+  const cleaned = p.replace(/\s*[([][^)\]]*[)\]]/g, "").replace(SENIORITY, " ").replace(/\s+/g, " ").trim();
+  const segments = cleaned.split(/\s*(?:[,|]|\s[-–—]\s)\s*/).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const inverted = invertLeaderFirst(segments);
+  if (inverted) {
+    const g = classifyText(inverted);
+    if (g !== "other") return g;
   }
-  return "other";
+  return classifyText(cleaned);
 }

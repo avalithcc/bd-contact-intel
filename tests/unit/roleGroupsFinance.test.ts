@@ -70,8 +70,8 @@ test("finance + operations directors move from operations to c_level_business (i
   }
 });
 
-test("pre-existing: VP of Finance lands in eng_leadership because the vp term matches first", () => {
-  assert.equal(classifyPosition("VP of Finance"), "eng_leadership");
+test("a VP of Finance is an executive, not engineering leadership (the bare vp term no longer wins)", () => {
+  assert.equal(classifyPosition("VP of Finance"), "c_level_business");
 });
 
 test("controller titles are deliberately left in other", () => {
