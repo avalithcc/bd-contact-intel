@@ -53,6 +53,9 @@ export const bd = pgTable("bd", {
   // who ENTERS the next daily build only (candidateQuery.ts); rows already in the queue stay until worked, dropped or expired. Written
   // by the BD themself from /follow-ups (roleGroupPreference.ts validates every key); no audit_log row, it is a view preference.
   followUpExcludedRoleGroups: text("follow_up_excluded_role_groups").array().notNull().default(sql`'{}'::text[]`),
+  // Whether the auto-prospecting consumer may DRAFT for this BD's contacts (drizzle/0070). OFF by default: a new BD, and every
+  // BD that existed, starts disabled. It only gates drafting; nothing in this path sends. Changed by hand until a switch exists.
+  autoProspectingEnabled: boolean("auto_prospecting_enabled").notNull().default(false),
 });
 
 // A contact, private to exactly one BD.
@@ -1068,6 +1071,7 @@ export const auditLog = pgTable(
     // created contacts and filled empty phones from the CEO's PDF)
     // 'revert_contactos_comerciales_2026_10' (scripts/revert-contactos-comerciales-2026-10.ts
     // deleted the untouched created contacts and cleared the filled phones)
+    // 'auto_prospecting_signals' (scripts/auto-prospecting.ts wrote hiring signals; metadata.signalIds is the revert list)
     // 'gmail_rebackfill' (scripts/rebackfill-gmail-account.ts reset one
     // account's history_id so the cron re-fetches up to two years of mail)
     // 'merge_companies' (scripts/merge-companies.ts folded confirmed duplicate
@@ -2058,8 +2062,14 @@ export const signal = pgTable(
     // publishedAt } for web_research.
     data: jsonb("data").notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // drizzle/0070: set when the auto-prospecting consumer has worked this signal (drafted OR refused), so it never fires twice.
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
   },
   (t) => ({
+    // One hiring signal per posting, enforced by the database: the producer's idempotency does not rely on its own SELECT.
+    hiringPostingUnique: uniqueIndex("signal_hiring_posting_unique").on(sql`(${t.data}->>'postingId')`).where(sql`${t.source} = 'hiring'`),
+    // The consumer's read: unconsumed hiring signals, oldest first.
+    hiringUnconsumed: index("signal_hiring_unconsumed_idx").on(t.createdAt).where(sql`${t.source} = 'hiring' and ${t.consumedAt} is null`),
     byLead: index("signal_lead_idx").on(t.leadId),
     byCompany: index("signal_company_idx").on(t.companyKey),
     byContact: index("signal_contact_idx").on(t.contactId),
@@ -2070,6 +2080,31 @@ export const signal = pgTable(
 
 export type Signal = typeof signal.$inferSelect;
 export type NewSignal = typeof signal.$inferInsert;
+
+// The outcome of the auto-prospecting consumer for ONE signal (drizzle/0070): a draft nobody has read yet, or a refusal with its
+// reason. Never sent from here. `signal_id` is unique: a signal is worked once.
+export const prospectDraft = pgTable(
+  "prospect_draft",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    signalId: uuid("signal_id").notNull().unique().references(() => signal.id, { onDelete: "cascade" }),
+    bdId: uuid("bd_id").references(() => bd.id, { onDelete: "set null" }),
+    personId: uuid("person_id").references(() => person.id, { onDelete: "cascade" }),
+    // 'drafted' | 'refused'
+    outcome: text("outcome").notNull(),
+    // Set on a refusal (see src/lib/prospecting/gates.ts); null on a draft.
+    reason: text("reason"),
+    subject: text("subject"),
+    body: text("body"),
+    language: text("language"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    // The daily cap and the screen read by (bd, day).
+    byBdCreated: index("prospect_draft_bd_created_idx").on(t.bdId, t.createdAt),
+    byPerson: index("prospect_draft_person_idx").on(t.personId),
+  }),
+);
 
 // One LinkedIn scrape run via Apify, for observability — mirrors syncRun pattern.
 export const linkedinScrapeJob = pgTable(
