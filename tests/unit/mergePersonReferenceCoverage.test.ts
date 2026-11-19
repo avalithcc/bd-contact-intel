@@ -45,6 +45,10 @@ const PERSON_FK_TABLE_DISPOSITION: Record<string, Disposition> = {
   email_message_person: "repointed",
   follow_up_queue_item: "repointed",
   duplicate_candidate: "repointed",
+  prospect_draft: {
+    excluded:
+      "a record of what the auto-prospecting consumer wrote for the person who existed at the time; a merged-away person row is kept (merged_into_id), so the record stays readable. Known gap: the survivor does not inherit the already_drafted flag, so it can be drafted once more",
+  },
   merge_event: {
     excluded: "the merge/unmerge ledger itself — survivor_id/merged_id identify the event and must never move",
   },
