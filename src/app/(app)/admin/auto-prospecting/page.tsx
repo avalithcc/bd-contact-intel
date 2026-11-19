@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
@@ -39,6 +40,7 @@ export default async function AutoProspectingPage() {
           </h1>
           <p className="meta">{l.subtitle}</p>
           <p className="meta">{l.readOnly}</p>
+          <p className="meta">{l.inSequences}</p>
         </div>
       </div>
 
@@ -73,6 +75,11 @@ export default async function AutoProspectingPage() {
                 <div className="meta">
                   {l.bd}: {r.bdName ?? "—"}
                 </div>
+                {r.sequenceId ? (
+                  <div className="meta">
+                    {l.sequence}: <Link href={`/sequences/${r.sequenceId}`}>{r.sequenceName}</Link>
+                  </div>
+                ) : null}
               </div>
             </article>
           ))}

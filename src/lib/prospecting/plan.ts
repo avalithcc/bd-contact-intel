@@ -34,7 +34,9 @@ export type RefusalReason =
   | "no_open_posting"
   | "invalid_model_output"
   | "banned_vocabulary"
-  | "language_unknown";
+  | "language_unknown"
+  | "unmapped_market"
+  | "sequence_rejected";
 
 /** One leadership contact at the company of an unconsumed signal, as the consumer's single read returns it. */
 export type CandidateRawRow = {
@@ -54,6 +56,7 @@ export type CandidateRawRow = {
   bd_name: string;
   bd_signature_html: string | null;
   bd_enabled: boolean;
+  bd_has_mailbox: boolean;
   in_active_sequence: boolean;
   open_follow_up: boolean;
   already_drafted: boolean;
@@ -78,6 +81,7 @@ export interface ProspectCandidate {
   bdName: string;
   bdSignatureHtml: string | null;
   bdEnabled: boolean;
+  bdHasMailbox: boolean;
   inActiveSequence: boolean;
   openFollowUp: boolean;
   alreadyDrafted: boolean;
@@ -103,6 +107,7 @@ export function candidateFromRow(r: CandidateRawRow): ProspectCandidate {
     bdName: r.bd_name,
     bdSignatureHtml: r.bd_signature_html,
     bdEnabled: r.bd_enabled,
+    bdHasMailbox: r.bd_has_mailbox,
     inActiveSequence: r.in_active_sequence,
     openFollowUp: r.open_follow_up,
     alreadyDrafted: r.already_drafted,
@@ -126,7 +131,7 @@ export type ProspectDecision =
   | { kind: "draft"; signalId: string; candidate: ProspectCandidate }
   | { kind: "refuse"; signalId: string; personId: string; bdId: string; reason: RefusalReason }
   // Left unconsumed and unrecorded: the switch is off, or the BD is at today's cap. A later run picks it up.
-  | { kind: "defer"; signalId: string; reason: "switch_off" | "daily_cap" };
+  | { kind: "defer"; signalId: string; reason: "switch_off" | "daily_cap" | "no_mailbox" };
 
 /**
  * One decision per signal. `candidates` arrive grouped by signal, best contact first. Pure: `draftedToday` (drafts already written
@@ -146,6 +151,11 @@ export function planProspectRun(candidates: readonly ProspectCandidate[], drafte
       continue;
     }
     const pick = enabled.find((c) => blocker(c, now) === null);
+    // The draft is written into the BD's own Sequence, which sends from their mailbox: without one there is nowhere to put it.
+    if (pick && !pick.bdHasMailbox) {
+      out.push({ kind: "defer", signalId, reason: "no_mailbox" });
+      continue;
+    }
     if (!pick) {
       out.push({ kind: "refuse", signalId, personId: first.personId, bdId: first.bdId, reason: blocker(first, now)! });
       continue;

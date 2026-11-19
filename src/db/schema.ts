@@ -2090,6 +2090,9 @@ export const prospectDraft = pgTable(
     signalId: uuid("signal_id").notNull().unique().references(() => signal.id, { onDelete: "cascade" }),
     bdId: uuid("bd_id").references(() => bd.id, { onDelete: "set null" }),
     personId: uuid("person_id").references(() => person.id, { onDelete: "cascade" }),
+    // The Sequence member this draft was written into (drafts since drizzle/0071). The text lives in sequence_draft, where it is reviewed and
+    // sent; this row keeps WHICH signal caused it. Null on a refusal and on the drafts written before 0071, which still carry their own text.
+    sequenceMemberId: uuid("sequence_member_id").references(() => sequenceMember.id, { onDelete: "set null" }),
     // 'drafted' | 'refused'
     outcome: text("outcome").notNull(),
     // Set on a refusal (see src/lib/prospecting/gates.ts); null on a draft.
@@ -2103,6 +2106,7 @@ export const prospectDraft = pgTable(
     // The daily cap and the screen read by (bd, day).
     byBdCreated: index("prospect_draft_bd_created_idx").on(t.bdId, t.createdAt),
     byPerson: index("prospect_draft_person_idx").on(t.personId),
+    byMember: index("prospect_draft_member_idx").on(t.sequenceMemberId),
   }),
 );
 

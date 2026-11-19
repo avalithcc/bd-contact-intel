@@ -20,9 +20,9 @@ const sequenceIds: string[] = [];
 
 type Seed = { ck: string; personId: string; bdId: string };
 
-async function seed(name: string, o: { emailStatus?: string; enabled?: boolean; closed?: boolean; bdId?: string; roleGroup?: string; country?: string | null; companyCountry?: string } = {}): Promise<Seed> {
+async function seed(name: string, o: { emailStatus?: string; enabled?: boolean; closed?: boolean; bdId?: string; roleGroup?: string; mailbox?: boolean; country?: string | null; companyCountry?: string } = {}): Promise<Seed> {
   const { db } = await import("@/db");
-  const { bd, company, jobPosting, person, targetCompany } = await import("@/db/schema");
+  const { bd, company, emailAccount, jobPosting, person, targetCompany } = await import("@/db/schema");
   const ck = key(name);
   companyKeys.push(ck);
   let bdId = o.bdId;
@@ -30,6 +30,8 @@ async function seed(name: string, o: { emailStatus?: string; enabled?: boolean; 
     const [b] = await db.insert(bd).values({ email: `${ck}@example.test`, name: "Bea Tester", autoProspectingEnabled: o.enabled ?? true }).returning();
     bdId = b!.id;
     bdIds.push(bdId);
+    // The dedicated Sequence sends from the BD's own connected mailbox; a BD without one is deferred, never drafted for.
+    if (o.mailbox !== false) await db.insert(emailAccount).values({ bdId, emailAddress: `${ck}-mbx@example.test` });
   }
   await db.insert(company).values({ companyKey: ck, displayName: `Acme ${name}`, country: o.companyCountry ?? null });
   await db.insert(targetCompany).values({ companyKey: ck, displayName: `Acme ${name}`, ats: "lever", config: {} });
@@ -50,6 +52,8 @@ after(async () => {
   const { auditLog, bd, company, emailAccount, jobPosting, person, sequence, signal, targetCompany, task } = await import("@/db/schema");
   const { inArray } = await import("drizzle-orm");
   if (sequenceIds.length) await db.delete(sequence).where(inArray(sequence.id, sequenceIds));
+  // The dedicated Sequences the consumer created (members cascade).
+  if (bdIds.length) await db.delete(sequence).where(inArray(sequence.ownerBdId, bdIds));
   if (companyKeys.length) {
     await db.delete(signal).where(inArray(signal.companyKey, companyKeys));
     await db.delete(task).where(inArray(task.companyKey, companyKeys));
@@ -77,6 +81,14 @@ const draftsOf = async (signalId: string) => {
   const { prospectDraft } = await import("@/db/schema");
   const { eq } = await import("drizzle-orm");
   return db.select().from(prospectDraft).where(eq(prospectDraft.signalId, signalId));
+};
+
+const memberDraft = async (memberId: string) => {
+  const { db } = await import("@/db");
+  const { sequenceDraft } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const [d] = await db.select().from(sequenceDraft).where(eq(sequenceDraft.sequenceMemberId, memberId));
+  return d!;
 };
 
 /** A model that never has to be right: it only records that it was called. */
@@ -148,7 +160,8 @@ test("a draft is written once; a consumed signal is never reworked", async () =>
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0]!.outcome, "drafted");
   assert.equal(drafts[0]!.personId, a.personId);
-  assert.match(drafts[0]!.body ?? "", /Acme/);
+  assert.equal(drafts[0]!.body, null, "the text lives in the Sequence draft, not here");
+  assert.match((await memberDraft(drafts[0]!.sequenceMemberId!)).body, /Acme/);
   const callsAfterFirst = m.calls.length;
 
   await consumeSignals({ execute: true, generate: m.generate });
@@ -179,6 +192,7 @@ test("gate 3: an open task, a recent email or an active sequence keeps a contact
   const { consumeSignals } = await import("@/lib/prospecting/consumer");
   const { db } = await import("@/db");
   const { activity, emailAccount, sequence, sequenceMember, task } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
 
   const withTask = await seed("task");
   await db.insert(task).values({ personId: withTask.personId, companyKey: withTask.ck, assignedToBdId: withTask.bdId, title: "Follow up", status: "open" });
@@ -187,7 +201,7 @@ test("gate 3: an open task, a recent email or an active sequence keeps a contact
   await db.insert(activity).values({ personId: withEmail.personId, actorBdId: withEmail.bdId, type: "email_sent", metadata: {} });
 
   const withSequence = await seed("sequence");
-  const [acct] = await db.insert(emailAccount).values({ bdId: withSequence.bdId, emailAddress: `${withSequence.ck}-mbx@example.test` }).returning();
+  const [acct] = await db.select().from(emailAccount).where(eq(emailAccount.bdId, withSequence.bdId));
   const [seq] = await db.insert(sequence).values({ name: "zz", ownerBdId: withSequence.bdId, emailAccountId: acct!.id, schedule: {} }).returning();
   sequenceIds.push(seq!.id);
   await db.insert(sequenceMember).values({ sequenceId: seq!.id, personId: withSequence.personId, state: "drafted" });
@@ -222,13 +236,13 @@ test("language: the person's own country decides it, not the company's, and no g
     const [sig] = await signalsOf(s.ck);
     const [d] = await draftsOf(sig!.id);
     assert.ok(sig!.consumedAt, label);
-    result[label] = [d!.outcome, d!.language, d!.reason, d!.body === null];
+    result[label] = [d!.outcome, d!.language, d!.reason, d!.sequenceMemberId === null ? null : (await memberDraft(d!.sequenceMemberId)).language];
   }
   assert.deepEqual(result, {
-    us: ["drafted", "en", null, false],
-    ar: ["drafted", "es", null, false],
-    none: ["refused", null, "language_unknown", true],
-    germany: ["refused", null, "language_unknown", true],
+    us: ["drafted", "en", null, "en"],
+    ar: ["drafted", "es", null, "es"],
+    none: ["refused", null, "language_unknown", null],
+    germany: ["refused", null, "language_unknown", null],
   });
   assert.equal(m.calls.filter((c) => /Acme (no-country|germany)/.test(c)).length, 0, "the model must never be asked to write without a language");
   assert.ok(m.calls.some((c) => c.includes("Acme us-person")), "the US person was drafted");
@@ -238,6 +252,83 @@ test("the screen read lists the draft with the signal that caused it, and refusa
   const { listProspectDrafts } = await import("@/lib/prospecting/queries");
   const { rows } = await listProspectDrafts(500);
   const mine = rows.filter((r) => r.companyName?.includes(`Acme`) && r.personName.endsWith(run));
-  assert.ok(mine.some((r) => r.outcome === "drafted" && r.signalTitle === "Senior Backend Engineer" && r.body));
+  assert.ok(mine.some((r) => r.outcome === "drafted" && r.signalTitle === "Senior Backend Engineer" && r.body && r.sequenceName?.startsWith("Descubrimiento automático")));
   assert.ok(mine.some((r) => r.outcome === "refused" && r.reason === "no_open_posting"));
+});
+
+test("an automatic draft lands in the dedicated Sequence, never in a hand-made one, un-reviewed and un-approved", async () => {
+  const { consumeSignals } = await import("@/lib/prospecting/consumer");
+  const { AUTO_SEQUENCE_PREFIX } = await import("@/lib/prospecting/autoSequence");
+  const { db } = await import("@/db");
+  const { emailAccount, sequence, sequenceDraft, sequenceMember } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  const a = await seed("lands");
+  const [acct] = await db.select().from(emailAccount).where(eq(emailAccount.bdId, a.bdId));
+  const [mine] = await db.insert(sequence).values({ name: "Hand-made", ownerBdId: a.bdId, emailAccountId: acct!.id, schedule: {} }).returning();
+  sequenceIds.push(mine!.id);
+  await produce(a.bdId);
+  await consumeSignals({ execute: true, generate: fakeModel().generate });
+
+  assert.equal((await db.select().from(sequenceMember).where(eq(sequenceMember.sequenceId, mine!.id))).length, 0, "nothing lands in a sequence a BD made");
+  const members = await db.select().from(sequenceMember).where(eq(sequenceMember.personId, a.personId));
+  assert.equal(members.length, 1);
+  const [auto] = await db.select().from(sequence).where(eq(sequence.id, members[0]!.sequenceId));
+  assert.ok(auto!.name.startsWith(AUTO_SEQUENCE_PREFIX));
+  assert.equal(auto!.ownerBdId, a.bdId);
+  assert.equal(auto!.emailAccountId, acct!.id);
+  assert.equal(members[0]!.state, "drafted");
+  const [d] = await db.select().from(sequenceDraft).where(eq(sequenceDraft.sequenceMemberId, members[0]!.id));
+  assert.deepEqual([d!.reviewedAt, d!.approvedAt, d!.scheduledFor, d!.reviewedByBdId, d!.approvedByBdId], [null, null, null, null, null]);
+  assert.equal(d!.step, 1);
+  assert.match(d!.body, /unsubscribe|darte de baja|Cancelar/i, "the footer the send path requires is attached");
+
+  // The REAL gate (approveBulk re-runs bulkApprovalGate on rows it read itself): refused until a human opens it.
+  const { approveBulk } = await import("@/lib/sequences/approvalQueries");
+  const refused = await approveBulk(a.bdId, [members[0]!.id]);
+  assert.deepEqual(refused, { ok: false, error: "rejected", rejected: [{ memberId: members[0]!.id, reason: "unreviewed" }] });
+  const [still] = await db.select().from(sequenceDraft).where(eq(sequenceDraft.id, d!.id));
+  assert.equal(still!.approvedAt, null);
+  // Opened by a human: the same call now passes, so the refusal above was the gate and nothing else.
+  await db.update(sequenceDraft).set({ reviewedAt: new Date(), reviewedByBdId: a.bdId }).where(eq(sequenceDraft.id, d!.id));
+  assert.equal((await approveBulk(a.bdId, [members[0]!.id])).ok, true);
+});
+
+test("the dedicated Sequence is created once per BD and reused by every later draft", async () => {
+  const { consumeSignals } = await import("@/lib/prospecting/consumer");
+  const { AUTO_SEQUENCE_PREFIX } = await import("@/lib/prospecting/autoSequence");
+  const { db } = await import("@/db");
+  const { sequence, sequenceMember } = await import("@/db/schema");
+  const { and, eq, like } = await import("drizzle-orm");
+  const first = await seed("reuse-a");
+  await produce(first.bdId);
+  await consumeSignals({ execute: true, generate: fakeModel().generate });
+  const mineAuto = () => db.select().from(sequence).where(and(eq(sequence.ownerBdId, first.bdId), like(sequence.name, `${AUTO_SEQUENCE_PREFIX}%`)));
+  assert.equal((await mineAuto()).length, 1);
+  // A later run, a different signal, the same BD.
+  const second = await seed("reuse-b", { bdId: first.bdId });
+  await produce(first.bdId);
+  await consumeSignals({ execute: true, generate: fakeModel().generate });
+  const seqs = await mineAuto();
+  assert.equal(seqs.length, 1, "one dedicated Sequence per BD, not one per run");
+  const members = await db.select().from(sequenceMember).where(eq(sequenceMember.sequenceId, seqs[0]!.id));
+  assert.deepEqual(members.map((m) => m.personId).sort(), [first.personId, second.personId].sort());
+});
+
+test("a BD with no connected mailbox is deferred: nothing is written, the model is not called, the signal stays unconsumed", async () => {
+  const { consumeSignals } = await import("@/lib/prospecting/consumer");
+  const a = await seed("nomailbox", { mailbox: false });
+  await produce(a.bdId);
+  const m = fakeModel();
+  await consumeSignals({ execute: true, generate: m.generate });
+  const [sig] = await signalsOf(a.ck);
+  assert.equal(sig!.consumedAt, null);
+  assert.equal((await draftsOf(sig!.id)).length, 0);
+  assert.equal(m.calls.filter((c) => c.includes("Acme nomailbox")).length, 0);
+});
+
+test("the signal that caused a draft stays readable from its Sequence member", async () => {
+  const { listProspectDrafts } = await import("@/lib/prospecting/queries");
+  const { rows } = await listProspectDrafts(500);
+  const row = rows.find((r) => r.outcome === "drafted" && r.companyName === "Acme lands");
+  assert.ok(row?.sequenceId && row.signalTitle === "Senior Backend Engineer" && row.signalUrl === "https://example.test/1");
 });
