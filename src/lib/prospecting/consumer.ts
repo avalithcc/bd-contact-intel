@@ -151,6 +151,10 @@ export interface ConsumeSummary {
   deferred: number;
   failed: number;
   byReason: Record<string, number>;
+  /** True when the wall-clock deadline stopped the run before every planned signal was worked. */
+  stoppedEarly: boolean;
+  /** Planned signals (to draft or refuse) NOT worked because the deadline passed: still unconsumed, the next run takes them. */
+  leftForNextRun: number;
 }
 
 /** The compliance address (the footer's) and the email of one person, read before the model is called: no audience, no draft. */
@@ -190,11 +194,18 @@ async function draftOne(c: ProspectCandidate, generate: typeof generateText | un
   return "failed"; // transient (gateway, network): leave the signal unconsumed so the next run retries it
 }
 
-/** `execute: false` plans only: no model call, no write. */
-export async function consumeSignals(opts: { execute: boolean; now?: Date; generate?: typeof generateText }): Promise<ConsumeSummary> {
+/**
+ * `execute: false` plans only: no model call, no write.
+ *
+ * `deadlineMs` (epoch ms on `clock`, default Date.now) is checked BEFORE each signal is started, never inside one: a signal in flight
+ * finishes its claim + outcome transaction, so stopping never leaves a signal claimed without its outcome. What is not started stays
+ * unconsumed, which is exactly how a deferral already looks to the next run.
+ */
+export async function consumeSignals(opts: { execute: boolean; now?: Date; generate?: typeof generateText; deadlineMs?: number; clock?: () => number }): Promise<ConsumeSummary> {
   const now = opts.now ?? new Date();
   const decisions: ProspectDecision[] = planProspectRun(await readCandidates(), await readDraftedToday(now), now);
-  const summary: ConsumeSummary = { drafted: 0, refused: 0, deferred: 0, failed: 0, byReason: {} };
+  const summary: ConsumeSummary = { drafted: 0, refused: 0, deferred: 0, failed: 0, byReason: {}, stoppedEarly: false, leftForNextRun: 0 };
+  const clock = opts.clock ?? Date.now;
   const count = (reason: string) => (summary.byReason[reason] = (summary.byReason[reason] ?? 0) + 1);
 
   for (const d of decisions) {
@@ -206,6 +217,11 @@ export async function consumeSignals(opts: { execute: boolean; now?: Date; gener
     if (!opts.execute) {
       d.kind === "draft" ? summary.drafted++ : summary.refused++;
       count(d.kind === "draft" ? "would_draft" : d.reason);
+      continue;
+    }
+    if (opts.deadlineMs !== undefined && clock() >= opts.deadlineMs) {
+      summary.stoppedEarly = true;
+      summary.leftForNextRun++;
       continue;
     }
     const outcome = d.kind === "refuse" ? ({ signalId: d.signalId, bdId: d.bdId, personId: d.personId, outcome: "refused", reason: d.reason } as Outcome) : await draftOne(d.candidate, opts.generate);

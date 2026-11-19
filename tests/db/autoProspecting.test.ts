@@ -339,3 +339,49 @@ test("the signal that caused a draft stays readable from its Sequence member", a
   const row = rows.find((r) => r.outcome === "drafted" && r.companyName === "Acme lands");
   assert.ok(row?.sequenceId && row.signalTitle === "Senior Backend Engineer" && row.signalUrl === "https://example.test/1");
 });
+
+test("the wall-clock budget stops the run: the rest stays unconsumed, is counted, and no signal is claimed without its draft", async () => {
+  const { consumeSignals } = await import("@/lib/prospecting/consumer");
+  const seeds = [await seed("budget-a"), await seed("budget-b"), await seed("budget-c")];
+  await produce(seeds[0]!.bdId);
+
+  // The injected clock only moves when the model is called: each draft "takes" 10 seconds, the budget is 5.
+  let t = 0;
+  const m = fakeModel();
+  const generate = (async (args: { prompt: string }) => {
+    t += 10_000;
+    return (m.generate as unknown as (a: { prompt: string }) => Promise<unknown>)(args);
+  }) as never;
+  const summary = await consumeSignals({ execute: true, generate, clock: () => t, deadlineMs: 5_000 });
+
+  const all = (await Promise.all(seeds.map((s) => signalsOf(s.ck)))).flat();
+  assert.equal(all.length, 3);
+  const consumed = all.filter((s) => s.consumedAt);
+  const untouched = all.filter((s) => !s.consumedAt);
+  assert.equal(consumed.length, 1, "one draft fits before the clock passes the deadline");
+  assert.equal(untouched.length, 2, "the other two are left for the next run");
+  assert.equal(summary.stoppedEarly, true);
+  assert.ok(summary.leftForNextRun >= 2, `leftForNextRun counts the signals not worked (${summary.leftForNextRun})`);
+  for (const s of all) assert.equal((await draftsOf(s.id)).length, s.consumedAt ? 1 : 0, "claimed iff it has its outcome row");
+  assert.equal(m.calls.length, 1, "no model call after the deadline");
+
+  // Resumable: the next run, with budget, picks the rest up.
+  t = 0;
+  const next = await consumeSignals({ execute: true, generate: fakeModel().generate });
+  assert.equal(next.stoppedEarly, false);
+  assert.equal((await Promise.all(seeds.map((s) => signalsOf(s.ck)))).flat().filter((s) => !s.consumedAt).length, 0);
+});
+
+test("the run's audit row is written by the real dependency, and the switch query sees a BD who is on", async () => {
+  const { AUTO_PROSPECTING_RUN_ACTION } = await import("@/lib/prospecting/cronRun");
+  const { realDeps } = await import("@/lib/prospecting/cronRunDeps");
+  const a = await seed("audit");
+  assert.equal(await realDeps.anyBdEnabled(), true);
+  await realDeps.audit(a.bdId, { trigger: "cron", drafted: 1, leftForNextRun: 0 });
+  const { db } = await import("@/db");
+  const { auditLog } = await import("@/db/schema");
+  const { and, eq } = await import("drizzle-orm");
+  const rows = await db.select().from(auditLog).where(and(eq(auditLog.actorBdId, a.bdId), eq(auditLog.action, AUTO_PROSPECTING_RUN_ACTION)));
+  assert.equal(rows.length, 1);
+  assert.equal((rows[0]!.metadata as { trigger: string }).trigger, "cron");
+});
