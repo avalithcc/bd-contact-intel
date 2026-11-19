@@ -21,6 +21,8 @@ import {
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
 import { parseEmailModelOutput, parseSubjectModelOutput, capBody, MAX_BODY_CHARS, type ParsedEmailMessage } from "@/lib/outreach/emailOutputParsing";
 import { bannedTermsInBody, describeViolations, validateSubject } from "@/lib/outreach/subjectRules";
+import { addSpanishOpeningMarks } from "@/lib/outreach/spanishMarks";
+import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
 import { formatEmailDraft } from "@/lib/outreach/emailDraftFormat";
 import type { OutreachChannel } from "@/lib/outreach/channel";
 
@@ -94,7 +96,7 @@ async function retryUntilRulesPass(
   for (let attempt = 1; attempt <= SUBJECT_RETRY_ATTEMPTS; attempt++) {
     const violations = validateSubject(current.subject, subjectOpts);
     const bodyTerms = bannedTermsInBody(current.body);
-    if (violations.length === 0 && bodyTerms.length === 0) return current;
+    if (violations.length === 0 && bodyTerms.length === 0) return withSpanishMarks(current, ctx.input.language);
 
     const feedback = [
       violations.length ? `the subject "${current.subject}" was REJECTED because ${describeViolations(violations)}. Write a different subject that obeys every subject rule` : null,
@@ -124,7 +126,19 @@ async function retryUntilRulesPass(
     console.error(`[outreach] body still carries banned vocabulary after ${SUBJECT_RETRY_ATTEMPTS} retries, draft discarded: ${JSON.stringify(remainingBody)}`);
     return null;
   }
-  return current;
+  return withSpanishMarks(current, ctx.input.language);
+}
+
+/**
+ * The last thing every draft passes through, on BOTH exits of the retry loop. Spanish opens a question with ¿ and the
+ * model keeps forgetting: both drafts the automatic path wrote on 2026-11-19 ended in "?" with no "¿".
+ *
+ * Repaired rather than retried: it is orthography, so the fix cannot change meaning, and a retry would spend a model
+ * call on a punctuation mark. Repaired rather than asked for in the prompt, because a prompt instruction is a
+ * request - 78.6% of live subjects once broke a rule that was written there.
+ */
+function withSpanishMarks(m: ParsedEmailMessage, language: MessageLanguage): ParsedEmailMessage {
+  return { ...m, subject: addSpanishOpeningMarks(m.subject, language), body: addSpanishOpeningMarks(m.body, language) };
 }
 
 export type GenerateSubjectResult = { ok: true; subject: string } | { ok: false; errorKey: "generationFailed" | "invalidModelOutput" | "gatewayNotConfigured" };
