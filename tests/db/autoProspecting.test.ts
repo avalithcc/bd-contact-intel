@@ -20,7 +20,7 @@ const sequenceIds: string[] = [];
 
 type Seed = { ck: string; personId: string; bdId: string };
 
-async function seed(name: string, o: { emailStatus?: string; enabled?: boolean; closed?: boolean; bdId?: string; roleGroup?: string } = {}): Promise<Seed> {
+async function seed(name: string, o: { emailStatus?: string; enabled?: boolean; closed?: boolean; bdId?: string; roleGroup?: string; country?: string | null; companyCountry?: string } = {}): Promise<Seed> {
   const { db } = await import("@/db");
   const { bd, company, jobPosting, person, targetCompany } = await import("@/db/schema");
   const ck = key(name);
@@ -31,7 +31,7 @@ async function seed(name: string, o: { emailStatus?: string; enabled?: boolean; 
     bdId = b!.id;
     bdIds.push(bdId);
   }
-  await db.insert(company).values({ companyKey: ck, displayName: `Acme ${name}` });
+  await db.insert(company).values({ companyKey: ck, displayName: `Acme ${name}`, country: o.companyCountry ?? null });
   await db.insert(targetCompany).values({ companyKey: ck, displayName: `Acme ${name}`, ats: "lever", config: {} });
   await db.insert(jobPosting).values({
     companyKey: ck, externalId: "1", title: "Senior Backend Engineer", location: "Austin, TX", url: "https://example.test/1",
@@ -40,7 +40,7 @@ async function seed(name: string, o: { emailStatus?: string; enabled?: boolean; 
   const email = `${ck}@example.test`;
   const [p] = await db
     .insert(person)
-    .values({ firstName: name, lastName: run, email, emailNormalized: email, emailStatus: o.emailStatus ?? "verified", emailSource: "apollo", company: `Acme ${name}`, companyKey: ck, roleGroup: o.roleGroup ?? "c_level_tech", jobTitle: "CTO", ownerBdId: bdId })
+    .values({ firstName: name, lastName: run, email, emailNormalized: email, emailStatus: o.emailStatus ?? "verified", emailSource: "apollo", company: `Acme ${name}`, companyKey: ck, roleGroup: o.roleGroup ?? "c_level_tech", jobTitle: "CTO", ownerBdId: bdId, country: o.country === undefined ? "Argentina" : o.country })
     .returning();
   return { ck, personId: p!.id, bdId };
 }
@@ -205,6 +205,33 @@ test("gate 3: an open task, a recent email or an active sequence keeps a contact
   }
   assert.deepEqual(reasons, { task: "open_follow_up", email: "recent_outreach", sequence: "in_active_sequence" });
   assert.equal(m.calls.filter((c) => /Acme (task|email|sequence)/.test(c)).length, 0);
+});
+
+test("language: the person's own country decides it, not the company's, and no guess is ever written", async () => {
+  const { consumeSignals } = await import("@/lib/prospecting/consumer");
+  const usAtArgentineCo = await seed("us-person", { country: "United States", companyCountry: "Argentina" });
+  const arAtUsCo = await seed("ar-person", { country: "Argentina", companyCountry: "United States" });
+  const noCountry = await seed("no-country", { country: null, companyCountry: "United States" });
+  const germany = await seed("germany", { country: "Germany", companyCountry: "Argentina" });
+  const m = fakeModel();
+  for (const s of [usAtArgentineCo, arAtUsCo, noCountry, germany]) await produce(s.bdId);
+  await consumeSignals({ execute: true, generate: m.generate });
+
+  const result: Record<string, unknown[]> = {};
+  for (const [label, s] of [["us", usAtArgentineCo], ["ar", arAtUsCo], ["none", noCountry], ["germany", germany]] as const) {
+    const [sig] = await signalsOf(s.ck);
+    const [d] = await draftsOf(sig!.id);
+    assert.ok(sig!.consumedAt, label);
+    result[label] = [d!.outcome, d!.language, d!.reason, d!.body === null];
+  }
+  assert.deepEqual(result, {
+    us: ["drafted", "en", null, false],
+    ar: ["drafted", "es", null, false],
+    none: ["refused", null, "language_unknown", true],
+    germany: ["refused", null, "language_unknown", true],
+  });
+  assert.equal(m.calls.filter((c) => /Acme (no-country|germany)/.test(c)).length, 0, "the model must never be asked to write without a language");
+  assert.ok(m.calls.some((c) => c.includes("Acme us-person")), "the US person was drafted");
 });
 
 test("the screen read lists the draft with the signal that caused it, and refusals with their reason", async () => {

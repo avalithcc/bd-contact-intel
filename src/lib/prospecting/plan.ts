@@ -5,6 +5,8 @@
  * a warning: the owner learns whether a gate works by reading the refusals.
  */
 import { parseDbTimestamp } from "@/lib/db/timestamp";
+import { resolveProspectLanguage } from "@/lib/prospecting/language";
+import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
 import type { OutreachMessageCompany } from "@/lib/outreach/messagePrompt";
 
 /** Drafts per BD per Argentina day. Deliberately low: the owner reads every one of them before anything is allowed to send. */
@@ -31,7 +33,8 @@ export type RefusalReason =
   | "company_is_sender"
   | "no_open_posting"
   | "invalid_model_output"
-  | "banned_vocabulary";
+  | "banned_vocabulary"
+  | "language_unknown";
 
 /** One leadership contact at the company of an unconsumed signal, as the consumer's single read returns it. */
 export type CandidateRawRow = {
@@ -45,6 +48,7 @@ export type CandidateRawRow = {
   role_group: string | null;
   company: string | null;
   preferred_language: string | null;
+  country: string | null;
   email_status: string;
   bd_id: string;
   bd_name: string;
@@ -68,6 +72,7 @@ export interface ProspectCandidate {
   roleGroup: string | null;
   company: string | null;
   preferredLanguage: string | null;
+  language: MessageLanguage | null;
   emailStatus: string;
   bdId: string;
   bdName: string;
@@ -92,6 +97,7 @@ export function candidateFromRow(r: CandidateRawRow): ProspectCandidate {
     roleGroup: r.role_group,
     company: r.company,
     preferredLanguage: r.preferred_language,
+    language: resolveProspectLanguage(r.preferred_language, r.country),
     emailStatus: r.email_status,
     bdId: r.bd_id,
     bdName: r.bd_name,
@@ -112,6 +118,7 @@ function blocker(c: ProspectCandidate, now: Date): RefusalReason | null {
   if (c.alreadyDrafted) return "already_drafted";
   const cutoff = now.getTime() - AUTO_PROSPECTING_COOLDOWN_DAYS * 86_400_000;
   if (c.lastTouchAt && c.lastTouchAt.getTime() > cutoff) return "recent_outreach";
+  if (!c.language) return "language_unknown";
   return null;
 }
 

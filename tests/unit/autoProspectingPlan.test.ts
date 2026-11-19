@@ -13,6 +13,7 @@ import {
   planProspectRun,
   type CandidateRawRow,
 } from "@/lib/prospecting/plan";
+import { ENGLISH_LANGUAGE_COUNTRIES, SPANISH_LANGUAGE_COUNTRIES } from "@/lib/prospecting/language";
 import { FOLLOW_UP_ENTRY_DAYS } from "@/lib/followUp/cycle";
 import { bd } from "@/db/schema";
 import type { OutreachMessageCompany } from "@/lib/outreach/messagePrompt";
@@ -31,6 +32,7 @@ function raw(over: Partial<CandidateRawRow> = {}): CandidateRawRow {
     role_group: "c_level_tech",
     company: "Acme",
     preferred_language: null,
+    country: "Argentina",
     email_status: "verified",
     bd_id: "bd-1",
     bd_name: "Bea",
@@ -133,6 +135,52 @@ const company = (over: Partial<OutreachMessageCompany> = {}): OutreachMessageCom
   miamiCount: 0,
   offshoreCount: 0,
   ...over,
+});
+
+describe("gate 4: the language comes from the person's own country, and a guess is a refusal", () => {
+  const out = (o: Partial<CandidateRawRow>) => {
+    const [d] = plan([raw(o)]);
+    return d!.kind === "draft" ? ["draft", d!.candidate.language] : [d!.kind, d!.kind === "refuse" ? d!.reason : null];
+  };
+
+  it("writes English to a US person and Spanish to an Argentine one", () => {
+    assert.deepEqual(out({ country: "United States" }), ["draft", "en"]);
+    assert.deepEqual(out({ country: "Argentina" }), ["draft", "es"]);
+  });
+
+  it("refuses a person with no country, and records why", () => {
+    assert.deepEqual(out({ country: null }), ["refuse", "language_unknown"]);
+    assert.deepEqual(out({ country: "  " }), ["refuse", "language_unknown"]);
+  });
+
+  it("refuses a country in neither list instead of falling back to a language", () => {
+    for (const country of ["Germany", "India", "Brazil", "Brasil", "Atlantis"]) {
+      assert.deepEqual(out({ country }), ["refuse", "language_unknown"], country);
+    }
+  });
+
+  it("matches case- and accent-insensitively, and by the Spanish spelling too", () => {
+    assert.deepEqual(out({ country: "UNITED STATES" }), ["draft", "en"]);
+    assert.deepEqual(out({ country: "méxico" }), ["draft", "es"]);
+    assert.deepEqual(out({ country: "Estados Unidos" }), ["draft", "en"]);
+    assert.deepEqual(out({ country: "Perú" }), ["draft", "es"]);
+  });
+
+  it("lets a declared preferred_language win over the country", () => {
+    assert.deepEqual(out({ country: "Argentina", preferred_language: "en" }), ["draft", "en"]);
+    assert.deepEqual(out({ country: null, preferred_language: "es" }), ["draft", "es"]);
+    assert.deepEqual(out({ country: "Germany", preferred_language: "en" }), ["draft", "en"]);
+  });
+
+  it("falls to the next leader who has a country when the best one has none", () => {
+    const [d] = plan([raw({ country: null }), raw({ person_id: "person-2", country: "Mexico" })]);
+    assert.equal(d!.kind === "draft" ? d!.candidate.personId : null, "person-2");
+  });
+
+  it("keeps both country lists explicit, disjoint, and Brazil out of Spanish", () => {
+    assert.ok(!SPANISH_LANGUAGE_COUNTRIES.has("BR"));
+    for (const iso of ENGLISH_LANGUAGE_COUNTRIES) assert.ok(!SPANISH_LANGUAGE_COUNTRIES.has(iso), iso);
+  });
 });
 
 describe("gate 2: the generator can refuse", () => {

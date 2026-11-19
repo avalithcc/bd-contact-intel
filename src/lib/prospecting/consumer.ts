@@ -21,7 +21,6 @@ import { openCycleRowSql } from "@/lib/followUp/openCycle";
 import { activeMemberStateSql } from "@/lib/sequences/activeMembership";
 import { buildPersonMessageInput } from "@/lib/outreach/personMessageInput";
 import { runGenerateOutreachMessage } from "@/lib/outreach/generateMessage";
-import { DEFAULT_MESSAGE_LANGUAGE, isMessageLanguage } from "@/lib/outreach/messageLanguage";
 import { signatureWillFollow } from "@/lib/signature/compose";
 import type { RoleGroupKey } from "@/lib/roleGroups";
 import { verifiedLeaderAtSql } from "@/lib/prospecting/producer";
@@ -43,7 +42,7 @@ export async function readCandidates(limit = SIGNAL_BATCH): Promise<ProspectCand
   const rank = sql.join(LEADERSHIP_ROLE_GROUPS.map((g) => sql`${g}`), sql`, `);
   const rows = await db.execute<CandidateRawRow>(sql`
     select s.id::text as signal_id, s.company_key, s.data as signal_data,
-      p.id::text as person_id, p.first_name, p.last_name, p.job_title, p.role_group, p.company, p.preferred_language, p.email_status,
+      p.id::text as person_id, p.first_name, p.last_name, p.job_title, p.role_group, p.company, p.preferred_language, p.country, p.email_status,
       b.id::text as bd_id, b.name as bd_name, b.signature_html as bd_signature_html, b.auto_prospecting_enabled as bd_enabled,
       exists (select 1 from sequence_member sm where sm.person_id = p.id and ${activeMemberStateSql("sm")}) as in_active_sequence,
       (exists (select 1 from task t where t.person_id = p.id and t.status = 'open')
@@ -126,7 +125,9 @@ async function draftOne(c: ProspectCandidate, generate: typeof generateText | un
   const refusal = companyFactRefusal(company?.displayName ?? c.company, company);
   if (refusal) return { ...base, outcome: "refused", reason: refusal };
 
-  const language = isMessageLanguage(c.preferredLanguage) ? c.preferredLanguage : DEFAULT_MESSAGE_LANGUAGE;
+  // The planner already refused a candidate with no resolvable language; this is the same answer, asserted before the model is called.
+  const language = c.language;
+  if (!language) return { ...base, outcome: "refused", reason: "language_unknown" };
   const built = buildPersonMessageInput({
     person: { firstName: c.firstName, lastName: c.lastName, jobTitle: c.jobTitle, roleGroup: (c.roleGroup ?? null) as RoleGroupKey | null, industry: null, companyKey: c.companyKey, company: company?.displayName ?? c.company },
     connection: null,

@@ -1949,6 +1949,7 @@ export const en = {
       no_open_posting: "No concrete open posting to write from",
       invalid_model_output: "The model returned something unusable",
       banned_vocabulary: "The draft used banned vocabulary",
+      language_unknown: "The person has no country, or a country outside the language lists: fill in the country to write to them",
     },
   },
   tendersPage: {
