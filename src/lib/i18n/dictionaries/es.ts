@@ -1933,6 +1933,7 @@ export const es: typeof en = {
       no_open_posting: "No hay una vacante abierta concreta de la que escribir",
       invalid_model_output: "El modelo devolvió algo inutilizable",
       banned_vocabulary: "El borrador usaba vocabulario prohibido",
+      language_unknown: "La persona no tiene país, o su país no está en la lista de idiomas: completá el país para poder escribirle",
     },
   },
   tendersPage: {
