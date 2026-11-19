@@ -18,6 +18,7 @@ import {
   missingRequirementKeys,
   parseTenderAnalysis,
   requirementFollowUpPrompt,
+  toTenderAnalysis,
 } from "@/lib/tenders/analysis";
 import { runTenderAnalysis } from "@/lib/tenders/analyse";
 
@@ -175,4 +176,36 @@ test("the completed object is exactly what the normal parser would have accepted
   const direct = parseTenderAnalysis(JSON.stringify(complete))!;
   assert.equal(direct.mustListIncluded, true);
   assert.equal(direct.pages, 23);
+});
+
+/**
+ * The round trip through the database. `saveTenderAnalysis` stores this module's OWN output, in which every requirement
+ * key has been filled in, and `tenderWorkspace` hands that stored object back to `toTenderAnalysis`. Deriving
+ * mustListIncluded from key presence alone therefore turned a stored `false` back into `true` on every read, and the
+ * ficha showed "el pliego no lo indica" for four requirements the model had never been asked to confirm.
+ */
+test("an incomplete reading survives the trip through the database still incomplete", () => {
+  const incomplete = parseTenderAnalysis(JSON.stringify(PARTIAL))!;
+  assert.equal(incomplete.mustListIncluded, false);
+
+  // Exactly what saveTenderAnalysis writes and tenderWorkspace reads back.
+  const reread = toTenderAnalysis(JSON.parse(JSON.stringify(incomplete)));
+  assert.ok(reread);
+  assert.equal(reread.mustListIncluded, false, "a stored false must never be recomputed as true");
+  assert.equal(reread.requirements.registration, "SIPRO vigente (Articulo 16)");
+
+  // And a second round trip does not drift either.
+  assert.equal(toTenderAnalysis(JSON.parse(JSON.stringify(reread)))!.mustListIncluded, false);
+});
+
+test("a complete reading survives the round trip complete", () => {
+  const complete = parseTenderAnalysis(JSON.stringify({ ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH } }))!;
+  assert.equal(complete.mustListIncluded, true);
+  assert.equal(toTenderAnalysis(JSON.parse(JSON.stringify(complete)))!.mustListIncluded, true);
+});
+
+test("the flag can only be lowered: a model that volunteers it still has to have answered the keys", () => {
+  assert.equal(parseTenderAnalysis(JSON.stringify({ ...PARTIAL, mustListIncluded: true }))!.mustListIncluded, false);
+  const complete = { ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH }, mustListIncluded: false };
+  assert.equal(parseTenderAnalysis(JSON.stringify(complete))!.mustListIncluded, false);
 });

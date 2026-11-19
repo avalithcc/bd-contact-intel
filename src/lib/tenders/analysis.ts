@@ -52,7 +52,15 @@ export function toTenderAnalysis(value: unknown): TenderAnalysis | null {
   const req = (typeof v.requirements === "object" && v.requirements !== null ? v.requirements : {}) as Record<string, unknown>;
   const requirements = Object.fromEntries(REQUIREMENT_KEYS.map((k) => [k, text(req[k], 1500)])) as unknown as TenderRequirements;
   const pages = typeof v.pages === "number" && Number.isInteger(v.pages) && v.pages > 0 ? v.pages : null;
-  const mustListIncluded = MUST_LIST_KEYS.every((k) => k in req);
+  /**
+   * The flag can only ever be LOWERED here, never raised, because this function runs TWICE on the same reading: once on
+   * the model's answer, and again on what was stored - and what is stored is this function's own output, where the
+   * requirement keys have all been filled in. Deriving it from key presence alone therefore resurrected a `false` as
+   * `true` on every read, which put "el pliego no lo indica" on four requirements the model was never asked to confirm.
+   * A stored `false` now survives the round trip, and a model that volunteers `true` still has to have answered the keys.
+   */
+  const claimed = typeof v.mustListIncluded === "boolean" ? v.mustListIncluded : true;
+  const mustListIncluded = claimed && MUST_LIST_KEYS.every((k) => k in req);
   return { summary, viability, requirements, pages, mustListIncluded };
 }
 
