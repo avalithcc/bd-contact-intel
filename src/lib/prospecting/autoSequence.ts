@@ -12,12 +12,12 @@ import { db } from "@/db";
 import { emailAccount } from "@/db/schema";
 import { createSequenceRow } from "@/lib/sequences/rosterQueries";
 import { AUTO_PROSPECTING_DAILY_CAP } from "@/lib/prospecting/plan";
+import { AUTO_SEQUENCE_PREFIX, autoSequenceName } from "@/lib/prospecting/autoSequenceName";
 
-export const AUTO_SEQUENCE_PREFIX = "Descubrimiento automático";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-export const autoSequenceName = (bdName: string) => `${AUTO_SEQUENCE_PREFIX} · ${bdName.trim()}`;
+export { AUTO_SEQUENCE_PREFIX, autoSequenceName, isAutoSequenceName } from "@/lib/prospecting/autoSequenceName";
 
 /** The BD's dedicated Sequence id, created on first use. Null when the BD has no connected mailbox (the caller defers). Serialized per BD. */
 export async function ensureAutoSequence(tx: Tx, bdId: string, bdName: string): Promise<string | null> {

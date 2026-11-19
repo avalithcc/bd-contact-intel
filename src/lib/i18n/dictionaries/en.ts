@@ -3821,6 +3821,9 @@ export const en = {
   sequences: {
     eyebrow: "Sequence",
     introLead: "{n} hand-picked contacts with open IT postings and a verified email. The system drafts each message separately from the company's signals;",
+    // See the Spanish note: the standard line claims a human picked them and that the address is verified. Neither is
+    // true of the automatic Sequence, and this is the screen where a send is decided.
+    autoIntroLead: "{n} contacts the system picked on its own from open IT roles; the address is probable and no send has confirmed it yet. Each draft is written separately from the company's signals;",
     introStrong: "nothing leaves without your approval",
     introTail: "Sent from your Gmail account and logged on each contact's record.",
     editSequence: "Edit sequence",
