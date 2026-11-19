@@ -78,8 +78,13 @@ describe("gate 1 and the planner", () => {
     assert.equal(b!.kind, "draft");
   });
 
-  it("uses the cooldown the follow-up queue already uses, not an invented one", () => {
-    assert.equal(AUTO_PROSPECTING_COOLDOWN_DAYS, FOLLOW_UP_ENTRY_DAYS);
+  it("waits 90 days before cold-writing the same person again, and is NOT the follow-up queue's 5", () => {
+    // The owner chose 90 on 2026-11-19. Pinned as a literal on purpose: this number is the only thing standing
+    // between a silent prospect and repeated unanswered mail, because on this path nobody reads the draft first.
+    // It must not drift back to FOLLOW_UP_ENTRY_DAYS, which answers a different question about people already in
+    // a conversation - so that value is asserted to be different rather than merely unused.
+    assert.equal(AUTO_PROSPECTING_COOLDOWN_DAYS, 90);
+    assert.notEqual(AUTO_PROSPECTING_COOLDOWN_DAYS, FOLLOW_UP_ENTRY_DAYS);
   });
 
   it("never drafts twice for the same person", () => {
