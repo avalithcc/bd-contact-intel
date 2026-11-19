@@ -16,6 +16,7 @@ import {
 } from "@/lib/prospecting/plan";
 import { ENGLISH_LANGUAGE_COUNTRIES, SPANISH_LANGUAGE_COUNTRIES } from "@/lib/prospecting/language";
 import { FOLLOW_UP_ENTRY_DAYS } from "@/lib/followUp/cycle";
+import { DAILY_SEND_CAP_WARN_ABOVE, validateDailySendCap } from "@/lib/sequences/capValidation";
 import { bd } from "@/db/schema";
 import type { OutreachMessageCompany } from "@/lib/outreach/messagePrompt";
 
@@ -286,5 +287,21 @@ describe("probable is enough to draft, never enough to send", () => {
         }
       }
     }
+  });
+});
+
+describe("the generation cap matches what the Sequence can send", () => {
+  it("is 8, the same cap the owner's hand-made Sequences send at", () => {
+    // The automatic Sequence was about to be created at 5 while every other one sent 8. Nobody would have noticed
+    // except as a week of half-speed output, so both halves are pinned: the number, and the fact that one constant
+    // feeds both the draft cap and the Sequence's send cap.
+    assert.equal(AUTO_PROSPECTING_DAILY_CAP, 8);
+    assert.equal(AUTO_PROSPECTING_DAILY_CAP, DAILY_SEND_CAP_WARN_ABOVE);
+    const autoSeqSrc = readFileSync("src/lib/prospecting/autoSequence.ts", "utf8");
+    assert.match(autoSeqSrc, /dailySendCap:\s*AUTO_PROSPECTING_DAILY_CAP/);
+  });
+
+  it("stays inside what the product accepts, so the Sequence can actually be created with it", () => {
+    assert.deepEqual(validateDailySendCap(AUTO_PROSPECTING_DAILY_CAP), { ok: true, value: 8, warn: false });
   });
 });
