@@ -9,6 +9,7 @@
 export const SESSION_EXEMPT_ROUTES: readonly string[] = [
   "/api/hiring/sync",
   "/api/hiring/discover",
+  "/api/prospecting/run",
   "/api/leads/ingest",
   "/api/tasks/digest",
   "/api/meetings/digest",

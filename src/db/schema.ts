@@ -1072,6 +1072,7 @@ export const auditLog = pgTable(
     // 'revert_contactos_comerciales_2026_10' (scripts/revert-contactos-comerciales-2026-10.ts
     // deleted the untouched created contacts and cleared the filled phones)
     // 'auto_prospecting_signals' (scripts/auto-prospecting.ts wrote hiring signals; metadata.signalIds is the revert list)
+    // 'auto_prospecting_run' (the daily /api/prospecting/run: counts, stoppedEarly, leftForNextRun; the drafts are listed by prospect_draft)
     // 'gmail_rebackfill' (scripts/rebackfill-gmail-account.ts reset one
     // account's history_id so the cron re-fetches up to two years of mail)
     // 'merge_companies' (scripts/merge-companies.ts folded confirmed duplicate
