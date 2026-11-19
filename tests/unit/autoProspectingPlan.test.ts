@@ -7,6 +7,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
   AUTO_PROSPECTING_COOLDOWN_DAYS,
+  DRAFTABLE_EMAIL_STATUSES,
   AUTO_PROSPECTING_DAILY_CAP,
   candidateFromRow,
   companyFactRefusal,
@@ -56,9 +57,17 @@ describe("gate 1 and the planner", () => {
     assert.equal(d!.kind, "draft");
   });
 
-  it("refuses a probable email: never drafts, records why", () => {
-    const [d] = plan([raw({ email_status: "probable" })]);
-    assert.deepEqual([d!.kind, d!.kind === "refuse" ? d!.reason : null], ["refuse", "email_not_verified"]);
+  // Changed deliberately on 2026-11-19, not a regression: this test used to assert that a probable email was
+  // refused. The owner opened gate 1 to probable AFTER the draft started landing in a Sequence unapproved, where
+  // bulkApprovalGate refuses it until a human opens it. Verified-only existed to stop mail nobody read; the gate
+  // does that now. 34 decision-makers with a fresh open role were blocked by the old rule and nothing else.
+  it("drafts for a probable email, and still refuses an unknown or missing status", () => {
+    const [ok] = plan([raw({ email_status: "probable" })]);
+    assert.equal(ok!.kind, "draft");
+    for (const status of [undefined, "bounced", "unknown"]) {
+      const [d] = plan([raw({ email_status: status })]);
+      assert.deepEqual([d!.kind, d!.kind === "refuse" ? d!.reason : null], ["refuse", "email_not_verified"], String(status));
+    }
   });
 
   it("skips a contact with an active sequence", () => {
@@ -239,5 +248,43 @@ describe("the dedicated Sequence needs a mailbox", () => {
     assert.deepEqual(planProspectRun(candidates, drafted, NOW), planProspectRun(candidates, drafted, NOW));
     assert.equal(JSON.stringify(candidates), before);
     assert.deepEqual([...drafted], [["bd-1", 1]]);
+  });
+});
+
+describe("probable is enough to draft, never enough to send", () => {
+  // Owner's decision, 2026-11-19. Both halves are pinned here on purpose: the first alone would let a future
+  // auto-send path inherit the looser rule by reusing the constant, which is exactly the mistake to prevent.
+  it("accepts a probable email for DRAFTING, and keeps unknown or missing statuses out", () => {
+    assert.deepEqual([...DRAFTABLE_EMAIL_STATUSES], ["verified", "probable"]);
+    const draftable = (status: string | null) =>
+      (DRAFTABLE_EMAIL_STATUSES as readonly string[]).includes(status ?? "");
+    assert.ok(draftable("verified"));
+    assert.ok(draftable("probable"));
+    for (const s of [null, "", "bounced", "unknown", "invalid"]) assert.ok(!draftable(s), String(s));
+  });
+
+  it("the producer's SQL accepts exactly the same statuses as the planner's gate 1", () => {
+    // A signal produced for someone the planner then refuses is wasted work; the reverse hides opportunities
+    // silently. They are two languages expressing one rule, so drift is only visible if something asserts it.
+    const sqlSrc = readFileSync("src/lib/prospecting/producer.ts", "utf8");
+    for (const status of DRAFTABLE_EMAIL_STATUSES) {
+      assert.ok(sqlSrc.includes(`'${status}'`), `producer SQL must accept ${status}`);
+    }
+    assert.ok(!/email_status = '/.test(sqlSrc), "producer must not pin a single status any more");
+  });
+
+  it("nothing in the prospecting path can send, so review is what makes probable safe", () => {
+    // The guarantee behind the owner's decision: the draft reaches a Sequence unapproved and bulkApprovalGate
+    // refuses it until a human opens it. If this ever fails, the probable rule above must be reverted with it.
+    const SEND = /gmail|resend|scheduledEmail|sendSchedule|sequences\/(release|run|compose|send)|email\/send/i;
+    for (const f of readdirSync("src/lib/prospecting")) {
+      if (!f.endsWith(".ts")) continue;
+      const src = readFileSync(`src/lib/prospecting/${f}`, "utf8");
+      for (const line of src.split("\n")) {
+        if (line.trimStart().startsWith("import") || line.includes("require(")) {
+          assert.ok(!SEND.test(line), `${f} must not import a send path: ${line.trim()}`);
+        }
+      }
+    }
   });
 });

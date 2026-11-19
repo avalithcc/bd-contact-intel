@@ -124,10 +124,17 @@ test("the producer writes one signal for a verified decision-maker and never a s
   await assert.rejects(() => db.insert(signal).values({ companyKey: a.ck, source: "hiring", data: sig!.data as object }), /signal_hiring_posting_unique|duplicate key/);
 });
 
-test("a probable email produces no signal", async () => {
-  const a = await seed("probable", { emailStatus: "probable" });
-  await produce(a.bdId);
-  assert.equal((await signalsOf(a.ck)).length, 0);
+// Changed with gate 1 on 2026-11-19: a probable email now DOES produce a signal, because the draft it leads to
+// lands in a Sequence unapproved. The producer and the planner must accept the same statuses - a signal produced
+// for someone the planner refuses is wasted work, and the reverse hides opportunities with no trace.
+test("a probable email produces a signal, and an unusable status does not", async () => {
+  const ok = await seed("probable", { emailStatus: "probable" });
+  await produce(ok.bdId);
+  assert.equal((await signalsOf(ok.ck)).length, 1, "probable is draftable");
+
+  const no = await seed("bounced", { emailStatus: "bounced" });
+  await produce(no.bdId);
+  assert.equal((await signalsOf(no.ck)).length, 0, "an unusable status stays out");
 });
 
 test("a verified email that is not a decision-maker produces no signal", async () => {
