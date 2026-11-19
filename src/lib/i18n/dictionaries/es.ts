@@ -3819,6 +3819,10 @@ export const es: typeof en = {
   sequences: {
     eyebrow: "Secuencia",
     introLead: "{n} contactos elegidos a mano, con vacantes IT abiertas y correo verificado. El sistema redacta cada borrador por separado usando las señales de la empresa;",
+    // The automatic Sequence's own wording. The standard line says "elegidos a mano" and "correo verificado", and in
+    // THIS Sequence both are false: the system picked them, and Lusha-revealed addresses are probable until a send
+    // confirms one. It is the screen where a send is decided, so it must not claim a human vetted the recipient.
+    autoIntroLead: "{n} contactos que eligió el sistema solo, a partir de vacantes IT abiertas; el correo es probable y todavía no lo confirmó ningún envío. Cada borrador se redacta por separado usando las señales de la empresa;",
     introStrong: "nada sale sin tu aprobación",
     introTail: "Enviada desde tu cuenta de Gmail y registrada en la ficha de cada contacto.",
     editSequence: "Editar secuencia",
