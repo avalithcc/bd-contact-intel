@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
+import { requireTendersEnabled } from "@/lib/tenders/enabled";
 import { importTenderFile, type TenderImportReport } from "@/lib/tenders/importFile";
 import { MAX_TENDERS_PER_IMPORT, setTenderTriage } from "@/lib/tenders/importDb";
 import { matchesMagic } from "@/lib/email/attachments/magic";
@@ -28,6 +29,7 @@ export type ImportTendersState =
 export async function importTendersAction(_prev: ImportTendersState, formData: FormData): Promise<ImportTendersState> {
   // Admin-only like the whole section: the file and the actor come from the request, the authority from the session. A non-admin gets AdminRequiredError, never a report.
   const me = await requireAdmin();
+  requireTendersEnabled();
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "missingFile" };
   if (file.size > MAX_FILE_BYTES) return { ok: false, error: "tooBig" };
@@ -49,6 +51,7 @@ export async function importTendersAction(_prev: ImportTendersState, formData: F
 /** Admin-only (the whole Licitaciones section is). Tenders are company-wide, not per BD. */
 export async function setTenderTriageAction(id: string, status: string): Promise<void> {
   const me = await requireAdmin();
+  requireTendersEnabled();
   if (!isTenderTriage(status)) throw new Error("Unknown tender state");
   const found = await setTenderTriage(id, status, undefined, me.id);
   if (!found) throw new Error("Tender not found");
@@ -59,6 +62,7 @@ export async function setTenderTriageAction(id: string, status: string): Promise
 /** An admin may overrule the model on one tender ("auto" gives the decision back to it); the move is logged with who made it. */
 export async function setTenderRelevanceAction(id: string, choice: string): Promise<void> {
   const me = await requireAdmin();
+  requireTendersEnabled();
   if (!isRelevanceChoice(choice)) throw new Error("Unknown relevance choice");
   const found = await setTenderRelevance(id, choice, undefined, me.id);
   if (!found) throw new Error("Tender not found");
@@ -69,6 +73,7 @@ export async function setTenderRelevanceAction(id: string, choice: string): Prom
 /** An admin may assign a tender to an admin, or release it with an empty value (the write refuses a non-admin owner); the move is logged with who made it. */
 export async function setTenderOwnerAction(id: string, ownerBdId: string): Promise<void> {
   const me = await requireAdmin();
+  requireTendersEnabled();
   const found = await setTenderOwner(id, ownerBdId === "" ? null : ownerBdId, me.id);
   if (!found) throw new Error("Tender or BD not found");
   revalidatePath("/licitaciones");
@@ -81,6 +86,7 @@ export async function setTenderOwnerAction(id: string, ownerBdId: string): Promi
  */
 export async function setTenderRequirementStatusAction(id: string, key: string, status: string | undefined, note?: string): Promise<void> {
   const me = await requireAdmin();
+  requireTendersEnabled();
   if (!isRequirementKey(key) || (status !== undefined && !isRequirementStatus(status)) || (note !== undefined && typeof note !== "string")) throw new Error("Unknown requirement or state");
   const found = await setRequirementStatus(id, key, { status, note }, me.id);
   if (!found) throw new Error("Tender not found");
@@ -90,6 +96,7 @@ export async function setTenderRequirementStatusAction(id: string, key: string, 
 /** An admin may edit the one shared note; the change is logged with who made it. */
 export async function saveTenderNoteAction(id: string, text: string): Promise<boolean> {
   const me = await requireAdmin();
+  requireTendersEnabled();
   const found = await saveTenderNote(id, typeof text === "string" ? text : "", me.id);
   if (found) revalidatePath(`/licitaciones/${id}`);
   return found;
@@ -101,6 +108,7 @@ export async function saveTenderNoteAction(id: string, text: string): Promise<bo
  */
 export async function registerTenderDocumentAction(input: { tenderId: string; storagePath: string; filename: string; size: number }): Promise<{ ok: boolean }> {
   const me = await requireAdmin();
+  requireTendersEnabled();
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user || typeof input?.storagePath !== "string" || !tenderDocumentPathBelongsTo(input.storagePath, data.user.id)) return { ok: false };
@@ -120,6 +128,7 @@ export type AnalyseTenderResult = { ok: true } | { ok: false; error: "noDocument
  */
 export async function analyseTenderAction(tenderId: string): Promise<AnalyseTenderResult> {
   const me = await requireAdmin();
+  requireTendersEnabled();
   if (!isUuid(tenderId)) return { ok: false, error: "noDocument" };
   const doc = await getCurrentTenderDocument(tenderId);
   if (!doc) return { ok: false, error: "noDocument" };

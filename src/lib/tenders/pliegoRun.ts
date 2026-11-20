@@ -8,6 +8,7 @@
  */
 import { NextResponse } from "next/server";
 import { isValidBearer } from "@/lib/cronAuth";
+import { TENDERS_ENABLED } from "@/lib/tenders/enabled";
 import type { PliegoOutcome } from "@/lib/tenders/pliegoFetch";
 
 export type { PliegoOutcome };
@@ -109,8 +110,10 @@ export async function runPliegoDownload(deps: PliegoRunDeps): Promise<PliegoRunS
 }
 
 /** Auth first: a wrong or missing bearer gets a 401 and `run` is never called. 500 when the run refused, so the caller sees it. */
-export async function handlePliegoRequest(request: Request, o: { secret: string | undefined; run: () => Promise<PliegoRunSummary> }): Promise<Response> {
+export async function handlePliegoRequest(request: Request, o: { secret: string | undefined; enabled?: boolean; run: () => Promise<PliegoRunSummary> }): Promise<Response> {
   if (!isValidBearer(request.headers.get("authorization"), o.secret)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Module paused (TENDERS_ENABLED): a plain answer and NO work, so nothing reads the database or calls the public portal.
+  if (!(o.enabled ?? TENDERS_ENABLED)) return NextResponse.json({ status: "disabled" });
   const result = await o.run();
   return NextResponse.json(result, { status: result.status === "refused" ? 500 : 200 });
 }

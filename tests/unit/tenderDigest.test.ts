@@ -17,7 +17,7 @@ function dt(id: string, daysLeft: number): DigestTender {
 }
 
 test("a BD with zero tasks and one tender closing in 3 days DOES get an email", () => {
-  const email = buildDigestEmail(RECIPIENT, NO_TASKS, SITE, [], { mine: [dt("1", 3)], unowned: [] });
+  const email = buildDigestEmail(RECIPIENT, NO_TASKS, SITE, [], { mine: [dt("1", 3)], unowned: [] }, true);
   assert.ok(email, "expected an email for a BD with only a closing tender");
   assert.match(email.subject, /licitaci/i);
   assert.ok(email.text.includes("Tender 1"));
@@ -30,7 +30,7 @@ test("a BD with zero tasks, zero follow-ups and zero tenders still gets null", (
 });
 
 test("unowned tenders are labelled as having nobody on them, apart from the BD's own", () => {
-  const email = buildDigestEmail(RECIPIENT, NO_TASKS, SITE, [], { mine: [dt("1", 3)], unowned: [dt("2", 10)] });
+  const email = buildDigestEmail(RECIPIENT, NO_TASKS, SITE, [], { mine: [dt("1", 3)], unowned: [dt("2", 10)] }, true);
   assert.ok(email);
   assert.ok(email.text.includes("Tender 1") && email.text.includes("Tender 2"));
   assert.match(email.text, /sin responsable/i);
@@ -113,7 +113,7 @@ test("the recipient list includes a BD who has NO tasks and NO follow-ups but ow
   const recipients = buildDigestRecipients(groupDigestTaskRowsByBd([]), new Map(), plan);
   assert.deepEqual([...recipients.keys()], ["bd-ana"]);
   const r = recipients.get("bd-ana")!;
-  const email = buildDigestEmail({ name: r.bdName, email: r.bdEmail }, { today: [], yesterday: [], overdue: [] }, SITE, [], r.tenders);
+  const email = buildDigestEmail({ name: r.bdName, email: r.bdEmail }, { today: [], yesterday: [], overdue: [] }, SITE, [], r.tenders, true);
   assert.ok(email);
 });
 

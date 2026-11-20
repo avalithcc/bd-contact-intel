@@ -27,6 +27,7 @@ import {
   renderEmailText,
   type Tone,
 } from "@/lib/mailer/emailLayout";
+import { TENDERS_ENABLED } from "@/lib/tenders/enabled";
 import { NO_TENDERS, renderTenderSections, tenderCount, type DigestTenders } from "@/lib/tasks/digestTenders";
 
 export interface DigestTask extends TaskSubjectInput {
@@ -286,8 +287,8 @@ function countsStrip(groups: DigestGroups<DigestTask>, expiring: readonly Expiri
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.surface1}" style="margin:0 0 24px;background-color:${C.surface1};border:1px solid ${C.line};border-radius:8px;border-collapse:separate;"><tr>${cells.join("")}</tr></table>`;
 }
 
-const DIGEST_REASON =
-  "Recibís este resumen cada mañana porque tenés tareas, seguimientos o licitaciones por cerrar en Avalith CRM. Si no hay nada por atender, no enviamos nada.";
+const digestReason = (tendersEnabled: boolean): string =>
+  `Recibís este resumen cada mañana porque tenés ${tendersEnabled ? "tareas, seguimientos o licitaciones por cerrar" : "tareas o seguimientos"} en Avalith CRM. Si no hay nada por atender, no enviamos nada.`;
 
 /**
  * Builds the digest's subject/html/text, or `null` when every group AND the expiring follow-ups are empty
@@ -300,8 +301,12 @@ export function buildDigestEmail(
   groups: DigestGroups<DigestTask>,
   siteBaseUrl: string,
   expiring: readonly ExpiringFollowUp[] = [],
-  tenders: DigestTenders = NO_TENDERS,
+  tendersIn: DigestTenders = NO_TENDERS,
+  tendersEnabled: boolean = TENDERS_ENABLED,
 ): DigestEmail | null {
+  // Paused module: whatever the caller passes, the digest has no tender block, count, wording or link.
+  const tenders = tendersEnabled ? tendersIn : NO_TENDERS;
+  const DIGEST_REASON = digestReason(tendersEnabled);
   // Every source counts here. This check once ignored follow-ups and a BD with no tasks got no warning, which is the BD who needs it.
   if (groups.today.length + groups.overdue.length + groups.yesterday.length + expiring.length + tenderCount(tenders) === 0) return null;
 

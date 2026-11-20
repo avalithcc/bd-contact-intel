@@ -166,12 +166,12 @@ test("a save that throws counts as that tender's failure, not the run's", async 
 test("auth first: a wrong bearer gets 401 and the run is never called", async () => {
   let called = false;
   const run = async () => (called = true, await runPortalFetch(deps().d));
-  const res = await handlePortalRequest(new Request("http://x", { headers: { authorization: "Bearer wrong" } }), { secret: "s", run });
+  const res = await handlePortalRequest(new Request("http://x", { headers: { authorization: "Bearer wrong" } }), { secret: "s", enabled: true, run });
   assert.equal(res.status, 401);
   assert.equal(called, false);
-  const none = await handlePortalRequest(new Request("http://x"), { secret: undefined, run });
+  const none = await handlePortalRequest(new Request("http://x"), { secret: undefined, enabled: true, run });
   assert.equal(none.status, 401);
-  const good = await handlePortalRequest(new Request("http://x", { headers: { authorization: "Bearer s" } }), { secret: "s", run });
+  const good = await handlePortalRequest(new Request("http://x", { headers: { authorization: "Bearer s" } }), { secret: "s", enabled: true, run });
   assert.equal(good.status, 200);
 });
 

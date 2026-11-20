@@ -12,6 +12,7 @@ import {
 import { isNavItemActive, shouldSetPending } from "@/lib/nav/pendingNav";
 import type { NavLabels } from "@/lib/i18n/navLabels";
 import { fillTemplate } from "@/lib/i18n/template";
+import { TENDERS_ENABLED } from "@/lib/tenders/enabled";
 import {
   ContactsIcon,
   CompaniesIcon,
@@ -325,15 +326,17 @@ export function Sidebar({
             {labels.auditLog}
           </Link>
           {/* Public tenders are a business decision, so the entry lives here and not in NAVIGATION (rendered for every BD). */}
-          <Link
-            href="/licitaciones"
-            className={`nav-item${isActive("/licitaciones") ? " active" : ""}`}
-            aria-current={isActive("/licitaciones") ? "page" : undefined}
-            onClick={markPending("/licitaciones")}
-          >
-            <TendersIcon className="icon" />
-            {labels.tenders}
-          </Link>
+          {TENDERS_ENABLED && (
+            <Link
+              href="/licitaciones"
+              className={`nav-item${isActive("/licitaciones") ? " active" : ""}`}
+              aria-current={isActive("/licitaciones") ? "page" : undefined}
+              onClick={markPending("/licitaciones")}
+            >
+              <TendersIcon className="icon" />
+              {labels.tenders}
+            </Link>
+          )}
           <Link
             href="/admin/lusha"
             className={`nav-item${isActive("/admin/lusha") ? " active" : ""}`}

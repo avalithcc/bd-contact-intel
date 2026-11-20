@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { TENDERS_ENABLED } from "@/lib/tenders/enabled";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getDictionary } from "@/lib/i18n/server";
@@ -10,6 +11,8 @@ import { TenderFicha } from "./TenderFicha";
 export const dynamic = "force-dynamic";
 
 export default async function TenderPage({ params }: { params: Promise<{ id: string }> }) {
+  // Module on standby (src/lib/tenders/enabled.ts): the page does not exist.
+  if (!TENDERS_ENABLED) notFound();
   try {
     await requireAdmin();
   } catch (err) {

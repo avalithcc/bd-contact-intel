@@ -13,7 +13,7 @@ import {
 } from "@/lib/tasks/digestQueries";
 import { buildDigestRecipients, groupDigestTaskRowsByBd } from "@/lib/tasks/digestRecipients";
 import { getClosingTendersForDigest, getTenderDigestRecipients } from "@/lib/tenders/digestQueries";
-import { planTenderDigest } from "@/lib/tenders/digestPlan";
+import { loadTenderDigestPlan } from "@/lib/tenders/digestGate";
 import { tenderCount } from "@/lib/tasks/digestTenders";
 import { digestRunHasFailure } from "@/lib/tasks/digestOutcome";
 import { sanitizeSendError } from "@/lib/tasks/sendErrorSanitizer";
@@ -89,9 +89,8 @@ export async function GET(request: Request) {
 
   // Tender deadlines, admin-only like the section. Unowned ones (and those owned by a non-admin) go to every admin, so the admin list is read only when there is a tender. The loop below runs over the
   // union of all three sources: a BD with no tasks and a closing tender is exactly who must not be skipped.
-  const closingTenders = await getClosingTendersForDigest(now);
-  const everyone = closingTenders.length > 0 ? await getTenderDigestRecipients() : [];
-  const tenderPlan = planTenderDigest(closingTenders, everyone, now);
+  // Paused module (TENDERS_ENABLED): nothing is read, so no tender reaches any recipient.
+  const tenderPlan = await loadTenderDigestPlan(now, { getClosing: (n) => getClosingTendersForDigest(n), getRecipients: () => getTenderDigestRecipients() });
 
   const recipients = buildDigestRecipients(byBd, followUpsByBd, tenderPlan);
 

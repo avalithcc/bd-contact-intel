@@ -141,12 +141,12 @@ test("bearer first: a wrong or missing token gets 401 and the run is never calle
     return { status: "ok", attempted: 0, downloaded: 0, skipped: 0, notFound: 0, failed: 0, skippedCooldown: 0, stoppedEarly: false, leftForNextRun: 0 } as const;
   };
   const req = (auth?: string) => new Request("http://x/api/tenders/pliegos", { headers: auth ? { authorization: auth } : {} });
-  assert.equal((await handlePliegoRequest(req(), { secret: "s", run })).status, 401);
-  assert.equal((await handlePliegoRequest(req("Bearer nope"), { secret: "s", run })).status, 401);
-  assert.equal((await handlePliegoRequest(req("Bearer undefined"), { secret: undefined, run })).status, 401);
+  assert.equal((await handlePliegoRequest(req(), { secret: "s", enabled: true, run })).status, 401);
+  assert.equal((await handlePliegoRequest(req("Bearer nope"), { secret: "s", enabled: true, run })).status, 401);
+  assert.equal((await handlePliegoRequest(req("Bearer undefined"), { secret: undefined, enabled: true, run })).status, 401);
   assert.equal(ran, 0);
-  assert.equal((await handlePliegoRequest(req("Bearer s"), { secret: "s", run })).status, 200);
-  const refused = await handlePliegoRequest(req("Bearer s"), { secret: "s", run: async () => ({ status: "refused", reason: "no_admin" }) });
+  assert.equal((await handlePliegoRequest(req("Bearer s"), { secret: "s", enabled: true, run })).status, 200);
+  const refused = await handlePliegoRequest(req("Bearer s"), { secret: "s", enabled: true, run: async () => ({ status: "refused", reason: "no_admin" }) });
   assert.equal(refused.status, 500);
 });
 

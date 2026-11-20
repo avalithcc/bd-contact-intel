@@ -9,6 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { isValidBearer } from "@/lib/cronAuth";
+import { TENDERS_ENABLED } from "@/lib/tenders/enabled";
 import type { PortalOutcome } from "@/lib/tenders/portalFetch";
 import { planOpeningCorrection, type OpeningCorrection } from "@/lib/tenders/openingCorrection";
 
@@ -98,7 +99,9 @@ export async function runPortalFetch(deps: PortalRunDeps): Promise<PortalRunSumm
 }
 
 /** Auth first: a wrong or missing bearer gets a 401 and `run` is never called. */
-export async function handlePortalRequest(request: Request, o: { secret: string | undefined; run: () => Promise<PortalRunSummary> }): Promise<Response> {
+export async function handlePortalRequest(request: Request, o: { secret: string | undefined; enabled?: boolean; run: () => Promise<PortalRunSummary> }): Promise<Response> {
   if (!isValidBearer(request.headers.get("authorization"), o.secret)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Module paused (TENDERS_ENABLED): a plain answer and NO work, so nothing reads the database or calls the public portal.
+  if (!(o.enabled ?? TENDERS_ENABLED)) return NextResponse.json({ status: "disabled" });
   return NextResponse.json(await o.run());
 }

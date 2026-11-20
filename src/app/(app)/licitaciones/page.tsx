@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { TENDERS_ENABLED } from "@/lib/tenders/enabled";
 import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getDictionary } from "@/lib/i18n/server";
@@ -21,6 +22,8 @@ export const dynamic = "force-dynamic";
 
 /** `?ver=todas` is the one-click way to everything, discarded and closed included; anything else is the default view. */
 export default async function TendersPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+  // Module on standby (src/lib/tenders/enabled.ts): the page does not exist.
+  if (!TENDERS_ENABLED) notFound();
   const view = (await searchParams).ver === "todas" ? "all" : "relevant";
   // Admin-only: a public tender is a business decision, not BD work. Admin screens 404 for everyone else.
   try {
