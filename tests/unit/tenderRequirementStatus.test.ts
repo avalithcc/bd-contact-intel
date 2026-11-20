@@ -68,10 +68,10 @@ test("lines are keyed: a re-analysis with other text keeps each answer on the sa
 const docWith = (analysis: ReturnType<typeof analysisOf>): TenderDocumentView => ({ id: "d1", filename: "p.pdf", sizeBytes: 1, createdAt: new Date("2026-11-10T10:00:00Z"), uploadedBy: null, analysis, analyzedAt: new Date("2026-11-10T10:00:00Z"), analyzedBy: null });
 const detail = (a: ReturnType<typeof analysisOf>, requirementStatuses: TenderDetail["requirementStatuses"]): TenderDetail => ({
   tender: { id: "44444444-4444-4444-8444-444444444444", processNumber: "P-1", fileNumber: "E", name: "N", processType: "L", openingAt: new Date("2026-12-09T13:00:00Z"), portalStatus: "P", executingUnit: "1", financialAdminService: "1", triageStatus: "a_revisar", note: null, aiRelevant: true, aiReason: null, aiClassifiedAt: null, relevanceOverride: null, ownerBdId: null, createdAt: new Date(), updatedAt: new Date(), daysLeft: 21, closed: false },
-  portal: null, documents: [docWith(a)], events: [], bdOptions: [], requirementStatuses,
+  portal: null, documents: [docWith(a)], events: [], bdOptions: [], requirementStatuses, requirementNotes: {},
 });
 const calls: [string, string, string][] = [];
-const actions = { setTriage: async () => {}, saveNote: async () => true, registerDocument: async () => ({ ok: true }), analyse: async () => ({ ok: true as const }), setOwner: async () => {}, setRequirementStatus: async (id: string, key: string, status: string) => { calls.push([id, key, status]); } };
+const actions = { setTriage: async () => {}, saveNote: async () => true, registerDocument: async () => ({ ok: true }), analyse: async () => ({ ok: true as const }), setOwner: async () => {}, setRequirementStatus: async (id: string, key: string, status: string | undefined) => { calls.push([id, key, status ?? ""]); } };
 const router = { push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} } as never;
 const render = (d: TenderDetail) => renderToStaticMarkup(createElement(AppRouterContext.Provider, { value: router }, createElement(ToastProvider, null, createElement(TenderFicha, { detail: d, labels: es.tenderDetail, triageLabels: es.tendersPage.triage, actions }))));
 
@@ -94,4 +94,65 @@ test("the action opens with requireAdmin, is registered in the ficha page and va
 
 test("both dictionaries carry the strings, all plain strings", () => {
   for (const d of [es, en]) for (const k of ["reqStatusPending", "reqStatusHave", "reqStatusMissing", "reqStatusLabel", "reqStatusError", "eventRequirement"] as const) assert.equal(typeof d.tenderDetail[k], "string", k);
+});
+
+// ---- the per-requirement note ----
+import { MAX_REQUIREMENT_NOTE_CHARS, keepsRequirementRow, normalizeRequirementNote, planRequirementWrite } from "@/lib/tenders/requirementStatus";
+
+test("the row is kept unless the status is pending AND the note is empty (one test per branch)", () => {
+  assert.equal(keepsRequirementRow("pending", null), false, "pending + empty deletes");
+  assert.equal(keepsRequirementRow("pending", "lo está averiguando administración"), true, "pending + note keeps");
+  assert.equal(keepsRequirementRow("have", null), true, "have + empty keeps");
+  assert.equal(keepsRequirementRow("have", "vencido, lo renuevan en marzo"), true, "have + note keeps");
+});
+
+test("the note is trimmed, blank is none, and it is capped at 200 characters", () => {
+  assert.equal(MAX_REQUIREMENT_NOTE_CHARS, 200);
+  assert.equal(normalizeRequirementNote("  vencido  "), "vencido");
+  assert.equal(normalizeRequirementNote("   "), null);
+  assert.equal(normalizeRequirementNote("x".repeat(300))!.length, 200);
+});
+
+test("a status change keeps the note, and a note change keeps the status", () => {
+  const old = { status: "have" as const, note: "vencido" };
+  assert.deepEqual(planRequirementWrite(old, { status: "missing" }), { op: "upsert", status: "missing", note: "vencido", statusChanged: true, noteChanged: false });
+  assert.deepEqual(planRequirementWrite(old, { note: " renovado " }), { op: "upsert", status: "have", note: "renovado", statusChanged: false, noteChanged: true });
+  // Back to pending with a note: the row survives, status stored as pending.
+  assert.deepEqual(planRequirementWrite(old, { status: "pending" }), { op: "upsert", status: "pending", note: "vencido", statusChanged: true, noteChanged: false });
+});
+
+test("pending with the note cleared deletes; nothing changed logs nothing", () => {
+  assert.equal(planRequirementWrite({ status: "pending", note: "x" }, { note: "" }).op, "delete");
+  assert.equal(planRequirementWrite({ status: "have", note: null }, { status: "pending" }).op, "delete");
+  const none = planRequirementWrite(undefined, { status: "pending" });
+  assert.equal(none.op, "delete");
+  assert.equal(none.statusChanged || none.noteChanged, false);
+  const same = planRequirementWrite({ status: "have", note: "a" }, { status: "have", note: "a" });
+  assert.equal(same.statusChanged || same.noteChanged, false);
+  // A note on a requirement with no row yet starts it as pending.
+  assert.deepEqual(planRequirementWrite(undefined, { note: "lo pedimos" }), { op: "upsert", status: "pending", note: "lo pedimos", statusChanged: false, noteChanged: true });
+});
+
+test("the clipboard line carries the note after the status, plain text on one line", () => {
+  const text = mustListText(analysisOf("ISO").requirements, es.tenderDetail, { processNumber: "P-1", name: "N" }, { team: "have" }, { team: "vencido, lo renuevan en marzo", guarantee: "lo está averiguando\nadministración" });
+  const body = text.split("\n").filter((l) => l.startsWith("- "));
+  assert.equal(body.length, 8);
+  assert.ok(body.find((l) => l.includes(es.tenderDetail.reqTeam))!.endsWith(`(${es.tenderDetail.reqStatusHave}): vencido, lo renuevan en marzo`));
+  assert.ok(body.find((l) => l.includes(es.tenderDetail.reqGuarantee))!.endsWith(`(${es.tenderDetail.reqStatusPending}): lo está averiguando administración`));
+  assert.ok(!body.find((l) => l.includes(es.tenderDetail.reqRegistration))!.includes("): "));
+});
+
+test("the ficha renders a note input and save button per requirement, filled with the stored note", () => {
+  const html = render({ ...detail(analysisOf("ISO"), { team: "have" }), requirementNotes: { team: "vencido" } });
+  assert.equal(html.split('data-requirement-note="').length - 1, 8);
+  assert.match(html, /<input[^>]*data-requirement-note="team"[^>]*value="vencido"/);
+  assert.match(html, /<input[^>]*maxLength="200"|<input[^>]*maxlength="200"/i);
+});
+
+test("the action takes an optional note after requireAdmin, and the dictionaries carry the strings", () => {
+  const src = readFileSync(join(__dirname, "..", "..", "src/app/(app)/licitaciones/actions.ts"), "utf8");
+  const body = src.slice(src.indexOf("export async function setTenderRequirementStatusAction"));
+  assert.ok(body.indexOf("requireAdmin") < body.indexOf("setRequirementStatus("));
+  assert.match(body.split("\n")[0], /note\?: string/);
+  for (const d of [es, en]) for (const k of ["reqNoteLabel", "reqNotePlaceholder", "reqNoteSave", "reqNoteSaving", "reqNoteError", "eventRequirementNote", "eventRequirementNoteCleared"] as const) assert.equal(typeof d.tenderDetail[k], "string", k);
 });

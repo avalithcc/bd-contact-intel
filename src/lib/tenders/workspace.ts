@@ -7,7 +7,7 @@ import { normalizeNote } from "./note";
 import { toTenderAnalysis, type TenderAnalysis } from "./analysis";
 import type { BdOption, TenderDetail, TenderEventKind } from "./detail";
 import { tenderTiming } from "./timing";
-import { isRequirementKey, isRequirementStatus, type RequirementKey, type RequirementStatus, type RequirementStatuses } from "./requirementStatus";
+import { isRequirementKey, isRequirementStatus, planRequirementWrite, type RequirementChange, type RequirementKey, type RequirementNotes, type RequirementRowState, type RequirementStatuses } from "./requirementStatus";
 
 /** The log shows the most recent movements; a tender worked over months stays well under this. */
 export const TENDER_EVENT_LIMIT = 100;
@@ -50,7 +50,7 @@ const eventsJson = sql`(
     limit ${TENDER_EVENT_LIMIT}
   ) y)`;
 
-const requirementStatusJson = sql`(select coalesce(json_object_agg(r.requirement_key, r.status), '{}'::json) from tender_requirement_status r where r.tender_id = tender.id)`;
+const requirementStatusJson = sql`(select coalesce(json_object_agg(r.requirement_key, json_build_object('status', r.status, 'note', r.note)), '{}'::json) from tender_requirement_status r where r.tender_id = tender.id)`;
 
 const bdOptionsJson = sql`(select coalesce(json_agg(json_build_object('id', b.id, 'name', b.name) order by b.name), '[]'::json) from bd b where b.role = 'admin')`;
 
@@ -62,7 +62,7 @@ const bdOptionsJson = sql`(select coalesce(json_agg(json_build_object('id', b.id
 export async function getTenderDetail(id: string, now: Date = new Date(), database: Pick<typeof db, "select"> = db): Promise<TenderDetail | null> {
   if (!isUuid(id)) return null;
   const [row] = await database
-    .select({ t: tender, portal: tenderPortal, docs: documentsJson.mapWith((v) => v as RawDocument[]), events: eventsJson.mapWith((v) => v as RawEvent[]), bds: bdOptionsJson.mapWith((v) => v as BdOption[]), statuses: requirementStatusJson.mapWith((v) => v as Record<string, string>) })
+    .select({ t: tender, portal: tenderPortal, docs: documentsJson.mapWith((v) => v as RawDocument[]), events: eventsJson.mapWith((v) => v as RawEvent[]), bds: bdOptionsJson.mapWith((v) => v as BdOption[]), statuses: requirementStatusJson.mapWith((v) => v as Record<string, { status: string; note: string | null }>) })
     .from(tender)
     .leftJoin(tenderPortal, eq(tenderPortal.tenderId, tender.id))
     .where(eq(tender.id, id))
@@ -73,7 +73,8 @@ export async function getTenderDetail(id: string, now: Date = new Date(), databa
     portal: row.portal,
     bdOptions: row.bds,
     // Same round trip as the rest; a row whose key or value is not one we know (hand-edited) is dropped rather than shown.
-    requirementStatuses: Object.fromEntries(Object.entries(row.statuses).filter(([k, v]) => isRequirementKey(k) && (v === "have" || v === "missing"))) as RequirementStatuses,
+    requirementStatuses: Object.fromEntries(Object.entries(row.statuses).filter(([k, v]) => isRequirementKey(k) && (v.status === "have" || v.status === "missing")).map(([k, v]) => [k, v.status])) as RequirementStatuses,
+    requirementNotes: Object.fromEntries(Object.entries(row.statuses).filter(([k, v]) => isRequirementKey(k) && v.note).map(([k, v]) => [k, v.note])) as RequirementNotes,
     documents: row.docs.map((d) => ({
       ...d,
       createdAt: parseDbTimestamp(d.createdAt),
@@ -193,31 +194,44 @@ export async function setTenderOwner(id: string, ownerBdId: string | null, actor
 export async function setRequirementStatus(
   tenderId: string,
   key: RequirementKey,
-  status: RequirementStatus,
+  change: RequirementChange,
   actorBdId: string,
   database: Pick<typeof db, "execute"> = db,
 ): Promise<boolean> {
-  if (!isUuid(tenderId) || !isRequirementKey(key) || !isRequirementStatus(status)) return false;
-  const rows = rowsOf<{ found: number }>(
+  if (!isUuid(tenderId) || !isRequirementKey(key) || (change.status !== undefined && !isRequirementStatus(change.status))) return false;
+  // Two round trips on purpose: the rule for keeping the row needs the merged state, and it lives in a pure module, not in SQL.
+  const found = rowsOf<{ found: number; status: string | null; note: string | null }>(
     await database.execute(sql`
-      with t as (select id from tender where id = ${tenderId}::uuid),
-      old as (select status from tender_requirement_status where tender_id = ${tenderId}::uuid and requirement_key = ${key}),
-      del as (
-        delete from tender_requirement_status where tender_id = ${tenderId}::uuid and requirement_key = ${key} and ${status} = 'pending' returning 1
-      ),
-      ups as (
-        insert into tender_requirement_status (tender_id, requirement_key, status, set_by_bd_id, updated_at)
-        select t.id, ${key}, ${status}, ${actorBdId}::uuid, clock_timestamp() from t where ${status} <> 'pending'
-        on conflict (tender_id, requirement_key) do update set status = excluded.status, set_by_bd_id = excluded.set_by_bd_id, updated_at = excluded.updated_at
-        returning 1
-      ),
-      ev as (
-        insert into tender_event (tender_id, actor_bd_id, kind, detail, created_at)
-        select t.id, ${actorBdId}::uuid, 'requirement', jsonb_build_object('key', ${key}::text, 'to', ${status}::text), clock_timestamp()
-        from t where coalesce((select status from old), 'pending') <> ${status}
-        returning 1
-      )
-      select (select count(*) from t)::int as found`),
-  );
-  return (rows[0]?.found ?? 0) > 0;
+      select (select count(*) from tender where id = ${tenderId}::uuid)::int as found,
+             r.status, r.note
+      from (select 1) one left join tender_requirement_status r on r.tender_id = ${tenderId}::uuid and r.requirement_key = ${key}`),
+  )[0];
+  if (!found || found.found === 0) return false;
+  const old: RequirementRowState | undefined = found.status && isRequirementStatus(found.status) ? { status: found.status, note: found.note } : undefined;
+  const plan = planRequirementWrite(old, change);
+  await database.execute(sql`
+    with
+    del as (
+      delete from tender_requirement_status where tender_id = ${tenderId}::uuid and requirement_key = ${key} and ${plan.op} = 'delete' returning 1
+    ),
+    ups as (
+      insert into tender_requirement_status (tender_id, requirement_key, status, note, set_by_bd_id, updated_at)
+      select id, ${key}, ${plan.status}, ${plan.note}::text, ${actorBdId}::uuid, clock_timestamp() from tender where id = ${tenderId}::uuid and ${plan.op} = 'upsert'
+      on conflict (tender_id, requirement_key) do update set status = excluded.status, note = excluded.note, set_by_bd_id = excluded.set_by_bd_id, updated_at = excluded.updated_at
+      returning 1
+    ),
+    ev as (
+      insert into tender_event (tender_id, actor_bd_id, kind, detail, created_at)
+      select id, ${actorBdId}::uuid, 'requirement', jsonb_build_object('key', ${key}::text, 'to', ${plan.status}::text), clock_timestamp()
+      from tender where id = ${tenderId}::uuid and ${plan.statusChanged}::boolean
+      returning 1
+    ),
+    evn as (
+      insert into tender_event (tender_id, actor_bd_id, kind, detail, created_at)
+      select id, ${actorBdId}::uuid, 'requirement_note', jsonb_build_object('key', ${key}::text, 'text', coalesce(${plan.note}::text, '')), clock_timestamp() + interval '1 millisecond'
+      from tender where id = ${tenderId}::uuid and ${plan.noteChanged}::boolean
+      returning 1
+    )
+    select 1`);
+  return true;
 }

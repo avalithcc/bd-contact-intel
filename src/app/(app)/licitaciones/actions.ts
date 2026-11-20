@@ -75,11 +75,14 @@ export async function setTenderOwnerAction(id: string, ownerBdId: string): Promi
   revalidatePath(`/licitaciones/${id}`);
 }
 
-/** An admin records what administration answered for one requirement (pending clears it); the move is logged with who made it. */
-export async function setTenderRequirementStatusAction(id: string, key: string, status: string): Promise<void> {
+/**
+ * An admin records what administration answered for one requirement: the status, its short note, or both. An absent field is
+ * left alone (the two are independent); pending with no note clears the row. The move is logged with who made it.
+ */
+export async function setTenderRequirementStatusAction(id: string, key: string, status: string | undefined, note?: string): Promise<void> {
   const me = await requireAdmin();
-  if (!isRequirementKey(key) || !isRequirementStatus(status)) throw new Error("Unknown requirement or state");
-  const found = await setRequirementStatus(id, key, status, me.id);
+  if (!isRequirementKey(key) || (status !== undefined && !isRequirementStatus(status)) || (note !== undefined && typeof note !== "string")) throw new Error("Unknown requirement or state");
+  const found = await setRequirementStatus(id, key, { status, note }, me.id);
   if (!found) throw new Error("Tender not found");
   revalidatePath(`/licitaciones/${id}`);
 }

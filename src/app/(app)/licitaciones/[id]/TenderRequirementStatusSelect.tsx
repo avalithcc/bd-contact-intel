@@ -21,7 +21,7 @@ export function TenderRequirementStatusSelect({
   labels: Record<RequirementStatus, string>;
   ariaLabel: string;
   errorLabel: string;
-  setStatus: (id: string, key: string, status: string) => Promise<void>;
+  setStatus: (id: string, key: string, status: string | undefined, note?: string) => Promise<void>;
 }) {
   const { showToast } = useToast();
   const [current, setCurrent] = useState(value);

@@ -83,7 +83,7 @@ function detail(documents: TenderDocumentView[]): TenderDetail {
       aiRelevant: true, aiReason: null, aiClassifiedAt: null, relevanceOverride: null, ownerBdId: null,
       createdAt: new Date("2026-11-01T10:00:00Z"), updatedAt: new Date("2026-11-01T10:00:00Z"), daysLeft: 21, closed: false,
     },
-    portal: null, documents, events: [], bdOptions: [], requirementStatuses: {},
+    portal: null, documents, events: [], bdOptions: [], requirementStatuses: {}, requirementNotes: {},
   };
 }
 

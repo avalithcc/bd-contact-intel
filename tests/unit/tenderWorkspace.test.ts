@@ -104,7 +104,7 @@ function detail(over: { documents?: TenderDocumentView[]; events?: TenderEventVi
     documents: over.documents ?? [],
     events: over.events ?? [],
     bdOptions: [],
-    requirementStatuses: {},
+    requirementStatuses: {}, requirementNotes: {},
   };
 }
 

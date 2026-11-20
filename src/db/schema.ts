@@ -2401,7 +2401,12 @@ export const tenderPortal = pgTable(
 /**
  * What Avalith has, per requirement of a tender, as the administrative area answers. THREE states on purpose, not a checkbox:
  * 'pending' (nobody asked yet - stored as NO row), 'have', 'missing'. An unchecked box would mean both "not asked" and "they
- * said no", which are opposite facts (pending work vs a reason not to bid). Only decisions are stored: setting 'pending' deletes the row.
+ * said no", which are opposite facts (pending work vs a reason not to bid).
+ *
+ * A row is kept while the status is a decision OR the note says something - see keepsRequirementRow in
+ * src/lib/tenders/requirementStatus.ts, which is the only place that rule lives. So `status` CAN hold 'pending' here,
+ * on a row that exists only to carry a note ("administración lo está averiguando"). Raw SQL over this table that
+ * assumes only 'have' and 'missing' is therefore wrong; read the status, do not infer it from the row's existence.
  * `requirement_key` is one of the keys of MUST_LIST_ROWS (src/lib/tenders/mustList.ts), NEVER the requirement's text: the text is
  * model output and changes on every re-analysis, the answer from administration must survive that. `note` is the answer in a few words.
  */

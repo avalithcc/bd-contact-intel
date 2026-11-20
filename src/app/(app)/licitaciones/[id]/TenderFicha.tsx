@@ -15,6 +15,7 @@ import { TenderNoteForm } from "./TenderNoteForm";
 import { TenderOwnerSelect } from "./TenderOwnerSelect";
 import { TenderPortalBlock } from "./TenderPortalBlock";
 import { TenderRequirementStatusSelect } from "./TenderRequirementStatusSelect";
+import { TenderRequirementNote } from "./TenderRequirementNote";
 import { isRequirementKey, type RequirementStatus } from "@/lib/tenders/requirementStatus";
 import { MUST_LIST_ROWS, mustListLines, mustListText } from "@/lib/tenders/mustList";
 
@@ -32,7 +33,7 @@ export interface TenderFichaActions {
   setTriage(id: string, status: string): Promise<void>;
   analyse(tenderId: string): Promise<{ ok: true } | { ok: false; error: string }>;
   setOwner(id: string, ownerBdId: string): Promise<void>;
-  setRequirementStatus(id: string, key: string, status: string): Promise<void>;
+  setRequirementStatus(id: string, key: string, status: string | undefined, note?: string): Promise<void>;
 }
 
 const when = (d: Date) => `${formatArgentinaDayMonthYear(d)}, ${formatArgentinaDayMonthTime(d).split(", ")[1]}`;
@@ -56,6 +57,11 @@ function eventText(e: TenderEventView, l: Dictionary["tenderDetail"], triage: Re
       const status: Record<string, string> = { pending: l.reqStatusPending, have: l.reqStatusHave, missing: l.reqStatusMissing };
       return fillTemplate(l.eventRequirement, { requirement: label, status: status[e.detail.to ?? ""] ?? "" });
     }
+    case "requirement_note": {
+      const key = e.detail.key;
+      const label = key && isRequirementKey(key) ? l[MUST_LIST_ROWS.find(([k]) => k === key)![1]] : (key ?? "");
+      return e.detail.text ? fillTemplate(l.eventRequirementNote, { requirement: label, note: e.detail.text }) : fillTemplate(l.eventRequirementNoteCleared, { requirement: label });
+    }
     case "relevance":
       return e.detail.to === "relevant" ? l.eventRelevanceRelevant : e.detail.to === "irrelevant" ? l.eventRelevanceIrrelevant : l.eventRelevanceAuto;
   }
@@ -65,16 +71,18 @@ function Reading({
   analysis,
   tender,
   statuses,
+  notes,
   labels: l,
   actions,
 }: {
   analysis: TenderAnalysis;
   tender: { id: string; processNumber: string; name: string };
   statuses: TenderDetail["requirementStatuses"];
+  notes: TenderDetail["requirementNotes"];
   labels: Dictionary["tenderDetail"];
   actions: TenderFichaActions;
 }): ReactNode {
-  const lines = mustListLines(analysis.requirements, l, statuses);
+  const lines = mustListLines(analysis.requirements, l, statuses, notes);
   const statusLabels: Record<RequirementStatus, string> = { pending: l.reqStatusPending, have: l.reqStatusHave, missing: l.reqStatusMissing };
   const economicsLines = [
     { label: l.econBudget, value: analysis.economics.budget },
@@ -103,11 +111,18 @@ function Reading({
               ariaLabel={fillTemplate(l.reqStatusLabel, { requirement: line.label })}
               errorLabel={l.reqStatusError}
               setStatus={actions.setRequirementStatus}
+            />{" "}
+            <TenderRequirementNote
+              id={tender.id}
+              requirementKey={line.key}
+              initial={line.note ?? ""}
+              save={actions.setRequirementStatus}
+              labels={{ label: fillTemplate(l.reqNoteLabel, { requirement: line.label }), placeholder: l.reqNotePlaceholder, save: l.reqNoteSave, saving: l.reqNoteSaving, error: l.reqNoteError }}
             />
           </li>
         ))}
       </ul>
-      {analysis.mustListIncluded && <CopyNumber value={mustListText(analysis.requirements, l, tender, statuses)} label={l.mustCopy} doneLabel={l.mustCopied} />}
+      {analysis.mustListIncluded && <CopyNumber value={mustListText(analysis.requirements, l, tender, statuses, notes)} label={l.mustCopy} doneLabel={l.mustCopied} />}
       <p className="strong">{l.economicsTitle}</p>
       {analysis.economicsIncluded ? <p className="help">{l.economicsIntro}</p> : <p className="help">{l.economicsReanalyse}</p>}
       {/* A reading from before the economics block never asked these questions, so no line is shown rather than "not stated". */}
@@ -265,7 +280,7 @@ export function TenderFicha({
                 {fillTemplate(analysis.pages ? l.analysisGeneratedPages : l.analysisGenerated, { filename: doc.filename, pages: String(analysis.pages ?? ""), when: doc.analyzedAt ? when(doc.analyzedAt) : "" })}
                 {doc.analyzedBy ? fillTemplate(l.analysisGeneratedBy, { who: doc.analyzedBy }) : ""}
               </p>
-              <Reading analysis={analysis} tender={t} statuses={detail.requirementStatuses} labels={l} actions={actions} />
+              <Reading analysis={analysis} tender={t} statuses={detail.requirementStatuses} notes={detail.requirementNotes} labels={l} actions={actions} />
             </>
           )}
           {doc && !analysis && <p className="meta">{l.analysisPending}</p>}

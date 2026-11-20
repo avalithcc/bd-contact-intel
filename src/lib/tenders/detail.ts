@@ -1,6 +1,6 @@
 import type { Tender, TenderPortal } from "@/db/schema";
 import type { TenderAnalysis } from "./analysis";
-import type { RequirementStatuses } from "./requirementStatus";
+import type { RequirementNotes, RequirementStatuses } from "./requirementStatus";
 import type { TenderTiming } from "./timing";
 
 /** What the ficha reads. Plain data (no `@/db` value import) so the view and its tests stay client-safe. */
@@ -16,7 +16,7 @@ export interface TenderDocumentView {
   analyzedBy: string | null;
 }
 
-export type TenderEventKind = "triage" | "note" | "document" | "analysis" | "relevance" | "owner" | "requirement";
+export type TenderEventKind = "triage" | "note" | "document" | "analysis" | "relevance" | "owner" | "requirement" | "requirement_note";
 
 export interface TenderEventView {
   id: string;
@@ -40,6 +40,8 @@ export interface TenderDetail {
   bdOptions: BdOption[];
   /** The answers given so far, by requirement key; a key that is absent is pending. Independent of the reading: a re-analysis does not touch it. */
   requirementStatuses: RequirementStatuses;
+  /** The reason behind each answer, by requirement key; independent of the status (a pending requirement can have one). */
+  requirementNotes: RequirementNotes;
   /** Newest first. */
   documents: TenderDocumentView[];
   /** Newest first, bounded. */
