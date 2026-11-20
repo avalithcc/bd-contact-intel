@@ -2152,6 +2152,8 @@ export const en = {
     eventRelevanceRelevant: "Marked the tender as relevant",
     eventRelevanceIrrelevant: "Marked the tender as not relevant",
     eventRelevanceAuto: "Gave relevance back to the automatic call",
+    eventOpeningMoved: "The opening moved from {from} to {to}",
+    eventActorPortal: "COMPR.AR",
     notFoundTitle: "We could not find that tender.",
   },
 

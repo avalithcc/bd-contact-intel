@@ -8,11 +8,12 @@ import { serviceRoleClient } from "@/lib/supabase/serviceRole";
 import { TENDER_DOCUMENTS_BUCKET, tenderDocumentPath } from "@/lib/tenders/document";
 import { fetchPliegoPdf } from "@/lib/tenders/pliegoFetch";
 import { PLIEGO_ABSENT_ERRORS, PLIEGO_RETRY_ABSENT_HOURS, PLIEGO_RETRY_FAILURE_HOURS, type PliegoCandidate, type PliegoRunDeps } from "@/lib/tenders/pliegoRun";
+import { tenderStillOpenSql } from "@/lib/tenders/openSql";
 import { tenderNotDecidedNoSql } from "@/lib/tenders/relevanceSql";
 import { addTenderDocument } from "@/lib/tenders/workspace";
 
 /**
- * Open, relevant tenders with NO tender_document row, soonest opening first, in ONE round trip. A correlated NOT EXISTS (not a
+ * Still-open (see tenderStillOpenSql: open by the CRM or the portal date), relevant tenders with NO tender_document row, soonest opening first, in ONE round trip. A correlated NOT EXISTS (not a
  * join) so a tender with an upload of the owner's can never be picked, whatever else is on it. A tender whose last pliego attempt
  * is inside its cooldown (see PLIEGO_RETRY_*_HOURS) is "cooling": it sorts last and is dropped from the rows, but the window counts
  * still see it, so the run can say how many it skipped and why. The left join is on the unique `tender_id`, so it cannot fan out.
@@ -31,7 +32,7 @@ export async function selectTendersWithoutDocument(limit: number, database: Pick
     })
     .from(tender)
     .leftJoin(tenderPortal, eq(tenderPortal.tenderId, tender.id))
-    .where(sql`${tender.openingAt} > now() and ${tenderNotDecidedNoSql} and not exists (select 1 from tender_document d where d.tender_id = ${tender.id})`)
+    .where(sql`${tenderStillOpenSql} and ${tenderNotDecidedNoSql} and not exists (select 1 from tender_document d where d.tender_id = ${tender.id})`)
     .orderBy(asc(sql`pliego_cooling`), asc(tender.openingAt), asc(tender.id))
     .limit(limit);
   return {

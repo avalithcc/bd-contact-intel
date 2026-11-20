@@ -94,7 +94,7 @@ test("it never follows a redirect off the portal", async () => {
 
 // ---- the run ----
 
-const cands = (n: number): PortalCandidate[] => Array.from({ length: n }, (_, i) => ({ id: `id-${i}`, processNumber: `P-${i}` }));
+const cands = (n: number): PortalCandidate[] => Array.from({ length: n }, (_, i) => ({ id: `id-${i}`, processNumber: `P-${i}`, openingAt: new Date("2026-12-01T14:00:00Z") }));
 const ok: PortalOutcome = { kind: "ok", portalUrl: "u", fields: { objeto: "o", currency: null, contractDuration: null, offerValidity: null, acceptsExtension: null, questionsUntil: null, openingAt: null, guaranteeOffer: null, guaranteeContract: null, guaranteeChallenge: null, circularCount: 0 } };
 
 function deps(over: Partial<PortalRunDeps> & { rows?: PortalCandidate[]; total?: number; step?: number } = {}) {
@@ -110,6 +110,7 @@ function deps(over: Partial<PortalRunDeps> & { rows?: PortalCandidate[]; total?:
       return ok;
     },
     save: async (c, o) => void saved.push([c.id, o.kind]),
+    applyOpening: async () => true,
     ...over,
   };
   return { d, saved, sleeps };
@@ -118,7 +119,7 @@ function deps(over: Partial<PortalRunDeps> & { rows?: PortalCandidate[]; total?:
 test("every due tender is fetched and saved, with a pause between them and none after the last", async () => {
   const { d, saved, sleeps } = deps();
   const r = await runPortalFetch(d);
-  assert.deepEqual(r, { status: "ok", attempted: 3, fetched: 3, notFound: 0, failed: 0, stoppedEarly: false, leftForNextRun: 0 });
+  assert.deepEqual(r, { status: "ok", attempted: 3, fetched: 3, notFound: 0, failed: 0, openingMoved: 0, stoppedEarly: false, leftForNextRun: 0 });
   assert.equal(saved.length, 3);
   assert.equal(sleeps.length, 2);
 });
@@ -152,7 +153,7 @@ test("one tender's failure never fails the run: it is recorded and the next one 
     rows: cands(4),
   });
   const r = await runPortalFetch(d);
-  assert.deepEqual(r, { status: "ok", attempted: 4, fetched: 1, notFound: 1, failed: 2, stoppedEarly: false, leftForNextRun: 0 });
+  assert.deepEqual(r, { status: "ok", attempted: 4, fetched: 1, notFound: 1, failed: 2, openingMoved: 0, stoppedEarly: false, leftForNextRun: 0 });
   assert.deepEqual(saved.map(([, k]) => k), ["error", "error", "not_found", "ok"]);
 });
 

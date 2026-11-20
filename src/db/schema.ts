@@ -2317,7 +2317,7 @@ export type NewTender = typeof tender.$inferInsert;
  * Its own table rather than audit_log because the log is read on every ficha by tender (audit_log has no index on it) and
  * because these are routine work notes, not the consequential actions audit_log exists for.
  * `kind`: 'triage' (detail {from, to}) | 'note' (detail {text}, "" when cleared) | 'document' (detail {filename}) |
- * 'analysis' (detail {filename}) | 'relevance' (detail {to}) | 'owner' (detail {to: the owner's name, "" when released}) | 'requirement' (detail {key, to: 'pending'|'have'|'missing'}). `actor_bd_id` is nulled when a BD is deleted: the history outlives the person.
+ * 'analysis' (detail {filename}) | 'relevance' (detail {to}) | 'owner' (detail {to: the owner's name, "" when released}) | 'requirement' (detail {key, to: 'pending'|'have'|'missing'}) | 'opening' (detail {from, to}: ISO instants; written by the daily portal run with no actor when COMPR.AR's date differs). `actor_bd_id` is nulled when a BD is deleted: the history outlives the person.
  */
 export const tenderEvent = pgTable(
   "tender_event",

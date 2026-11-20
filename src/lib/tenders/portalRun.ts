@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { isValidBearer } from "@/lib/cronAuth";
 import type { PortalOutcome } from "@/lib/tenders/portalFetch";
+import { planOpeningCorrection, type OpeningCorrection } from "@/lib/tenders/openingCorrection";
 
 export type { PortalOutcome };
 
@@ -22,9 +23,13 @@ export const PORTAL_MAX_PER_RUN = 40;
 /** A tender fetched more recently than this is skipped. */
 export const PORTAL_REFRESH_HOURS = 12;
 
+export { PORTAL_GRACE_DAYS } from "@/lib/tenders/openSql";
+
 export interface PortalCandidate {
   id: string;
   processNumber: string;
+  /** `tender.opening_at` as the query read it: what the portal's date is compared against. */
+  openingAt: Date;
 }
 
 export interface PortalRunDeps {
@@ -35,6 +40,8 @@ export interface PortalRunDeps {
   /** Must not throw; a throw is still counted as that tender's failure. */
   fetchOne: (processNumber: string) => Promise<PortalOutcome>;
   save: (candidate: PortalCandidate, outcome: PortalOutcome, at: Date) => Promise<void>;
+  /** Moves `tender.opening_at` and logs the move, atomically; false when the row already held that instant. */
+  applyOpening: (candidate: PortalCandidate, correction: OpeningCorrection) => Promise<boolean>;
 }
 
 export interface PortalRunSummary {
@@ -43,6 +50,8 @@ export interface PortalRunSummary {
   fetched: number;
   notFound: number;
   failed: number;
+  /** Tenders whose opening date was corrected to the portal's. */
+  openingMoved: number;
   stoppedEarly: boolean;
   leftForNextRun: number;
 }
@@ -50,7 +59,7 @@ export interface PortalRunSummary {
 export async function runPortalFetch(deps: PortalRunDeps): Promise<PortalRunSummary> {
   const deadline = deps.clock() + PORTAL_BUDGET_MS;
   const { rows, total } = await deps.selectDue(PORTAL_MAX_PER_RUN);
-  const s = { attempted: 0, fetched: 0, notFound: 0, failed: 0 };
+  const s = { attempted: 0, fetched: 0, notFound: 0, failed: 0, openingMoved: 0 };
   let stoppedEarly = false;
 
   for (const candidate of rows) {
@@ -68,8 +77,18 @@ export async function runPortalFetch(deps: PortalRunDeps): Promise<PortalRunSumm
     }
     try {
       await deps.save(candidate, outcome, new Date(deps.clock()));
-      if (outcome.kind === "ok") s.fetched++;
-      else if (outcome.kind === "not_found") s.notFound++;
+      if (outcome.kind === "ok") {
+        s.fetched++;
+        // Only a SUCCEEDED fetch that returned a date can correct; its own failure never undoes the fetch.
+        const correction = planOpeningCorrection(candidate.openingAt, outcome.fields.openingAt);
+        if (correction) {
+          try {
+            if (await deps.applyOpening(candidate, correction)) s.openingMoved++;
+          } catch {
+            /* the date stays as it was and the next run tries again */
+          }
+        }
+      } else if (outcome.kind === "not_found") s.notFound++;
       else s.failed++;
     } catch {
       s.failed++;

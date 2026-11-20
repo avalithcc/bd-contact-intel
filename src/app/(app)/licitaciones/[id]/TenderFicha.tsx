@@ -38,7 +38,8 @@ export interface TenderFichaActions {
 
 const when = (d: Date) => `${formatArgentinaDayMonthYear(d)}, ${formatArgentinaDayMonthTime(d).split(", ")[1]}`;
 
-function eventText(e: TenderEventView, l: Dictionary["tenderDetail"], triage: Record<TenderTriage, string>): string {
+/** Exported for the test: the one place a log entry becomes a sentence. */
+export function eventText(e: TenderEventView, l: Dictionary["tenderDetail"], triage: Record<TenderTriage, string>): string {
   const name = (s?: string) => (s && isTenderTriage(s) ? triage[s] : (s ?? ""));
   switch (e.kind) {
     case "triage":
@@ -61,6 +62,10 @@ function eventText(e: TenderEventView, l: Dictionary["tenderDetail"], triage: Re
       const key = e.detail.key;
       const label = key && isRequirementKey(key) ? l[MUST_LIST_ROWS.find(([k]) => k === key)![1]] : (key ?? "");
       return e.detail.text ? fillTemplate(l.eventRequirementNote, { requirement: label, note: e.detail.text }) : fillTemplate(l.eventRequirementNoteCleared, { requirement: label });
+    }
+    case "opening": {
+      const at = (iso?: string) => (iso && !Number.isNaN(new Date(iso).getTime()) ? when(new Date(iso)) : "");
+      return fillTemplate(l.eventOpeningMoved, { from: at(e.detail.from), to: at(e.detail.to) });
     }
     case "relevance":
       return e.detail.to === "relevant" ? l.eventRelevanceRelevant : e.detail.to === "irrelevant" ? l.eventRelevanceIrrelevant : l.eventRelevanceAuto;
@@ -311,7 +316,7 @@ export function TenderFicha({
                     <div className="tl-head">
                       <span className="what">{eventText(e, l, triageLabels)}</span>
                       <span className="when">
-                        {e.actor ?? l.someone}, {when(e.createdAt)}
+                        {e.actor ?? (e.kind === "opening" ? l.eventActorPortal : l.someone)}, {when(e.createdAt)}
                       </span>
                     </div>
                     {e.kind === "note" && e.detail.text && <div className="tl-body"><blockquote>{e.detail.text}</blockquote></div>}

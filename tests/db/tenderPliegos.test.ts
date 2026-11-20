@@ -49,7 +49,7 @@ test("a tender with ANY document, the owner's included, is never selected; one w
     const bare = await seedTender(tx, { opening: 9 });
     const sooner = await seedTender(tx, { opening: 4 });
     const no = await seedTender(tx, { opening: 5, ai: false });
-    const closed = await seedTender(tx, { opening: -1 });
+    const closed = await seedTender(tx, { opening: -30 }); // well past the grace window
     await tx.insert(tenderDocument).values({ tenderId: hand.id, storagePath: "u/d/x.pdf", filename: "x.pdf", sizeBytes: 10, uploadedByBdId: owner!.id });
     const ids = (await selectTendersWithoutDocument(1000, tx)).rows.map((r) => r.id);
     assert.ok(!ids.includes(hand.id) && !ids.includes(no.id) && !ids.includes(closed.id));
@@ -122,5 +122,28 @@ test("a tender that gained a document is excluded whatever its flag says; a row 
     assert.ok((await selectDueTenders(1000, tx)).rows.some((r) => r.id === u.id));
     await stamp(tx, u.id, null, 0);
     assert.equal((await tx.select().from(tenderPortal).where(eq(tenderPortal.tenderId, u.id))).length, 1, "upsert, never a second row");
+  });
+});
+
+test("pliego selection: open by either source, past both is not, and a document excludes either way", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { bd, tenderDocument, tenderPortal } = await import("@/db/schema");
+    const { selectTendersWithoutDocument } = await import("@/lib/tenders/pliegoRunDeps");
+    const [owner] = await tx.insert(bd).values({ name: "ZZ", email: `zz-${Math.random().toString(36).slice(2)}@example.test`, role: "admin" }).returning();
+    const portal = async (t: Awaited<ReturnType<typeof seedTender>>, days: number) => void (await tx.insert(tenderPortal).values({ tenderId: t.id, fetchedAt: new Date(), openingAt: new Date(Date.now() + days * DAY) }));
+    const movedOpen = await seedTender(tx, { opening: -2 });
+    await portal(movedOpen, 5);
+    const pastBoth = await seedTender(tx, { opening: -2 });
+    await portal(pastBoth, -1);
+    const movedWithDoc = await seedTender(tx, { opening: -2 });
+    await portal(movedWithDoc, 5);
+    const futureWithDoc = await seedTender(tx, { opening: 5 });
+    const graceNoPortal = await seedTender(tx, { opening: -2 });
+    for (const t of [movedWithDoc, futureWithDoc]) await tx.insert(tenderDocument).values({ tenderId: t.id, storagePath: `u/d/${t.id}.pdf`, filename: "x.pdf", sizeBytes: 10, uploadedByBdId: owner!.id });
+    const ids = (await selectTendersWithoutDocument(1000, tx)).rows.map((r) => r.id);
+    assert.ok(ids.includes(movedOpen.id), "past the CRM date but open per the portal is selected");
+    assert.ok(!ids.includes(pastBoth.id), "past both is not");
+    assert.ok(!ids.includes(movedWithDoc.id) && !ids.includes(futureWithDoc.id), "a document excludes it either way");
+    assert.ok(ids.includes(graceNoPortal.id), "no portal date, inside the grace window, is selected");
   });
 });

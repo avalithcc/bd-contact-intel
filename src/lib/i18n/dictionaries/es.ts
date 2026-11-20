@@ -2136,6 +2136,8 @@ export const es: typeof en = {
     eventRelevanceRelevant: "Marcó la licitación como relevante",
     eventRelevanceIrrelevant: "Marcó la licitación como no relevante",
     eventRelevanceAuto: "Devolvió la relevancia al criterio automático",
+    eventOpeningMoved: "La apertura se movió del {from} al {to}",
+    eventActorPortal: "COMPR.AR",
     notFoundTitle: "No encontramos esa licitación.",
   },
 
