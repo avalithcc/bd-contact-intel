@@ -178,7 +178,7 @@ test("the progress log shows who and when for a note, a state change, an upload 
 const portalRow = (over: Partial<TenderPortal> = {}): TenderPortal => {
   const parsed = parseCitizenView(readFileSync(new URL("./fixtures/comprar-citizen-view.html", import.meta.url), "utf8"));
   if (!parsed.ok) throw new Error("fixture");
-  return { id: "p1", tenderId: "44444444-4444-4444-8444-444444444444", ...parsed.fields, portalUrl: "https://comprar.gob.ar/PLIEGO/VistaPreviaPliegoCiudadano.aspx?qs=x", fetchedAt: new Date("2026-11-20T12:00:00Z"), fetchError: null, ...over };
+  return { id: "p1", tenderId: "44444444-4444-4444-8444-444444444444", ...parsed.fields, portalUrl: "https://comprar.gob.ar/PLIEGO/VistaPreviaPliegoCiudadano.aspx?qs=x", fetchedAt: new Date("2026-11-20T12:00:00Z"), fetchError: null, pliegoCheckedAt: null, pliegoError: null, ...over };
 };
 
 test("a tender with no portal row shows no portal block at all", () => {

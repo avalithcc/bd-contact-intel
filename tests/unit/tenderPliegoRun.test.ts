@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { handlePliegoRequest, PLIEGO_BUDGET_MS, runPliegoDownload, type PliegoCandidate, type PliegoRunDeps, type PliegoOutcome, type PliegoRunSummary } from "@/lib/tenders/pliegoRun";
+import { handlePliegoRequest, PLIEGO_ABSENT_ERRORS, PLIEGO_BUDGET_MS, PLIEGO_RETRY_ABSENT_HOURS, PLIEGO_RETRY_FAILURE_HOURS, pliegoErrorFor, runPliegoDownload, type PliegoCandidate, type PliegoRunDeps, type PliegoOutcome, type PliegoRunSummary } from "@/lib/tenders/pliegoRun";
 
 const rows = (n: number): PliegoCandidate[] => Array.from({ length: n }, (_, i) => ({ id: `t${i}`, processNumber: `P-${i}` }));
 const pdf: PliegoOutcome = { kind: "ok", bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46]), filename: "a.pdf" };
@@ -12,16 +12,19 @@ function ok(s: PliegoRunSummary) {
   return s;
 }
 
-function deps(over: Partial<PliegoRunDeps> & { candidates?: PliegoCandidate[]; total?: number; outcomes?: Record<string, PliegoOutcome | Error>; stepMs?: number } = {}) {
+function deps(over: Partial<PliegoRunDeps> & { candidates?: PliegoCandidate[]; total?: number; cooling?: number; outcomes?: Record<string, PliegoOutcome | Error>; stepMs?: number } = {}) {
   let now = 0;
-  const log = { fetched: [] as string[], stored: [] as string[], slept: [] as number[] };
+  const log = { fetched: [] as string[], stored: [] as string[], slept: [] as number[], recorded: {} as Record<string, string | null> };
   const d: PliegoRunDeps = {
     clock: () => now,
     sleep: async (ms) => {
       log.slept.push(ms);
     },
     prepare: async () => ({ ok: true }),
-    selectDue: async () => ({ rows: over.candidates ?? rows(3), total: over.total ?? (over.candidates ?? rows(3)).length }),
+    selectDue: async () => ({ rows: over.candidates ?? rows(3), total: over.total ?? (over.candidates ?? rows(3)).length, cooling: over.cooling ?? 0 }),
+    record: async (c, error) => {
+      log.recorded[c.id] = error;
+    },
     fetchOne: async (p) => {
       log.fetched.push(p);
       now += over.stepMs ?? 10_000;
@@ -43,7 +46,7 @@ test("downloads each due tender, strictly in order, pausing between tenders and 
   const s = ok(await runPliegoDownload(d));
   assert.deepEqual(log.fetched, ["P-0", "P-1"]);
   assert.equal(log.slept.length, 1);
-  assert.deepEqual(s, { status: "ok", attempted: 2, downloaded: 2, skipped: 0, notFound: 0, failed: 0, stoppedEarly: false, leftForNextRun: 0 });
+  assert.deepEqual(s, { status: "ok", attempted: 2, downloaded: 2, skipped: 0, notFound: 0, failed: 0, skippedCooldown: 0, stoppedEarly: false, leftForNextRun: 0 });
 });
 
 test("stops STARTING a tender once the budget has passed and reports what it left", async () => {
@@ -75,6 +78,40 @@ test("not found and missing pliego count as notFound; non-pdf, oversized, errors
   assert.deepEqual(log.stored, [], "nothing is stored for a refused body");
 });
 
+test("each outcome records the right pliego_error; success and a document that appeared record null", async () => {
+  const { d, log } = deps({
+    candidates: rows(7),
+    stepMs: 1_000,
+    store: async (c) => (c.id === "t6" ? "skipped" : "stored"),
+    outcomes: { "P-1": { kind: "not_found" }, "P-2": { kind: "no_document" }, "P-3": { kind: "not_pdf" }, "P-4": { kind: "too_large" }, "P-5": { kind: "error", message: "timeout" } },
+  });
+  ok(await runPliegoDownload(d));
+  assert.deepEqual(log.recorded, { t0: null, t1: "not_found", t2: "no_document", t3: "not_pdf", t4: "too_large", t5: "error: timeout", t6: null });
+});
+
+test("a throwing fetch or store records a failure, and a record that throws never fails the run", async () => {
+  const { d, log } = deps({ candidates: rows(2), stepMs: 1_000, outcomes: { "P-0": new Error("boom") }, store: async () => { throw new Error("db"); } });
+  assert.equal(ok(await runPliegoDownload(d)).failed, 2);
+  assert.deepEqual(log.recorded, { t0: "error: boom", t1: "error: store: db" });
+  const s = ok(await runPliegoDownload({ ...d, record: async () => { throw new Error("down"); } }));
+  assert.equal(s.attempted, 2);
+});
+
+test("the cooling count is reported as its own number", async () => {
+  const s = ok(await runPliegoDownload(deps({ candidates: [], total: 0, cooling: 5 }).d));
+  assert.equal(s.skippedCooldown, 5);
+  assert.equal(s.attempted, 0);
+});
+
+test("the two cooldown windows are different, the absent one is longer, and failure messages cannot pose as absent", () => {
+  assert.notEqual(PLIEGO_RETRY_ABSENT_HOURS, PLIEGO_RETRY_FAILURE_HOURS);
+  assert.ok(PLIEGO_RETRY_ABSENT_HOURS > PLIEGO_RETRY_FAILURE_HOURS);
+  assert.equal(PLIEGO_RETRY_ABSENT_HOURS, 24);
+  assert.equal(PLIEGO_RETRY_FAILURE_HOURS, 2);
+  for (const kind of ["not_found", "no_document"] as const) assert.ok((PLIEGO_ABSENT_ERRORS as readonly string[]).includes(pliegoErrorFor({ kind })));
+  for (const o of [{ kind: "not_pdf" }, { kind: "too_large" }, { kind: "error", message: "no_document" }] as const) assert.ok(!(PLIEGO_ABSENT_ERRORS as readonly string[]).includes(pliegoErrorFor(o)));
+});
+
 test("a store that throws is that tender's failure and the run goes on", async () => {
   const { d } = deps({ candidates: rows(2), store: async (c) => { if (c.id === "t0") throw new Error("db"); return "stored"; } });
   const s = ok(await runPliegoDownload(d));
@@ -101,7 +138,7 @@ test("bearer first: a wrong or missing token gets 401 and the run is never calle
   let ran = 0;
   const run = async () => {
     ran++;
-    return { status: "ok", attempted: 0, downloaded: 0, skipped: 0, notFound: 0, failed: 0, stoppedEarly: false, leftForNextRun: 0 } as const;
+    return { status: "ok", attempted: 0, downloaded: 0, skipped: 0, notFound: 0, failed: 0, skippedCooldown: 0, stoppedEarly: false, leftForNextRun: 0 } as const;
   };
   const req = (auth?: string) => new Request("http://x/api/tenders/pliegos", { headers: auth ? { authorization: auth } : {} });
   assert.equal((await handlePliegoRequest(req(), { secret: "s", run })).status, 401);

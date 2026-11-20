@@ -2369,6 +2369,11 @@ export const tenderDocument = pgTable(
  * `fetch_error` is NULL when the last fetch succeeded; on a failed refresh only `fetched_at` and `fetch_error` change, so the
  * last good data stays. `fetch_error = 'not_found'` is a normal outcome (the process is not in the portal's search, as with
  * contrataciones directas), a row with no `portal_url` has never had data. Dates are real instants (Argentina wall clock on the portal).
+ *
+ * `pliego_checked_at` / `pliego_error` belong to the pliego DOWNLOAD (src/lib/tenders/pliegoRun.ts), not to the portal fetch: the last
+ * attempt to bring the pliego and why it failed, so a tender whose organism has not published one is not retried every run. NULL
+ * `pliego_checked_at` = never tried; set with NULL `pliego_error` = the last attempt succeeded. The download may create the row
+ * itself (no portal fetch yet); it then stamps `fetched_at` with the epoch so the portal refresh still treats the tender as stale.
  */
 export const tenderPortal = pgTable(
   "tender_portal",
@@ -2391,6 +2396,8 @@ export const tenderPortal = pgTable(
     portalUrl: text("portal_url"),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
     fetchError: text("fetch_error"),
+    pliegoCheckedAt: timestamp("pliego_checked_at", { withTimezone: true }),
+    pliegoError: text("pliego_error"),
   },
   (t) => ({
     tenderUnique: uniqueIndex("tender_portal_tender_unique").on(t.tenderId),

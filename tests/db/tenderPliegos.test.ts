@@ -71,3 +71,56 @@ test("the guarded insert writes once, and never adds a second document to a tend
     assert.ok(await addTenderDocument({ ...input, storagePath: "u/d/p2.pdf", onlyIfNone: false }, tx), "the manual upload still always adds");
   });
 });
+
+const HOUR = 3600 * 1000;
+async function stamp(tx: Tx, tenderId: string, error: string | null, hoursAgo: number) {
+  const { savePliegoAttempt } = await import("@/lib/tenders/pliegoRunDeps");
+  await savePliegoAttempt({ id: tenderId, processNumber: "x" }, error, new Date(Date.now() - hoursAgo * HOUR), tx);
+}
+
+test("cooldown: absent tenders rest 24h, failed ones 2h, a past cooldown or a success is selected again, and the count says how many rest", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { selectTendersWithoutDocument } = await import("@/lib/tenders/pliegoRunDeps");
+    const fresh = await seedTender(tx, { opening: 5 });
+    const absentRecent = await seedTender(tx, { opening: 5 });
+    const absentOld = await seedTender(tx, { opening: 5 });
+    const failedRecent = await seedTender(tx, { opening: 5 });
+    const failedOld = await seedTender(tx, { opening: 5 });
+    const succeeded = await seedTender(tx, { opening: 5 });
+    await stamp(tx, absentRecent.id, "no_document", 3);
+    await stamp(tx, absentOld.id, "not_found", 25);
+    await stamp(tx, failedRecent.id, "error: timeout", 1);
+    await stamp(tx, failedOld.id, "not_pdf", 3);
+    await stamp(tx, succeeded.id, null, 0);
+    const before = await selectTendersWithoutDocument(1000, tx);
+    const ids = before.rows.map((r) => r.id);
+    assert.ok(!ids.includes(absentRecent.id) && !ids.includes(failedRecent.id));
+    for (const t of [fresh, absentOld, failedOld, succeeded]) assert.ok(ids.includes(t.id));
+    assert.ok(before.cooling >= 2);
+    const limited = await selectTendersWithoutDocument(1, tx);
+    assert.equal(limited.total, before.total, "total ignores the limit and the cooling rows");
+    assert.equal(limited.cooling, before.cooling);
+  });
+});
+
+test("a tender that gained a document is excluded whatever its flag says; a row made by the pliego run keeps the portal job interested", async () => {
+  await inRolledBackTransaction(async (tx) => {
+    const { bd, tenderDocument, tenderPortal } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { selectTendersWithoutDocument } = await import("@/lib/tenders/pliegoRunDeps");
+    const { selectDueTenders } = await import("@/lib/tenders/portalRunDeps");
+    const [owner] = await tx.insert(bd).values({ name: "ZZ", email: `zz-${Math.random().toString(36).slice(2)}@example.test`, role: "admin" }).returning();
+    const t = await seedTender(tx, { opening: 5 });
+    await tx.insert(tenderDocument).values({ tenderId: t.id, storagePath: "u/d/y.pdf", filename: "y.pdf", sizeBytes: 10, uploadedByBdId: owner!.id });
+    await stamp(tx, t.id, "no_document", 100);
+    assert.ok(!(await selectTendersWithoutDocument(1000, tx)).rows.some((r) => r.id === t.id));
+    const u = await seedTender(tx, { opening: 5 });
+    await stamp(tx, u.id, "no_document", 0);
+    const [row] = await tx.select().from(tenderPortal).where(eq(tenderPortal.tenderId, u.id));
+    assert.equal(row!.portalUrl, null);
+    assert.ok(row!.fetchedAt.getTime() < Date.now() - 12 * HOUR);
+    assert.ok((await selectDueTenders(1000, tx)).rows.some((r) => r.id === u.id));
+    await stamp(tx, u.id, null, 0);
+    assert.equal((await tx.select().from(tenderPortal).where(eq(tenderPortal.tenderId, u.id))).length, 1, "upsert, never a second row");
+  });
+});

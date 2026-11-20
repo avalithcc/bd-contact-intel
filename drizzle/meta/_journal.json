@@ -519,6 +519,13 @@
       "when": 1795810800000,
       "tag": "0073_tender_requirement_status",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1795897200000,
+      "tag": "0074_tender_pliego_attempt",
+      "breakpoints": true
     }
   ]
 }
