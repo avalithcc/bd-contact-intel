@@ -213,3 +213,37 @@ test("a clean form renders the Revisado button enabled, carrying the help title 
   assert.ok(html.includes(es.sequences.reviewMarkReviewedHelp), "and explains what it unlocks");
   assert.ok(!html.includes(es.sequences.reviewMarkReviewedDirty), "a clean form is never the unsaved-edits case");
 });
+
+/**
+ * The form is UNCONTROLLED (`defaultValue`), so fresh props never reach the DOM inputs; only a remount re-seeds them,
+ * and the only thing that remounts is `reads` advancing in reloadReducer, which ignores every event while `pending` is
+ * null. So any in-dialog action that REWRITES the stored draft has to arm the reload first, or the new text sits in
+ * the props invisibly until the dialog is closed and reopened.
+ *
+ * The owner hit this regenerating a subject. It cannot be reproduced by rendering, because it needs a click and then a
+ * prop change, and these dialog tests render to static markup. Pinned at the source instead: both callers go through
+ * `armReload`, and nothing dispatches the click behind its back.
+ */
+import { readFileSync } from "node:fs";
+
+const dialogSource = readFileSync("src/app/(app)/sequences/_components/ReviewDialog.tsx", "utf8");
+
+test("every in-dialog action that rewrites the draft arms the reload, and only armReload dispatches the click", () => {
+  const clicks = dialogSource.match(/dispatch\(\{\s*type:\s*"click"/g) ?? [];
+  assert.equal(clicks.length, 1, "the click is dispatched in exactly one place: armReload");
+  assert.match(dialogSource, /function armReload\(\)/, "the helper exists, so the two callers cannot drift");
+
+  for (const [what, handler] of [
+    ["regenerateSubject", /onClick=\{\(\) => \{ armReload\(\); onAction\(\{ type: "regenerateSubject"/],
+    ["reloadCurrent", /onClick=\{\(\) => \{ armReload\(\); onAction\(\{ type: "reloadCurrent"/],
+  ] as const) {
+    assert.match(dialogSource, handler, `${what} must arm the reload before the action`);
+  }
+});
+
+test("the reload timeout does not run while a generation is in flight", () => {
+  // Ten seconds is right for a refetch and far too short for a model call. A timeout firing mid-generation clears
+  // `pending`, and the refreshed subject then arrives to an idle reducer that drops it - the original bug, intermittent.
+  assert.match(dialogSource, /if \(!pending \|\| generating\) return;/);
+  assert.match(dialogSource, /\}, \[pending, generating\]\);/, "generating must be a dependency, or the clock never restarts");
+});

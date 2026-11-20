@@ -59,11 +59,16 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   const version = view ? draftVersion(view.draft.generatedAt, view.draft.editedAt) : null;
   const reloadAt = memberId ? reloadKey(memberId, step) : null;
   useEffect(() => { dispatch({ type: "props", open, key: reloadAt, marker: m }); }, [open, reloadAt, m]);
+  // The clock does NOT run while a generation is in flight for this member. The timeout exists to free the button when a
+  // refetch never answers, and ten seconds is the right patience for a refetch - but a subject regeneration is a model
+  // call that routinely outlasts it, and a timeout that fired mid-generation cleared `pending`, so the refreshed text
+  // arrived to a reducer that ignores everything while idle and the form never re-seeded. That is the original bug
+  // back again, only intermittently, which is strictly worse than always. The clock starts when the generation ends.
   useEffect(() => {
-    if (!pending) return;
+    if (!pending || generating) return;
     const t = setTimeout(() => dispatch({ type: "timeout" }), RELOAD_TIMEOUT_MS);
     return () => clearTimeout(t);
-  }, [pending]);
+  }, [pending, generating]);
   // "Revisado" is an explicit act: opening, closing, Esc and the backdrop mark nothing. The version it sends is the one of
   // the render the form was MOUNTED with (re-taken per open, per member/step and per reload), which is the text the person
   // read: a background refresh that moves the stored text on must make the server refuse with "stale", not be sent along.
@@ -84,6 +89,24 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
   const [pressed, setPressed] = useState<ReviewFooterId | null>(null);
   if (!busy && pressed) setPressed(null);
   if (!m || !view) return null;
+
+  /**
+   * Arm the reload machinery BEFORE an action that rewrites the stored draft.
+   *
+   * The form is UNCONTROLLED (`defaultValue`), so React writes the text into the inputs once, at mount. Fresh data from
+   * router.refresh() changes the props and nothing else: only a remount re-seeds the DOM, and the only thing that
+   * remounts is `reads` advancing in reloadReducer. That reducer ignores every event while `pending` is null
+   * (reviewReload.ts line 22), so an action that did not arm it left the new text sitting in the props, invisible,
+   * until the dialog was closed and reopened. The owner hit exactly that regenerating a subject: "si bien indica que se
+   * hace, no lo muestra en el modal, debo salir del modal y volver a abrir el borrador."
+   *
+   * Both callers go through here so they cannot drift: the next action that rewrites the draft from inside this dialog
+   * must call it too, or it will have the same silent staleness.
+   */
+  function armReload() {
+    if (!m) return;
+    dispatch({ type: "click", key: reloadKey(m.memberId, step), marker: m });
+  }
 
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ") || l.unnamed;
   // An unapproved step 1 draft in another language than today's: the exits are in the alert, Aprobar waits (the server refuses it too).
@@ -124,7 +147,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
     ) : id === "regenerateSubject" ? (
       // Offered HERE because this is where a BD reads the subject and decides it is weak. It was first shipped only in
       // the card's "⋯" menu, and the owner looked for it in this dialog, which is the obvious place to want it.
-      <BusyButton key={id} type="button" pending={generating} pendingLabel={l.generating} className="btn btn-ghost" disabled={busy || regenerateLocked} onClick={() => onAction({ type: "regenerateSubject", memberId: m.memberId })}>
+      <BusyButton key={id} type="button" pending={generating} pendingLabel={l.generating} className="btn btn-ghost" disabled={busy || regenerateLocked} onClick={() => { armReload(); onAction({ type: "regenerateSubject", memberId: m.memberId }); }}>
         <GenerateIcon className="icon" />
         {l.reviewRegenerateSubject}
       </BusyButton>
@@ -182,7 +205,7 @@ export function ReviewDialog({ open, onClose, member: m, step, fromAddress, sche
           <div className="alert alert-warn" role="alert">
             <WarningIcon className="icon" />
             <div className="grow">{l.reviewStaleNotice}</div>
-            <button type="button" className="btn btn-secondary btn-sm" disabled={pending !== null} onClick={() => { dispatch({ type: "click", key: reloadKey(m.memberId, step), marker: m }); onAction({ type: "reloadCurrent", memberId: m.memberId, step }); }}>{l.reviewStaleReload}</button>
+            <button type="button" className="btn btn-secondary btn-sm" disabled={pending !== null} onClick={() => { armReload(); onAction({ type: "reloadCurrent", memberId: m.memberId, step }); }}>{l.reviewStaleReload}</button>
           </div>
         )}
         {mismatch && <LanguageMismatchAlert m={m} mismatch={mismatch} name={name} l={l} ownView={ownView} explain busy={busy} locked={regenerateLocked} onRegenerate={() => onAction({ type: "regenerate", memberId: m.memberId, step })} onKeep={() => onAction({ type: "keepLanguage", memberId: m.memberId, step })} />}
