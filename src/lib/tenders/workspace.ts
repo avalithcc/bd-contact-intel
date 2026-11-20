@@ -109,9 +109,9 @@ export async function saveTenderNote(id: string, raw: string, actorBdId: string,
   return (rows[0]?.found ?? 0) > 0;
 }
 
-/** Registers an uploaded pliego as the tender's newest document and logs it, in ONE statement. Null when the tender does not exist. */
+/** Registers an uploaded pliego as the tender's newest document and logs it, in ONE statement. Null when the tender does not exist, or when `onlyIfNone` is set and it already has a document (the automatic download never adds to one). */
 export async function addTenderDocument(
-  input: { tenderId: string; storagePath: string; filename: string; sizeBytes: number; actorBdId: string },
+  input: { tenderId: string; storagePath: string; filename: string; sizeBytes: number; actorBdId: string; onlyIfNone?: boolean },
   database: Pick<typeof db, "execute"> = db,
 ): Promise<string | null> {
   if (!isUuid(input.tenderId)) return null;
@@ -121,6 +121,7 @@ export async function addTenderDocument(
         insert into tender_document (tender_id, storage_path, filename, size_bytes, uploaded_by_bd_id, created_at)
         select t.id, ${input.storagePath}, ${input.filename}, ${input.sizeBytes}::int, ${input.actorBdId}::uuid, clock_timestamp()
         from tender t where t.id = ${input.tenderId}::uuid
+          and (${input.onlyIfNone ?? false}::boolean is false or not exists (select 1 from tender_document d where d.tender_id = t.id))
         returning id, tender_id
       ),
       ev as (

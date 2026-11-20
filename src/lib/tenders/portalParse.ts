@@ -121,3 +121,20 @@ export function parseSearchPage(html: string): SearchPage {
   const row = /__doPostBack\((?:&#39;|')(ctl00\$CPH1\$GridListaPliegos\$ctl\d+\$lnkNumeroProceso)(?:&#39;|')/.exec(html);
   return { resultCount, rowTarget: row?.[1] ?? null };
 }
+
+const foldLabel = (s: string): string => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const CLAUSULAS_LABEL = /^clausulas particulares\b/;
+
+/**
+ * The `__doPostBack` target that downloads the pliego: the "btnVer" of the row of the Clausulas grid whose document label is
+ * "Clausulas Particulares" (that grid can list several documents). The `ctlNN` index is read from the page, never assumed.
+ */
+export function parsePliegoTarget(html: string): string | null {
+  const rows = html.matchAll(/UC_Clausulas_gvActosAdministrativos_ctl(\d+)_lblDocumento"[^>]*>([^<]*)</g);
+  for (const m of rows) {
+    if (!CLAUSULAS_LABEL.test(foldLabel(unescapeHtml(m[2] ?? "")))) continue;
+    const target = `ctl00$CPH1$UCVistaPreviaPliego$UC_Clausulas$gvActosAdministrativos$ctl${m[1]}$btnVer`;
+    if (html.includes(target)) return target;
+  }
+  return null;
+}

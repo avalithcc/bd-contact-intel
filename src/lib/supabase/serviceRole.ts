@@ -20,3 +20,11 @@ export function serviceRoleAttachmentStorage(): AttachmentStorage | null {
   if (!key || !url) return null;
   return supabaseAttachmentStorage(createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }));
 }
+
+/** The raw service-role client, for the one server job that writes to a bucket with no user session (the pliego download). */
+export function serviceRoleClient() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!key || !url) return null;
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
