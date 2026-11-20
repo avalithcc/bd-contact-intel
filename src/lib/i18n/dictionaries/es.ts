@@ -4277,6 +4277,7 @@ export const es: typeof en = {
     toastApprovedMany: "{n} borradores aprobados y programados.",
     toastCancelled: "Envío cancelado. El contacto volvió a borradores.",
     toastSubjectRegenerated: "Asunto regenerado. El cuerpo quedó igual, y el borrador vuelve a necesitar aprobación.",
+    toastSubjectUnchanged: "Asunto sin cambios. El modelo volvió a proponer el mismo asunto tras varios intentos; probá de nuevo o editalo a mano.",
     toastSubjectEdited: "Ese borrador lo editaste a mano. Abrilo y regenerá desde ahí para no perder tus cambios.",
     toastReminderCancelled: "Aprobación del recordatorio cancelada.",
     toastReminderApproved: "Recordatorio aprobado. Sale el {date} a las {time}.",

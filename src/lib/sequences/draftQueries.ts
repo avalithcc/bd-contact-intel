@@ -253,7 +253,7 @@ export const generateReminderDraft = (bdId: string, sequenceId: string, memberId
 
 export type RegenerateSubjectResult =
   | { ok: true; subject: string }
-  | { ok: false; error: "not_found" | "not_editable" | "no_draft" | "edited" | "generation_failed" };
+  | { ok: false; error: "not_found" | "not_editable" | "no_draft" | "edited" | "generation_failed" | "subject_unchanged" };
 
 /**
  * "Regenerar solo el asunto": rewrites one member's subject and leaves the body exactly as it stands.
@@ -303,8 +303,8 @@ export async function regenerateDraftSubject(
   if (!base) return { ok: false, error: "not_editable" };
 
   const generate = overrides.generateSubject ?? runGenerateOutreachSubject;
-  const generated = await generate({ ...base, subjectOnly: { existingBody: existing.body, currentSubject: existing.subject ?? undefined } });
-  if (!generated.ok) return { ok: false, error: "generation_failed" };
+  const generated = await generate({ ...base, subjectOnly: { existingBody: existing.body, rejectedSubjects: existing.subject ? [existing.subject] : [] } });
+  if (!generated.ok) return { ok: false, error: generated.errorKey === "unchanged" ? "subject_unchanged" : "generation_failed" };
 
   return db.transaction(async (tx) => {
     const [m] = await tx.select({ state: sequenceMember.state }).from(sequenceMember).where(eq(sequenceMember.id, memberId)).for("update");

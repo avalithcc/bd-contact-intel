@@ -21,6 +21,7 @@ import {
 import { extractOutreachSignals, type OutreachSignal } from "@/lib/outreach/messageSignals";
 import { parseEmailModelOutput, parseSubjectModelOutput, capBody, MAX_BODY_CHARS, type ParsedEmailMessage } from "@/lib/outreach/emailOutputParsing";
 import { bannedTermsInBody, describeViolations, validateSubject } from "@/lib/outreach/subjectRules";
+import { repeatsAny } from "@/lib/outreach/subjectDifference";
 import { addSpanishOpeningMarks } from "@/lib/outreach/spanishMarks";
 import type { MessageLanguage } from "@/lib/outreach/messageLanguage";
 import { formatEmailDraft } from "@/lib/outreach/emailDraftFormat";
@@ -141,33 +142,47 @@ function withSpanishMarks(m: ParsedEmailMessage, language: MessageLanguage): Par
   return { ...m, subject: addSpanishOpeningMarks(m.subject, language), body: addSpanishOpeningMarks(m.body, language) };
 }
 
-export type GenerateSubjectResult = { ok: true; subject: string } | { ok: false; errorKey: "generationFailed" | "invalidModelOutput" | "gatewayNotConfigured" };
+export type GenerateSubjectResult = { ok: true; subject: string } | { ok: false; errorKey: "generationFailed" | "invalidModelOutput" | "gatewayNotConfigured" | "unchanged" };
+
+/**
+ * Extra rounds allowed when a regenerated subject is only a repeat of one the BD already rejected. A button that
+ * sometimes hands back the same string reads as broken (production, 2026-11-20: five clicks, one identical subject),
+ * so a repeat is retried; but each round is a paid model call, so it is capped rather than looped until different.
+ *
+ * Worst case per click: (1 + SUBJECT_DIFFERENT_RETRIES) rounds x (1 + SUBJECT_RETRY_ATTEMPTS) calls = 3 x 3 = 9 model
+ * calls, and only when every round both repeats AND breaks a subject rule. A typical click is 1 call.
+ */
+export const SUBJECT_DIFFERENT_RETRIES = 2;
 
 /**
  * Rewrites ONLY the subject of an email whose body is already written ("Regenerar solo el asunto").
  *
  * The body goes INTO the prompt (see `subjectOnly` in messagePrompt.ts) so the new subject matches the email that will
- * actually be sent. It runs the same validate-and-retry as a full generation, because a subject regenerated on demand
- * is exactly where a BD will notice the vendor vocabulary this rule exists to keep out.
+ * actually be sent. Each round runs the same validate-and-retry as a full generation, because a subject regenerated on
+ * demand is exactly where a BD will notice the vendor vocabulary this rule exists to keep out. A round whose subject
+ * repeats a rejected one (see subjectDifference.ts) is retried with every rejected subject in the prompt; if the last
+ * round still repeats, the outcome is `unchanged` so the caller can tell the BD instead of storing the repeat.
  */
 export async function runGenerateOutreachSubject(
-  input: BuildOutreachMessagePromptInput & { subjectOnly: { existingBody: string; currentSubject?: string } },
+  input: BuildOutreachMessagePromptInput & { subjectOnly: { existingBody: string; rejectedSubjects?: string[] } },
   generate: typeof generateText = generateText,
 ): Promise<GenerateSubjectResult> {
-  const { system, prompt } = buildOutreachMessagePrompt(input);
+  const rejected = (input.subjectOnly.rejectedSubjects ?? []).filter((x) => x.trim() !== "");
 
-  async function attempt(extra: string): Promise<string | null> {
-    const { text, finishReason } = await generate({
-      model: OUTREACH_MODEL,
-      system,
-      prompt: `${prompt}${extra}`,
-      maxOutputTokens: MAX_OUTPUT_TOKENS.email,
-    });
-    if (finishReason === "length") return null;
-    return parseSubjectModelOutput(text);
-  }
+  async function round(): Promise<GenerateSubjectResult> {
+    const { system, prompt } = buildOutreachMessagePrompt({ ...input, subjectOnly: { ...input.subjectOnly, rejectedSubjects: rejected } });
 
-  try {
+    async function attempt(extra: string): Promise<string | null> {
+      const { text, finishReason } = await generate({
+        model: OUTREACH_MODEL,
+        system,
+        prompt: `${prompt}${extra}`,
+        maxOutputTokens: MAX_OUTPUT_TOKENS.email,
+      });
+      if (finishReason === "length") return null;
+      return parseSubjectModelOutput(text);
+    }
+
     let subject = await attempt("");
     if (!subject) return { ok: false, errorKey: "invalidModelOutput" };
 
@@ -186,6 +201,16 @@ export async function runGenerateOutreachSubject(
       console.error(`[outreach] regenerated subject still breaks the rule: ${JSON.stringify({ subject, violations: remaining })}`);
     }
     return { ok: true, subject };
+  }
+
+  try {
+    for (let i = 0; i <= SUBJECT_DIFFERENT_RETRIES; i++) {
+      const r = await round();
+      if (!r.ok) return r;
+      if (!repeatsAny(r.subject, rejected)) return r;
+      rejected.push(r.subject);
+    }
+    return { ok: false, errorKey: "unchanged" };
   } catch (error) {
     console.error("runGenerateOutreachSubject failed", error);
     if (GatewayError.isInstance(error) && (error.statusCode === 401 || error.statusCode === 403)) {

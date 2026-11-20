@@ -304,6 +304,7 @@ export function SequenceDetailScreen({ detail, labels: l, sendLabels, now, viewe
           if (!r) return;
           if (r.ok) showToast(l.toastSubjectRegenerated, "success");
           else if (r.error === "edited") showToast(l.toastSubjectEdited, "error");
+          else if (r.error === "subject_unchanged") showToast(l.toastSubjectUnchanged, "error");
           else fail();
           router.refresh();
         });

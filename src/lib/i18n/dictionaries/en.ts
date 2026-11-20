@@ -4259,6 +4259,7 @@ export const en = {
     toastApprovedMany: "{n} drafts approved and scheduled.",
     toastCancelled: "Send cancelled. The contact is back in drafts.",
     toastSubjectRegenerated: "Subject regenerated. The body is unchanged, and the draft needs approving again.",
+    toastSubjectUnchanged: "Subject unchanged. The model proposed the same subject again after several attempts; try again or edit it by hand.",
     toastSubjectEdited: "That draft was hand-edited. Open it and regenerate from there so your changes are not lost.",
     toastReminderCancelled: "Reminder approval cancelled.",
     toastReminderApproved: "Reminder approved. It goes out on {date} at {time}.",

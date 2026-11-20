@@ -6,7 +6,7 @@ import { strict as assert } from "node:assert";
 import { describe, it } from "node:test";
 import { buildOutreachMessagePrompt } from "@/lib/outreach/messagePrompt";
 import { parseSubjectModelOutput } from "@/lib/outreach/emailOutputParsing";
-import { runGenerateOutreachSubject } from "@/lib/outreach/generateMessage";
+import { runGenerateOutreachSubject, SUBJECT_DIFFERENT_RETRIES } from "@/lib/outreach/generateMessage";
 
 const base = {
   contact: { firstName: "Ana", lastName: "Lee", position: "VP Engineering", roleGroup: null, isLeadership: true, connectedOn: null, companyName: "Flybondi" },
@@ -53,7 +53,7 @@ describe("the subject-only prompt", () => {
 
 describe("the subject-only prompt when a subject is being replaced", () => {
   const OLD = "Backend, Salesforce y pagos en LATAM y Madrid";
-  const withOld = () => buildOutreachMessagePrompt({ ...base, subjectOnly: { existingBody: BODY, currentSubject: OLD } });
+  const withOld = () => buildOutreachMessagePrompt({ ...base, subjectOnly: { existingBody: BODY, rejectedSubjects: [OLD] } });
 
   it("states the rejected subject, framed as data", () => {
     const { prompt } = withOld();
@@ -77,15 +77,21 @@ describe("the subject-only prompt when a subject is being replaced", () => {
 
   it("is unchanged when there is no current subject", () => {
     const a = buildOutreachMessagePrompt({ ...base, subjectOnly: { existingBody: BODY } }).prompt;
-    const b = buildOutreachMessagePrompt({ ...base, subjectOnly: { existingBody: BODY, currentSubject: "  " } }).prompt;
+    const b = buildOutreachMessagePrompt({ ...base, subjectOnly: { existingBody: BODY, rejectedSubjects: ["  "] } }).prompt;
     assert.equal(a, b);
     assert.ok(!a.includes("REJECTED_SUBJECT"));
+  });
+
+  it("lists every rejected subject, so a later attempt sees all of them", () => {
+    const { prompt } = buildOutreachMessagePrompt({ ...base, subjectOnly: { existingBody: BODY, rejectedSubjects: [OLD, "Otro asunto repetido"] } });
+    assert.ok(prompt.includes(OLD) && prompt.includes("Otro asunto repetido"));
+    assert.ok(prompt.includes("these subjects"));
   });
 
   it("reaches the model through runGenerateOutreachSubject", async () => {
     const calls: { prompt?: string }[] = [];
     const gen = (async (a: { prompt?: string }) => (calls.push(a), { text: '{"subject":"Equipo de ingenieria para Flybondi"}', finishReason: "stop" })) as unknown as Parameters<typeof runGenerateOutreachSubject>[1];
-    await runGenerateOutreachSubject({ ...base, subjectOnly: { existingBody: BODY, currentSubject: OLD } } as Parameters<typeof runGenerateOutreachSubject>[0], gen);
+    await runGenerateOutreachSubject({ ...base, subjectOnly: { existingBody: BODY, rejectedSubjects: [OLD] } } as Parameters<typeof runGenerateOutreachSubject>[0], gen);
     assert.ok((calls[0]!.prompt ?? "").includes(OLD));
   });
 });
@@ -137,6 +143,43 @@ describe("runGenerateOutreachSubject", () => {
     assert.equal(r.ok && r.subject, "Flybondi suma equipo de ingenieria");
     assert.equal(calls.length, 2);
     assert.ok((calls[1]!.prompt ?? "").includes("REJECTED"));
+  });
+
+  describe("when the new subject repeats a rejected one", () => {
+    const OLD = "Backend, Salesforce y pagos en LATAM y Madrid";
+    const rin = { ...base, subjectOnly: { existingBody: BODY, rejectedSubjects: [OLD] } } as Parameters<typeof runGenerateOutreachSubject>[0];
+
+    it("stops as soon as a different subject arrives", async () => {
+      const calls: Call[] = [];
+      const r = await runGenerateOutreachSubject(
+        rin,
+        fake(['{"subject":"Salesforce, backend y pagos en Madrid y LATAM"}', '{"subject":"Equipo de ingenieria para Flybondi"}', '{"subject":"nunca"}'], calls),
+      );
+      assert.deepEqual(r, { ok: true, subject: "Equipo de ingenieria para Flybondi" });
+      assert.equal(calls.length, 2);
+      assert.ok((calls[1]!.prompt ?? "").includes("Salesforce, backend y pagos en Madrid y LATAM"), "the repeat joins the rejected list");
+      assert.ok((calls[1]!.prompt ?? "").includes(OLD));
+    });
+
+    it("reports unchanged at the cap instead of returning the repeat", async () => {
+      const calls: Call[] = [];
+      const r = await runGenerateOutreachSubject(rin, fake([`{"subject":"${OLD}"}`], calls));
+      assert.deepEqual(r, { ok: false, errorKey: "unchanged" });
+      assert.equal(calls.length, SUBJECT_DIFFERENT_RETRIES + 1);
+    });
+
+    it("lets the third attempt see both earlier ones", async () => {
+      const calls: Call[] = [];
+      await runGenerateOutreachSubject(rin, fake(['{"subject":"Pagos, backend y Salesforce LATAM Madrid"}', '{"subject":"Madrid y LATAM: backend, pagos, Salesforce"}', '{"subject":"Equipo de ingenieria"}'], calls));
+      const last = calls[2]!.prompt ?? "";
+      assert.ok(last.includes(OLD) && last.includes("Pagos, backend y Salesforce LATAM Madrid") && last.includes("Madrid y LATAM: backend, pagos, Salesforce"));
+    });
+
+    it("does not loop on a first generation with nothing rejected", async () => {
+      const calls: Call[] = [];
+      await runGenerateOutreachSubject(input, fake(['{"subject":"Flybondi suma equipo de ingenieria"}'], calls));
+      assert.equal(calls.length, 1);
+    });
   });
 
   it("fails cleanly on unusable output instead of saving nothing over a good subject", async () => {
