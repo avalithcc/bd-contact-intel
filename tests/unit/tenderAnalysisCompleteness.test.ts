@@ -42,7 +42,7 @@ const COMPLETE_PATCH = {
   affidavits: "Declaracion jurada de habilidad para contratar (Anexo IV)",
 };
 
-const ECONOMICS = { budget: "ARS 12.000.000 (art. 3)", paymentTerms: "30 dias de conformada la factura (art. 9)", penalties: null };
+const ECONOMICS = { budget: "ARS 12.000.000 (art. 3)", budgetAmount: "ARS 12.000.000", paymentTerms: "30 dias de conformada la factura (art. 9)", penalties: null };
 /** Requirements still partial, economics fully answered: isolates the requirements retry from the economics one. */
 const PARTIAL_REQ = { ...PARTIAL, economics: ECONOMICS };
 
@@ -223,7 +223,7 @@ const COMPLETE_REQ = { ...PARTIAL.requirements, ...COMPLETE_PATCH };
 
 test("a dropped budget is re-asked exactly like a dropped team, and merged without overwriting an answered key", async () => {
   const first = { ...PARTIAL, requirements: COMPLETE_REQ, economics: { paymentTerms: "30 dias", penalties: null } };
-  const { generate, calls } = scriptedGenerate([JSON.stringify(first), JSON.stringify({ budget: "ARS 5.000.000", paymentTerms: "WRONG, must not win" })]);
+  const { generate, calls } = scriptedGenerate([JSON.stringify(first), JSON.stringify({ budget: "ARS 5.000.000", budgetAmount: "ARS 5.000.000", paymentTerms: "WRONG, must not win" })]);
   const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
   assert.ok(result.ok);
   assert.equal(calls.length, 2);
@@ -235,6 +235,21 @@ test("a dropped budget is re-asked exactly like a dropped team, and merged witho
   assert.equal(result.analysis.economics.penalties, null);
   assert.equal(result.analysis.economicsIncluded, true);
   assert.equal(result.analysis.mustListIncluded, true);
+});
+
+test("a dropped budgetAmount alone is re-asked like any economics key, and null is a valid answer to it", async () => {
+  const { budgetAmount: _drop, ...rest } = ECONOMICS;
+  const first = { ...PARTIAL, requirements: COMPLETE_REQ, economics: rest };
+  const { generate, calls } = scriptedGenerate([JSON.stringify(first), JSON.stringify({ budgetAmount: null })]);
+  const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
+  assert.ok(result.ok);
+  assert.equal(calls.length, 2);
+  const asked = (calls[1]!.messages as { content: unknown }[])[2]!.content as string;
+  assert.ok(asked.includes('"budgetAmount"') && !asked.includes('"budget",') && !asked.includes('"penalties"'));
+  assert.ok(asked.includes("bare figure"));
+  assert.equal(result.analysis.economics.budgetAmount, null);
+  assert.equal(result.analysis.economics.budget, ECONOMICS.budget);
+  assert.equal(result.analysis.economicsIncluded, true);
 });
 
 test("one re-ask can complete both blocks, and a wrapped economics patch is accepted", async () => {
@@ -256,7 +271,7 @@ test("an answer complete in both blocks costs exactly one model call", async () 
 });
 
 test("economics null is an answer: all three null still counts as included", async () => {
-  const nulls = { budget: null, paymentTerms: null, penalties: null };
+  const nulls = { budget: null, budgetAmount: null, paymentTerms: null, penalties: null };
   const { generate, calls } = scriptedGenerate([JSON.stringify({ ...PARTIAL, requirements: COMPLETE_REQ, economics: nulls })]);
   const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
   assert.ok(result.ok);
@@ -292,6 +307,6 @@ test("a complete economics block survives the round trip, and the flag can only 
   assert.equal(parseTenderAnalysis(JSON.stringify({ ...PARTIAL, requirements: COMPLETE_REQ, economics: ECONOMICS, economicsIncluded: false }))!.economicsIncluded, false);
 });
 
-test("the prompt asks for the three economics keys and no others", () => {
-  for (const k of ["economics", "budget", "paymentTerms", "penalties"]) assert.ok(ANALYSIS_SYSTEM_PROMPT.includes(`"${k}"`), k);
+test("the prompt asks for the four economics keys, budgetAmount as the bare figure", () => {
+  for (const k of ["economics", "budget", "budgetAmount", "paymentTerms", "penalties"]) assert.ok(ANALYSIS_SYSTEM_PROMPT.includes(`"${k}"`), k);
 });

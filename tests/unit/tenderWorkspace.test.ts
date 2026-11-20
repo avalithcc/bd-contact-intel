@@ -46,7 +46,7 @@ const ANALYSIS: TenderAnalysis = {
   summary: "Replica de infraestructura critica en nube publica.",
   viability: "Encaja con trabajo de infraestructura.",
   requirements: { registration: "Inscripcion en el registro", antecedents: null, guarantee: "5%", submissionDeadline: "27/11 14:00", certifications: null, financialStanding: null, team: null, affidavits: null },
-  economics: { budget: null, paymentTerms: null, penalties: null },
+  economics: { budget: null, budgetAmount: null, paymentTerms: null, penalties: null },
   pages: 24,
   mustListIncluded: true,
   economicsIncluded: true,

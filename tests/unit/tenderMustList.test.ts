@@ -32,7 +32,7 @@ const MODEL_JSON = {
     team: "CV de 3 profesionales con titulo universitario",
     affidavits: "Anexo III, declaracion jurada de habilidad",
   },
-  economics: { budget: "ARS 12.000.000 (art. 3)", paymentTerms: null, penalties: "1% por dia de demora, tope 10% (art. 21)" },
+  economics: { budget: "ARS 12.000.000 (art. 3)", budgetAmount: null, paymentTerms: null, penalties: "1% por dia de demora, tope 10% (art. 21)" },
   pages: 24,
 };
 

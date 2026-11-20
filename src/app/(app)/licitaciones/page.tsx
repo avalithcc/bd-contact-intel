@@ -82,8 +82,8 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
             <thead>
               <tr>
                 <th className="sorted">{l.colDays}</th>
-                <th>{l.colProcess}</th>
                 <th>{l.colTitle}</th>
+                <th>{l.colBudget}</th>
                 <th>{l.colAgency}</th>
                 <th>{l.colRelevance}</th>
                 <th>{l.colPortalState}</th>
@@ -108,9 +108,6 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
                       </span>
                     </div>
                   </td>
-                  <td className="nowrap">
-                    <span className="mono">{r.processNumber}</span>
-                  </td>
                   <td>
                     <div className="stack-sm">
                       <Link className="strong" href={`/licitaciones/${r.id}`}>
@@ -118,6 +115,9 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
                       </Link>
                       {r.processType && <div className="meta">{r.processType}</div>}
                     </div>
+                  </td>
+                  <td className="nowrap">
+                    <BudgetCellView cell={r.budgetCell} labels={l} />
                   </td>
                   <td>
                     {r.executingUnit}
@@ -179,4 +179,10 @@ function RelevanceCell({ row, labels: l }: { row: TenderListRow; labels: Diction
       />
     </div>
   );
+}
+
+function BudgetCellView({ cell, labels: l }: { cell: TenderListRow["budgetCell"]; labels: Dictionary["tendersPage"] }) {
+  if (cell.state === "amount") return <span className="mono">{cell.amount}</span>;
+  const text = cell.state === "bidder_sets" ? l.budgetBidderSets : cell.state === "reanalyse" ? l.budgetReanalyse : l.budgetNoPliego;
+  return <span className="meta">{text}</span>;
 }

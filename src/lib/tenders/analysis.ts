@@ -22,6 +22,8 @@ export interface TenderRequirements {
 export interface TenderEconomics {
   /** Official budget or estimated contract amount, with the currency and the clause. */
   budget: string | null;
+  /** The bare figure with its currency as the document writes it ("ARS 48.000.000"), for a table cell. Null when the document fixes no amount. */
+  budgetAmount: string | null;
   /** How and when the supplier is paid, with the clause. */
   paymentTerms: string | null;
   /** Fines and penalties (SLA breaches, caps as a share of the contract), with the clause. */
@@ -48,7 +50,7 @@ const BASE_REQUIREMENT_KEYS = ["registration", "antecedents", "guarantee", "subm
 const MUST_LIST_KEYS = ["certifications", "financialStanding", "team", "affidavits"] as const;
 const REQUIREMENT_KEYS = [...BASE_REQUIREMENT_KEYS, ...MUST_LIST_KEYS] as const;
 export type RequirementKey = (typeof REQUIREMENT_KEYS)[number];
-const ECONOMICS_KEYS = ["budget", "paymentTerms", "penalties"] as const;
+const ECONOMICS_KEYS = ["budget", "budgetAmount", "paymentTerms", "penalties"] as const;
 export type EconomicsKey = (typeof ECONOMICS_KEYS)[number];
 
 /** The blocks of the analysis whose keys must each be answered (null counts as an answer, absence does not). */
@@ -75,7 +77,7 @@ export function toTenderAnalysis(value: unknown): TenderAnalysis | null {
   const req = blockOf(v, "requirements");
   const requirements = Object.fromEntries(REQUIREMENT_KEYS.map((k) => [k, text(req[k], 1500)])) as unknown as TenderRequirements;
   const econ = blockOf(v, "economics");
-  const economics = Object.fromEntries(ECONOMICS_KEYS.map((k) => [k, text(econ[k], 1500)])) as unknown as TenderEconomics;
+  const economics = Object.fromEntries(ECONOMICS_KEYS.map((k) => [k, text(econ[k], k === "budgetAmount" ? 40 : 1500)])) as unknown as TenderEconomics;
   const pages = typeof v.pages === "number" && Number.isInteger(v.pages) && v.pages > 0 ? v.pages : null;
   /**
    * The flag can only ever be LOWERED here, never raised, because this function runs TWICE on the same reading: once on
@@ -176,10 +178,11 @@ export const ANALYSIS_SYSTEM_PROMPT = [
   "Every one of those eight keys must be present in the object. Leaving a key out is a question you did not answer, which is not the same as null, so never leave one out.",
   "A requirement can be stated anywhere in the document, including the technical specifications and the annexes, not only among the administrative conditions. Look there too before writing null.",
   'Anything you name in "viability" as something the bidder must have, hold or prove must also appear under the matching "requirements" key.',
-  '"economics": an object with "budget" (the official budget or estimated contract amount, with the currency),',
+  '"economics": an object with "budget" (the official budget or estimated contract amount, with the currency and the clause),',
+  '"budgetAmount" (ONLY the bare figure with its currency, exactly as the document writes it, e.g. "ARS 48.000.000" or "USD 120.000", at most 30 characters and nothing else: no clause, no explanation; null when the document fixes no amount, which is common because many pliegos leave the price blank for the bidder to fill in, while "budget" still carries that explanation),',
   '"paymentTerms" (how and when the supplier is paid, e.g. days after the invoice is approved) and',
   '"penalties" (fines and penalties, e.g. SLA breaches and any cap as a percentage of the contract). Quote or closely paraphrase the document, with the clause when it gives one, and use null for any it does not state.',
-  "Every one of those three economics keys must be present too, with the same rule: leaving one out is not the same as null.",
+  "Every one of those four economics keys must be present too, with the same rule: leaving one out is not the same as null.",
   '"pages": the number of pages of the document, as an integer, or null.',
 ].join("\n");
 
@@ -200,5 +203,6 @@ export function analysisFollowUpPrompt(missing: readonly MissingKey[]): string {
     `Reply with one JSON object and nothing else, holding exactly ${one ? "that key" : "those keys"} at the top level.`,
     "Quote or closely paraphrase what the document says, with the clause when it gives one, in neutral Spanish.",
     "Use null only when you have looked and the document truly does not state it.",
+    'If "budgetAmount" is among them, it is ONLY the bare figure with its currency as the document writes it (e.g. "ARS 48.000.000"), at most 30 characters, and null when the document fixes no amount; "budget" keeps the explanation.',
   ].join("\n");
 }
