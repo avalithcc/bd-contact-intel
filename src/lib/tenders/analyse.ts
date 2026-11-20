@@ -30,6 +30,19 @@ const MAX_FOLLOW_UP_TOKENS = 3000;
 
 const FIRST_TURN = "Analyse the attached tender document and reply with the JSON object described.";
 
+/**
+ * Every way this can fail WITHOUT throwing used to return its error code and log nothing, so a failed analysis left no
+ * trace anywhere: the owner saw a toast, the server logs were silent, and the only observable fact was that
+ * `analyzed_at` had not moved. Diagnosing it meant guessing. These lines carry the one thing the code already knows and
+ * the database never records - why the answer was unusable - and they are deliberately cheap to grep.
+ *
+ * `usage` and `finishReason` are the two that decide between "the model was cut off" and "the model answered something
+ * that is not JSON", which are different bugs with different fixes.
+ */
+function logUnusable(stage: "first" | "follow-up", why: string, d: { finishReason?: string; usage?: unknown; textLength?: number }): void {
+  console.error(`[tender-analysis] ${stage} answer unusable: ${why}`, JSON.stringify({ finishReason: d.finishReason, usage: d.usage, textLength: d.textLength }));
+}
+
 export type AnalyseResult = { ok: true; analysis: TenderAnalysis } | { ok: false; error: "gatewayNotConfigured" | "generationFailed" | "invalidModelOutput" };
 
 /**
@@ -48,16 +61,22 @@ export async function runTenderAnalysis(pdf: Uint8Array, filename: string, gener
         ],
       },
     ];
-    const { text, finishReason } = await generate({
+    const { text, finishReason, usage } = await generate({
       model: ANALYSIS_MODEL,
       system: ANALYSIS_SYSTEM_PROMPT,
       maxOutputTokens: MAX_OUTPUT_TOKENS,
       messages: opening,
     });
     // A cut-off answer is never usable, even when the truncated text happens to parse.
-    if (finishReason === "length") return { ok: false, error: "invalidModelOutput" };
+    if (finishReason === "length") {
+      logUnusable("first", "cut off by maxOutputTokens", { finishReason, usage, textLength: text.length });
+      return { ok: false, error: "invalidModelOutput" };
+    }
     let object = jsonObjectIn(text);
-    if (!object) return { ok: false, error: "invalidModelOutput" };
+    if (!object) {
+      logUnusable("first", "no JSON object in the answer", { finishReason, usage, textLength: text.length });
+      return { ok: false, error: "invalidModelOutput" };
+    }
 
     // Every follow-up is anchored on the SAME first answer and names only what is still missing, so two re-asks never
     // compound into a conversation where the model is answering its own corrections.
@@ -69,9 +88,15 @@ export async function runTenderAnalysis(pdf: Uint8Array, filename: string, gener
         maxOutputTokens: MAX_FOLLOW_UP_TOKENS,
         messages: [...opening, { role: "assistant", content: text }, { role: "user", content: analysisFollowUpPrompt(missing) }],
       });
-      if (followUp.finishReason === "length") break;
+      if (followUp.finishReason === "length") {
+        logUnusable("follow-up", "cut off by maxOutputTokens", { finishReason: followUp.finishReason, usage: followUp.usage, textLength: followUp.text.length });
+        break;
+      }
       const patch = jsonObjectIn(followUp.text);
-      if (!patch) break;
+      if (!patch) {
+        logUnusable("follow-up", "no JSON object in the answer", { finishReason: followUp.finishReason, usage: followUp.usage, textLength: followUp.text.length });
+        break;
+      }
       object = mergeAnalysisPatch(object, patch);
       const left = missingKeys(object);
       // A re-ask that answered nothing will not answer anything on the next one either: stop rather than pay for it.
@@ -82,7 +107,11 @@ export async function runTenderAnalysis(pdf: Uint8Array, filename: string, gener
     // Still incomplete is reported, never papered over: toTenderAnalysis leaves mustListIncluded or economicsIncluded false and the ficha
     // asks for a new analysis instead of showing a key that was never answered as "the pliego does not state it".
     const analysis = toTenderAnalysis(object);
-    return analysis ? { ok: true, analysis } : { ok: false, error: "invalidModelOutput" };
+    if (!analysis) {
+      logUnusable("first", "parsed JSON has no summary or no viability", { finishReason, usage, textLength: text.length });
+      return { ok: false, error: "invalidModelOutput" };
+    }
+    return { ok: true, analysis };
   } catch (error) {
     console.error("runTenderAnalysis failed", error);
     if (GatewayError.isInstance(error) && (error.statusCode === 401 || error.statusCode === 403)) return { ok: false, error: "gatewayNotConfigured" };
