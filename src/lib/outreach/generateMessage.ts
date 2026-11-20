@@ -151,7 +151,7 @@ export type GenerateSubjectResult = { ok: true; subject: string } | { ok: false;
  * is exactly where a BD will notice the vendor vocabulary this rule exists to keep out.
  */
 export async function runGenerateOutreachSubject(
-  input: BuildOutreachMessagePromptInput & { subjectOnly: { existingBody: string } },
+  input: BuildOutreachMessagePromptInput & { subjectOnly: { existingBody: string; currentSubject?: string } },
   generate: typeof generateText = generateText,
 ): Promise<GenerateSubjectResult> {
   const { system, prompt } = buildOutreachMessagePrompt(input);

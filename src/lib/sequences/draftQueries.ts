@@ -283,7 +283,7 @@ export async function regenerateDraftSubject(
   }
 
   const [existing] = await db
-    .select({ body: sequenceDraft.body })
+    .select({ body: sequenceDraft.body, subject: sequenceDraft.subject })
     .from(sequenceDraft)
     .where(and(eq(sequenceDraft.sequenceMemberId, memberId), eq(sequenceDraft.step, STEP)));
   if (!existing) return { ok: false, error: "no_draft" };
@@ -303,7 +303,7 @@ export async function regenerateDraftSubject(
   if (!base) return { ok: false, error: "not_editable" };
 
   const generate = overrides.generateSubject ?? runGenerateOutreachSubject;
-  const generated = await generate({ ...base, subjectOnly: { existingBody: existing.body } });
+  const generated = await generate({ ...base, subjectOnly: { existingBody: existing.body, currentSubject: existing.subject ?? undefined } });
   if (!generated.ok) return { ok: false, error: "generation_failed" };
 
   return db.transaction(async (tx) => {
