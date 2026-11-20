@@ -53,11 +53,17 @@ function yesNo(raw: string | null): boolean | null {
   return v === "sí" || v === "si" ? true : v === "no" ? false : null;
 }
 
+/**
+ * Rows of the CIRCULARES grid, one `lblNumero` per circular.
+ *
+ * This counted the administrative-acts grid instead, looking for acts whose document named a circular, and it was wrong
+ * on the first real case: 64-0021-LPR26 has THREE circulars and only TWO "Autorización circular" acts, because one act
+ * can publish more than one. A circular can change what the pliego demands - on that tender one lowered the minimum
+ * technical score from 75 to 60 points out of 100 - so undercounting them hides the very thing the field exists to
+ * surface. The acts grid was never the right source; the circulars grid is.
+ */
 function countCirculars(html: string): number {
-  const re = /_gvActosAdministrativos_ctl\d+_lblDocumento"[^>]*>([\s\S]*?)<\/span>/g;
-  let n = 0;
-  for (let m = re.exec(html); m; m = re.exec(html)) if (/circular/i.test(squash(m[1] ?? ""))) n++;
-  return n;
+  return (html.match(/_gvCirculares_ctl\d+_lblNumero"/g) ?? []).length;
 }
 
 /** The citizen view (`VistaPreviaPliegoCiudadano.aspx`). Anything that is not that page is a failure value, never a throw. */

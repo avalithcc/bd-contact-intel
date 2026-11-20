@@ -44,9 +44,29 @@ test("'No' on the extension is false, distinct from not stated", () => {
   assert.ok(r.ok && r.fields.acceptsExtension === false);
 });
 
-test("circulars are the acts of the grid that name a circular", () => {
-  const r = parseCitizenView(citizen.replace("Autorización llamado", "Circular modificatoria Nº 1").replace("Autorización pliego", "Circular aclaratoria Nº 2"));
-  assert.ok(r.ok && r.fields.circularCount === 2);
+/**
+ * Counted against a REAL page that really has circulars, not an edited one.
+ *
+ * The first version of this counted the administrative-acts grid and was wrong on the first live tender: 64-0021-LPR26
+ * publishes THREE circulars through only TWO "Autorización circular" acts. The old test passed because it was built by
+ * renaming two acts inside a page that has no circulars at all, so it could only ever confirm the implementation it was
+ * written from. A fixture that cannot contain the defect cannot catch it.
+ */
+const circulars = read("comprar-citizen-view-circulars.html");
+
+test("circulars are the rows of the circulars grid, not the acts that published them", () => {
+  const r = parseCitizenView(circulars);
+  assert.ok(r.ok);
+  if (!r.ok) return;
+  assert.equal(r.fields.circularCount, 3);
+  // The same page: two acts name a circular. Counting those is what gave 2.
+  assert.equal((circulars.match(/Autorización circular/g) ?? []).length, 2);
+});
+
+test("a tender with no circulars counts zero, and the acts grid cannot inflate it", () => {
+  const r = parseCitizenView(citizen);
+  assert.ok(r.ok && r.fields.circularCount === 0);
+  assert.ok(citizen.includes("Autorización pliego"), "the acts grid is present, so zero is a real count and not an absent section");
 });
 
 test("malformed or foreign HTML is a failure, never a throw", () => {
