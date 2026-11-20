@@ -13,6 +13,7 @@ import { TenderAnalyseButton } from "./TenderAnalyseButton";
 import { TenderDocumentUpload } from "./TenderDocumentUpload";
 import { TenderNoteForm } from "./TenderNoteForm";
 import { TenderOwnerSelect } from "./TenderOwnerSelect";
+import { TenderPortalBlock } from "./TenderPortalBlock";
 import { mustListLines, mustListText } from "@/lib/tenders/mustList";
 
 /** COMPR.AR has no stable link per process (its result links are `__doPostBack`), so the number is pasted into the portal's own search. */
@@ -190,6 +191,8 @@ export function TenderFicha({
           </div>
         </div>
       </div>
+
+      <TenderPortalBlock portal={detail.portal} labels={l} when={when} />
 
       <div className="card mb-lg">
         <div className="card-header">

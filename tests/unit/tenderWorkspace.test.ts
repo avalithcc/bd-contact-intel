@@ -11,6 +11,9 @@ import { ToastProvider } from "@/components/ToastProvider";
 import { es } from "@/lib/i18n/dictionaries/es";
 import { MAX_TENDER_DOCUMENT_BYTES, checkTenderDocument, tenderDocumentPath, tenderDocumentPathBelongsTo } from "@/lib/tenders/document";
 import { canAnalyse, currentDocument, parseTenderAnalysis, type TenderAnalysis } from "@/lib/tenders/analysis";
+import { readFileSync } from "node:fs";
+import type { TenderPortal } from "@/db/schema";
+import { parseCitizenView } from "@/lib/tenders/portalParse";
 import type { TenderDetail, TenderDocumentView, TenderEventView } from "@/lib/tenders/detail";
 import { normalizeNote } from "@/lib/tenders/note";
 
@@ -73,7 +76,7 @@ test("the current document is the newest upload and analysing needs one", () => 
   assert.equal(canAnalyse(docs[1]!), true);
 });
 
-function detail(over: { documents?: TenderDocumentView[]; events?: TenderEventView[]; note?: string | null } = {}): TenderDetail {
+function detail(over: { documents?: TenderDocumentView[]; events?: TenderEventView[]; note?: string | null; portal?: TenderPortal | null } = {}): TenderDetail {
   return {
     tender: {
       id: "44444444-4444-4444-8444-444444444444",
@@ -97,6 +100,7 @@ function detail(over: { documents?: TenderDocumentView[]; events?: TenderEventVi
       daysLeft: 21,
       closed: false,
     },
+    portal: over.portal ?? null,
     documents: over.documents ?? [],
     events: over.events ?? [],
     bdOptions: [],
@@ -167,4 +171,31 @@ test("the progress log shows who and when for a note, a state change, an upload 
   assert.ok(html.includes("Cambió el estado de A revisar a En análisis"));
   assert.ok(html.includes("Subió el pliego pliego.pdf") && html.includes("Analizó el pliego pliego.pdf"));
   assert.ok(html.includes("Ana, 12 nov 2026, 10:00"));
+});
+
+// The row is built from the REAL parser over the REAL saved page, so a renamed field breaks here and not in production.
+const portalRow = (over: Partial<TenderPortal> = {}): TenderPortal => {
+  const parsed = parseCitizenView(readFileSync(new URL("./fixtures/comprar-citizen-view.html", import.meta.url), "utf8"));
+  if (!parsed.ok) throw new Error("fixture");
+  return { id: "p1", tenderId: "44444444-4444-4444-8444-444444444444", ...parsed.fields, portalUrl: "https://comprar.gob.ar/PLIEGO/VistaPreviaPliegoCiudadano.aspx?qs=x", fetchedAt: new Date("2026-11-20T12:00:00Z"), fetchError: null, ...over };
+};
+
+test("a tender with no portal row shows no portal block at all", () => {
+  assert.ok(!render(detail()).includes(es.tenderDetail.portalTitle));
+  // A row that never held data (not in the portal's search, or every try failed) is the same as no row: no block of dashes.
+  assert.ok(!render(detail({ portal: portalRow({ objeto: null, portalUrl: null, fetchError: "not_found" }) })).includes(es.tenderDetail.portalTitle));
+});
+
+test("the portal block shows what the portal states, and says so in words for what it does not", () => {
+  const l = es.tenderDetail;
+  const html = render(detail({ portal: portalRow({ offerValidity: null }) }));
+  for (const v of [l.portalTitle, "12 Meses", "Peso Argentino", "5,00%", "10,00%", "9 dic 2026, 10:00", "15 dic 2026, 10:00"]) assert.ok(html.includes(v), `missing ${v}`);
+  assert.equal(html.split(`<dd>${l.portalNotStated}</dd>`).length - 1, 1, "only the one blank field says it is not stated");
+  assert.ok(!html.includes(l.portalCirculars), "zero circulars is not shown");
+  assert.ok(!html.includes(l.portalStale));
+});
+
+test("a failed refresh over good data keeps the data and warns it may be old", () => {
+  const html = render(detail({ portal: portalRow({ fetchError: "http_500" }) }));
+  assert.ok(html.includes("12 Meses") && html.includes(es.tenderDetail.portalStale));
 });

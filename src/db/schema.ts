@@ -2363,5 +2363,42 @@ export const tenderDocument = pgTable(
   }),
 );
 
+/**
+ * What COMPR.AR's public citizen view says about one tender, fetched without a login (src/lib/tenders/portalFetch.ts).
+ * A MISSING ROW means "never fetched"; a NULL column means "fetched, and the portal does not state it" - keep them apart.
+ * `fetch_error` is NULL when the last fetch succeeded; on a failed refresh only `fetched_at` and `fetch_error` change, so the
+ * last good data stays. `fetch_error = 'not_found'` is a normal outcome (the process is not in the portal's search, as with
+ * contrataciones directas), a row with no `portal_url` has never had data. Dates are real instants (Argentina wall clock on the portal).
+ */
+export const tenderPortal = pgTable(
+  "tender_portal",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenderId: uuid("tender_id")
+      .notNull()
+      .references(() => tender.id, { onDelete: "cascade" }),
+    objeto: text("objeto"),
+    currency: text("currency"),
+    contractDuration: text("contract_duration"),
+    offerValidity: text("offer_validity"),
+    acceptsExtension: boolean("accepts_extension"),
+    questionsUntil: timestamp("questions_until", { withTimezone: true }),
+    openingAt: timestamp("opening_at", { withTimezone: true }),
+    guaranteeOffer: text("guarantee_offer"),
+    guaranteeContract: text("guarantee_contract"),
+    guaranteeChallenge: text("guarantee_challenge"),
+    circularCount: integer("circular_count"),
+    portalUrl: text("portal_url"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+    fetchError: text("fetch_error"),
+  },
+  (t) => ({
+    tenderUnique: uniqueIndex("tender_portal_tender_unique").on(t.tenderId),
+    byFetchedAt: index("tender_portal_fetched_at_idx").on(t.fetchedAt),
+  }),
+);
+
+export type TenderPortal = typeof tenderPortal.$inferSelect;
+
 export type TenderEvent = typeof tenderEvent.$inferSelect;
 export type TenderDocument = typeof tenderDocument.$inferSelect;

@@ -1,6 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { tender, tenderDocument } from "@/db/schema";
+import { tender, tenderDocument, tenderPortal } from "@/db/schema";
 import { parseDbTimestamp } from "@/lib/db/timestamp";
 import { isUuid } from "@/lib/uuid";
 import { normalizeNote } from "./note";
@@ -59,13 +59,15 @@ const bdOptionsJson = sql`(select coalesce(json_agg(json_build_object('id', b.id
 export async function getTenderDetail(id: string, now: Date = new Date(), database: Pick<typeof db, "select"> = db): Promise<TenderDetail | null> {
   if (!isUuid(id)) return null;
   const [row] = await database
-    .select({ t: tender, docs: documentsJson.mapWith((v) => v as RawDocument[]), events: eventsJson.mapWith((v) => v as RawEvent[]), bds: bdOptionsJson.mapWith((v) => v as BdOption[]) })
+    .select({ t: tender, portal: tenderPortal, docs: documentsJson.mapWith((v) => v as RawDocument[]), events: eventsJson.mapWith((v) => v as RawEvent[]), bds: bdOptionsJson.mapWith((v) => v as BdOption[]) })
     .from(tender)
+    .leftJoin(tenderPortal, eq(tenderPortal.tenderId, tender.id))
     .where(eq(tender.id, id))
     .limit(1);
   if (!row) return null;
   return {
     tender: { ...row.t, ...tenderTiming(row.t.openingAt, now) },
+    portal: row.portal,
     bdOptions: row.bds,
     documents: row.docs.map((d) => ({
       ...d,

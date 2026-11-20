@@ -67,6 +67,7 @@ const CONVERTED_TABLES: readonly string[] = [
   "tender",
   "tender_document",
   "tender_event",
+  "tender_portal",
   "prospect_draft",
   "job_posting",
   "contact",

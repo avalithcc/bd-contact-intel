@@ -1,4 +1,4 @@
-import type { Tender } from "@/db/schema";
+import type { Tender, TenderPortal } from "@/db/schema";
 import type { TenderAnalysis } from "./analysis";
 import type { TenderTiming } from "./timing";
 
@@ -33,6 +33,8 @@ export interface BdOption {
 
 export interface TenderDetail {
   tender: Tender & TenderTiming;
+  /** What the portal's public view says. NULL = never fetched (the ficha shows nothing); a null FIELD = fetched, the portal does not state it. */
+  portal: TenderPortal | null;
   /** Every admin, by name, for the owner picker: only an admin can open the section, so only an admin can own a tender. */
   bdOptions: BdOption[];
   /** Newest first. */
