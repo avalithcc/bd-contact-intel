@@ -32,6 +32,7 @@ const MODEL_JSON = {
     team: "CV de 3 profesionales con titulo universitario",
     affidavits: "Anexo III, declaracion jurada de habilidad",
   },
+  economics: { budget: "ARS 12.000.000 (art. 3)", paymentTerms: null, penalties: "1% por dia de demora, tope 10% (art. 21)" },
   pages: 24,
 };
 
@@ -116,10 +117,40 @@ test("a reading from before the must-list asks for a new analysis instead of cla
   assert.ok(html.includes(es.tenderDetail.mustReanalyse));
 });
 
+test("the economics block renders its values, 'not stated' for null, and a legacy reading asks for a new analysis", () => {
+  const html = render(detail([docWith(analysisOf(MODEL_JSON))]));
+  for (const label of [es.tenderDetail.econBudget, es.tenderDetail.econPayment, es.tenderDetail.econPenalties]) assert.ok(html.includes(label), label);
+  assert.ok(html.includes("ARS 12.000.000 (art. 3)"));
+  assert.ok(!html.includes(es.tenderDetail.economicsReanalyse));
+
+  const { economics, ...legacy } = MODEL_JSON;
+  void economics;
+  const old = render(detail([docWith(analysisOf(legacy))]));
+  assert.ok(old.includes(es.tenderDetail.economicsReanalyse));
+  assert.ok(!old.includes(es.tenderDetail.econBudget));
+});
+
 test("both dictionaries carry the new strings and none is a function (the slice crosses a client boundary whole)", () => {
   for (const d of [es, en]) {
-    for (const k of ["mustTitle", "mustIntro", "mustCopy", "mustCopied", "mustClipboardHeader", "mustReanalyse", "reqCertifications", "reqFinancial", "reqTeam", "reqAffidavits", "ownerLabel", "ownerNone", "ownerError", "eventOwnerSet", "eventOwnerCleared"] as const) {
+    for (const k of ["mustTitle", "mustIntro", "mustCopy", "mustCopied", "mustClipboardHeader", "mustReanalyse", "economicsTitle", "economicsIntro", "economicsReanalyse", "econBudget", "econPayment", "econPenalties", "reqCertifications", "reqFinancial", "reqTeam", "reqAffidavits", "ownerLabel", "ownerNone", "ownerError", "eventOwnerSet", "eventOwnerCleared"] as const) {
       assert.equal(typeof d.tenderDetail[k], "string", k);
     }
   }
+});
+
+/**
+ * The ficha is INTERNAL CRM copy, so its Spanish is voseo; neutral Spanish is for what goes out to a prospect. The two
+ * registers landed side by side twice in this slice - "Analice el pliego de nuevo" was added right under "Analizá el
+ * pliego de nuevo" - and nothing failed, because a mixed register is still a valid string. This pins the forms that
+ * actually appeared rather than trying to detect register in general: a narrow guard that fires beats a clever one
+ * that does not exist.
+ */
+test("the ficha's Spanish stays voseo: no tuteo/usted forms slipped in beside it", () => {
+  const copy = Object.values(es.tenderDetail).filter((v): v is string => typeof v === "string").join("\n");
+  for (const form of ["Analice", "Revise", "Valide", "Consulte", "lo dé por", "Analiza el", "Revisa el"]) {
+    assert.ok(!copy.includes(form), `tenderDetail uses the non-voseo form "${form}"`);
+  }
+  // The voseo forms the block is built on are still there, so the guard cannot pass by the strings disappearing.
+  assert.ok(copy.includes("Analizá"));
+  assert.ok(copy.includes("no lo des por cierto"));
 });

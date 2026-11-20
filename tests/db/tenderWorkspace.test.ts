@@ -40,8 +40,10 @@ const ANALYSIS = {
   summary: "Replica de infraestructura.",
   viability: "Encaja.",
   requirements: { registration: null, antecedents: null, guarantee: "5%", submissionDeadline: null, certifications: null, financialStanding: null, team: null, affidavits: null },
+  economics: { budget: null, paymentTerms: null, penalties: null },
   pages: 24,
   mustListIncluded: true,
+  economicsIncluded: true,
 };
 
 test("saving a note writes it on the tender and it appears in the progress log with who and when", async () => {

@@ -14,10 +14,10 @@ import test from "node:test";
 import type { generateText } from "ai";
 import {
   ANALYSIS_SYSTEM_PROMPT,
-  mergeRequirementPatch,
-  missingRequirementKeys,
+  analysisFollowUpPrompt,
+  mergeAnalysisPatch,
+  missingKeys,
   parseTenderAnalysis,
-  requirementFollowUpPrompt,
   toTenderAnalysis,
 } from "@/lib/tenders/analysis";
 import { runTenderAnalysis } from "@/lib/tenders/analyse";
@@ -42,7 +42,14 @@ const COMPLETE_PATCH = {
   affidavits: "Declaracion jurada de habilidad para contratar (Anexo IV)",
 };
 
+const ECONOMICS = { budget: "ARS 12.000.000 (art. 3)", paymentTerms: "30 dias de conformada la factura (art. 9)", penalties: null };
+/** Requirements still partial, economics fully answered: isolates the requirements retry from the economics one. */
+const PARTIAL_REQ = { ...PARTIAL, economics: ECONOMICS };
+
 const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+
+const missingRequirementKeys = (v: unknown) => missingKeys(v).filter((m) => m.block === "requirements").map((m) => m.key);
+const mergeRequirementPatch = mergeAnalysisPatch;
 
 /** Answers each call in order and records what it was asked, so the follow-up's shape is asserted, not assumed. */
 function scriptedGenerate(answers: string[]) {
@@ -58,7 +65,7 @@ function scriptedGenerate(answers: string[]) {
 
 test("an absent requirement key is named; a key answered with null is not", () => {
   assert.deepEqual(missingRequirementKeys(PARTIAL), ["certifications", "financialStanding", "team", "affidavits"]);
-  assert.deepEqual(missingRequirementKeys({ ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH } }), []);
+  assert.deepEqual(missingRequirementKeys({ ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH }, economics: ECONOMICS }), []);
   assert.deepEqual(missingRequirementKeys(null), ["registration", "antecedents", "guarantee", "submissionDeadline", "certifications", "financialStanding", "team", "affidavits"]);
 });
 
@@ -80,7 +87,7 @@ test("a patch the model wrapped in its own \"requirements\" object is accepted t
 });
 
 test("dropped keys are asked for again, and the completed reading carries the must-list", async () => {
-  const { generate, calls } = scriptedGenerate([JSON.stringify(PARTIAL), JSON.stringify(COMPLETE_PATCH)]);
+  const { generate, calls } = scriptedGenerate([JSON.stringify(PARTIAL_REQ), JSON.stringify(COMPLETE_PATCH)]);
   const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
 
   assert.equal(result.ok, true);
@@ -102,7 +109,7 @@ test("dropped keys are asked for again, and the completed reading carries the mu
 });
 
 test("a complete first answer costs exactly one model call", async () => {
-  const complete = { ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH } };
+  const complete = { ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH }, economics: ECONOMICS };
   const { generate, calls } = scriptedGenerate([JSON.stringify(complete)]);
   const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
   assert.ok(result.ok);
@@ -111,7 +118,7 @@ test("a complete first answer costs exactly one model call", async () => {
 });
 
 test("a re-ask that answers nothing stops the loop instead of paying for the next one", async () => {
-  const { generate, calls } = scriptedGenerate([JSON.stringify(PARTIAL), JSON.stringify({ unrelated: "nada" })]);
+  const { generate, calls } = scriptedGenerate([JSON.stringify(PARTIAL_REQ), JSON.stringify({ unrelated: "nada" })]);
   const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
   assert.ok(result.ok);
   assert.equal(calls.length, 2);
@@ -124,7 +131,7 @@ test("a re-ask that answers nothing stops the loop instead of paying for the nex
 test("partial progress is kept and the second re-ask asks only for what is still missing", async () => {
   const half = { team: COMPLETE_PATCH.team, financialStanding: COMPLETE_PATCH.financialStanding };
   const rest = { certifications: null, affidavits: COMPLETE_PATCH.affidavits };
-  const { generate, calls } = scriptedGenerate([JSON.stringify(PARTIAL), JSON.stringify(half), JSON.stringify(rest)]);
+  const { generate, calls } = scriptedGenerate([JSON.stringify(PARTIAL_REQ), JSON.stringify(half), JSON.stringify(rest)]);
   const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
   assert.ok(result.ok);
   assert.equal(result.analysis.mustListIncluded, true);
@@ -164,15 +171,16 @@ test("the prompt makes completeness a rule, points past the administrative secti
 });
 
 test("the follow-up asks for a bare object and reads naturally for one key and for many", () => {
-  const one = requirementFollowUpPrompt(["team"]);
+  const one = analysisFollowUpPrompt([{ block: "requirements", key: "team" }]);
   assert.ok(one.includes("this key") && one.includes("that key") && one.includes('"team"'));
-  const many = requirementFollowUpPrompt(["team", "affidavits"]);
+  const many = analysisFollowUpPrompt([{ block: "requirements", key: "team" }, { block: "economics", key: "budget" }]);
+  assert.ok(many.includes('"requirements" and "economics"'));
   assert.ok(many.includes("these keys") && many.includes("those keys"));
   assert.ok(many.includes("Use null only when you have looked and the document truly does not state it."));
 });
 
 test("the completed object is exactly what the normal parser would have accepted in one pass", () => {
-  const complete = { ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH } };
+  const complete = { ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH }, economics: ECONOMICS };
   const direct = parseTenderAnalysis(JSON.stringify(complete))!;
   assert.equal(direct.mustListIncluded, true);
   assert.equal(direct.pages, 23);
@@ -199,7 +207,7 @@ test("an incomplete reading survives the trip through the database still incompl
 });
 
 test("a complete reading survives the round trip complete", () => {
-  const complete = parseTenderAnalysis(JSON.stringify({ ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH } }))!;
+  const complete = parseTenderAnalysis(JSON.stringify({ ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH }, economics: ECONOMICS }))!;
   assert.equal(complete.mustListIncluded, true);
   assert.equal(toTenderAnalysis(JSON.parse(JSON.stringify(complete)))!.mustListIncluded, true);
 });
@@ -208,4 +216,82 @@ test("the flag can only be lowered: a model that volunteers it still has to have
   assert.equal(parseTenderAnalysis(JSON.stringify({ ...PARTIAL, mustListIncluded: true }))!.mustListIncluded, false);
   const complete = { ...PARTIAL, requirements: { ...PARTIAL.requirements, ...COMPLETE_PATCH }, mustListIncluded: false };
   assert.equal(parseTenderAnalysis(JSON.stringify(complete))!.mustListIncluded, false);
+});
+
+/** Economics: the same machinery, keyed by block. */
+const COMPLETE_REQ = { ...PARTIAL.requirements, ...COMPLETE_PATCH };
+
+test("a dropped budget is re-asked exactly like a dropped team, and merged without overwriting an answered key", async () => {
+  const first = { ...PARTIAL, requirements: COMPLETE_REQ, economics: { paymentTerms: "30 dias", penalties: null } };
+  const { generate, calls } = scriptedGenerate([JSON.stringify(first), JSON.stringify({ budget: "ARS 5.000.000", paymentTerms: "WRONG, must not win" })]);
+  const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
+  assert.ok(result.ok);
+  assert.equal(calls.length, 2);
+  const asked = (calls[1]!.messages as { content: unknown }[])[2]!.content as string;
+  assert.ok(asked.includes('"budget"') && asked.includes('"economics"'));
+  assert.ok(!asked.includes('"paymentTerms"') && !asked.includes('"penalties"') && !asked.includes('"team"'));
+  assert.equal(result.analysis.economics.budget, "ARS 5.000.000");
+  assert.equal(result.analysis.economics.paymentTerms, "30 dias");
+  assert.equal(result.analysis.economics.penalties, null);
+  assert.equal(result.analysis.economicsIncluded, true);
+  assert.equal(result.analysis.mustListIncluded, true);
+});
+
+test("one re-ask can complete both blocks, and a wrapped economics patch is accepted", async () => {
+  const { generate, calls } = scriptedGenerate([JSON.stringify(PARTIAL), JSON.stringify({ ...COMPLETE_PATCH, economics: ECONOMICS })]);
+  const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
+  assert.ok(result.ok);
+  assert.equal(calls.length, 2);
+  assert.equal(result.analysis.mustListIncluded, true);
+  assert.equal(result.analysis.economicsIncluded, true);
+  assert.equal(result.analysis.economics.budget, ECONOMICS.budget);
+});
+
+test("an answer complete in both blocks costs exactly one model call", async () => {
+  const { generate, calls } = scriptedGenerate([JSON.stringify({ ...PARTIAL, requirements: COMPLETE_REQ, economics: ECONOMICS })]);
+  const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
+  assert.ok(result.ok);
+  assert.equal(calls.length, 1);
+  assert.equal(result.analysis.economicsIncluded, true);
+});
+
+test("economics null is an answer: all three null still counts as included", async () => {
+  const nulls = { budget: null, paymentTerms: null, penalties: null };
+  const { generate, calls } = scriptedGenerate([JSON.stringify({ ...PARTIAL, requirements: COMPLETE_REQ, economics: nulls })]);
+  const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
+  assert.ok(result.ok);
+  assert.equal(calls.length, 1);
+  assert.equal(result.analysis.economicsIncluded, true);
+});
+
+test("economics stays bounded and a run still incomplete is reported incomplete", async () => {
+  const base = { ...PARTIAL, requirements: COMPLETE_REQ };
+  const { generate, calls } = scriptedGenerate([JSON.stringify(base), JSON.stringify({ budget: "x" }), JSON.stringify({ paymentTerms: "y" })]);
+  const result = await runTenderAnalysis(pdf, "pliego.pdf", generate);
+  assert.ok(result.ok);
+  assert.equal(calls.length, 3);
+  assert.equal(result.analysis.economicsIncluded, false);
+  assert.equal(result.analysis.economics.penalties, null);
+  assert.equal(result.analysis.mustListIncluded, true);
+});
+
+test("an analysis with economics absent stays economicsIncluded:false through the jsonb round trip, twice", () => {
+  const legacy = parseTenderAnalysis(JSON.stringify({ ...PARTIAL, requirements: COMPLETE_REQ }))!;
+  assert.equal(legacy.economicsIncluded, false);
+  const once = toTenderAnalysis(JSON.parse(JSON.stringify(legacy)))!;
+  assert.equal(once.economicsIncluded, false, "a stored false must never be recomputed as true");
+  assert.equal(once.economics.budget, null);
+  assert.equal(toTenderAnalysis(JSON.parse(JSON.stringify(once)))!.economicsIncluded, false);
+});
+
+test("a complete economics block survives the round trip, and the flag can only be lowered", () => {
+  const full = parseTenderAnalysis(JSON.stringify({ ...PARTIAL, requirements: COMPLETE_REQ, economics: ECONOMICS }))!;
+  assert.equal(full.economicsIncluded, true);
+  assert.equal(toTenderAnalysis(JSON.parse(JSON.stringify(full)))!.economicsIncluded, true);
+  assert.equal(parseTenderAnalysis(JSON.stringify({ ...PARTIAL, economicsIncluded: true }))!.economicsIncluded, false);
+  assert.equal(parseTenderAnalysis(JSON.stringify({ ...PARTIAL, requirements: COMPLETE_REQ, economics: ECONOMICS, economicsIncluded: false }))!.economicsIncluded, false);
+});
+
+test("the prompt asks for the three economics keys and no others", () => {
+  for (const k of ["economics", "budget", "paymentTerms", "penalties"]) assert.ok(ANALYSIS_SYSTEM_PROMPT.includes(`"${k}"`), k);
 });

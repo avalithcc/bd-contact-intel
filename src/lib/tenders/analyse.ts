@@ -2,10 +2,10 @@ import { generateText } from "ai";
 import { GatewayError } from "@ai-sdk/gateway";
 import {
   ANALYSIS_SYSTEM_PROMPT,
+  analysisFollowUpPrompt,
   jsonObjectIn,
-  mergeRequirementPatch,
-  missingRequirementKeys,
-  requirementFollowUpPrompt,
+  mergeAnalysisPatch,
+  missingKeys,
   toTenderAnalysis,
   type TenderAnalysis,
 } from "./analysis";
@@ -16,7 +16,7 @@ const ANALYSIS_MODEL = "anthropic/claude-sonnet-5";
 const MAX_OUTPUT_TOKENS = 6000;
 
 /**
- * How many times a dropped requirement key is asked for again.
+ * How many times a dropped key (requirements or economics) is asked for again.
  *
  * Asked once, the model answered four of the eight keys on a real 23-page pliego and said nothing about the other four -
  * including a team requirement it had just described in its own "viability" text. The must-list is the artifact the owner
@@ -61,25 +61,25 @@ export async function runTenderAnalysis(pdf: Uint8Array, filename: string, gener
 
     // Every follow-up is anchored on the SAME first answer and names only what is still missing, so two re-asks never
     // compound into a conversation where the model is answering its own corrections.
-    let missing = missingRequirementKeys(object);
+    let missing = missingKeys(object);
     for (let attempt = 0; attempt < REQUIREMENT_RETRY_ATTEMPTS && missing.length > 0; attempt++) {
       const followUp = await generate({
         model: ANALYSIS_MODEL,
         system: ANALYSIS_SYSTEM_PROMPT,
         maxOutputTokens: MAX_FOLLOW_UP_TOKENS,
-        messages: [...opening, { role: "assistant", content: text }, { role: "user", content: requirementFollowUpPrompt(missing) }],
+        messages: [...opening, { role: "assistant", content: text }, { role: "user", content: analysisFollowUpPrompt(missing) }],
       });
       if (followUp.finishReason === "length") break;
       const patch = jsonObjectIn(followUp.text);
       if (!patch) break;
-      object = mergeRequirementPatch(object, patch);
-      const left = missingRequirementKeys(object);
+      object = mergeAnalysisPatch(object, patch);
+      const left = missingKeys(object);
       // A re-ask that answered nothing will not answer anything on the next one either: stop rather than pay for it.
       if (left.length === missing.length) break;
       missing = left;
     }
 
-    // Still incomplete is reported, never papered over: toTenderAnalysis leaves mustListIncluded false and the ficha
+    // Still incomplete is reported, never papered over: toTenderAnalysis leaves mustListIncluded or economicsIncluded false and the ficha
     // asks for a new analysis instead of showing a key that was never answered as "the pliego does not state it".
     const analysis = toTenderAnalysis(object);
     return analysis ? { ok: true, analysis } : { ok: false, error: "invalidModelOutput" };

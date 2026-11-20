@@ -18,10 +18,21 @@ export interface TenderRequirements {
   affidavits: string | null;
 }
 
+/** The money side of the pliego. Each is null when the document does not state it, like the requirements. */
+export interface TenderEconomics {
+  /** Official budget or estimated contract amount, with the currency and the clause. */
+  budget: string | null;
+  /** How and when the supplier is paid, with the clause. */
+  paymentTerms: string | null;
+  /** Fines and penalties (SLA breaches, caps as a share of the contract), with the clause. */
+  penalties: string | null;
+}
+
 export interface TenderAnalysis {
   summary: string;
   viability: string;
   requirements: TenderRequirements;
+  economics: TenderEconomics;
   /** Pages the model read, when it says so. */
   pages: number | null;
   /**
@@ -29,12 +40,24 @@ export interface TenderAnalysis {
    * asked", NOT "the pliego does not state it", so the must-list must not be built from it.
    */
   mustListIncluded: boolean;
+  /** False for a reading stored before the economics block was asked for: its null keys mean "never asked". */
+  economicsIncluded: boolean;
 }
 
 const BASE_REQUIREMENT_KEYS = ["registration", "antecedents", "guarantee", "submissionDeadline"] as const;
 const MUST_LIST_KEYS = ["certifications", "financialStanding", "team", "affidavits"] as const;
 const REQUIREMENT_KEYS = [...BASE_REQUIREMENT_KEYS, ...MUST_LIST_KEYS] as const;
 export type RequirementKey = (typeof REQUIREMENT_KEYS)[number];
+const ECONOMICS_KEYS = ["budget", "paymentTerms", "penalties"] as const;
+export type EconomicsKey = (typeof ECONOMICS_KEYS)[number];
+
+/** The blocks of the analysis whose keys must each be answered (null counts as an answer, absence does not). */
+const BLOCKS = { requirements: REQUIREMENT_KEYS, economics: ECONOMICS_KEYS } as const;
+export type AnalysisBlock = keyof typeof BLOCKS;
+export interface MissingKey {
+  block: AnalysisBlock;
+  key: RequirementKey | EconomicsKey;
+}
 
 const text = (v: unknown, max: number): string | null => {
   if (typeof v !== "string") return null;
@@ -49,8 +72,10 @@ export function toTenderAnalysis(value: unknown): TenderAnalysis | null {
   const summary = text(v.summary, 4000);
   const viability = text(v.viability, 4000);
   if (!summary || !viability) return null;
-  const req = (typeof v.requirements === "object" && v.requirements !== null ? v.requirements : {}) as Record<string, unknown>;
+  const req = blockOf(v, "requirements");
   const requirements = Object.fromEntries(REQUIREMENT_KEYS.map((k) => [k, text(req[k], 1500)])) as unknown as TenderRequirements;
+  const econ = blockOf(v, "economics");
+  const economics = Object.fromEntries(ECONOMICS_KEYS.map((k) => [k, text(econ[k], 1500)])) as unknown as TenderEconomics;
   const pages = typeof v.pages === "number" && Number.isInteger(v.pages) && v.pages > 0 ? v.pages : null;
   /**
    * The flag can only ever be LOWERED here, never raised, because this function runs TWICE on the same reading: once on
@@ -61,7 +86,10 @@ export function toTenderAnalysis(value: unknown): TenderAnalysis | null {
    */
   const claimed = typeof v.mustListIncluded === "boolean" ? v.mustListIncluded : true;
   const mustListIncluded = claimed && MUST_LIST_KEYS.every((k) => k in req);
-  return { summary, viability, requirements, pages, mustListIncluded };
+  // Same rule as above and for the same reason: only ever lowered, never recomputed upward from filled keys.
+  const economicsClaimed = typeof v.economicsIncluded === "boolean" ? v.economicsIncluded : true;
+  const economicsIncluded = economicsClaimed && ECONOMICS_KEYS.every((k) => k in econ);
+  return { summary, viability, requirements, economics, pages, mustListIncluded, economicsIncluded };
 }
 
 /** The model is asked for bare JSON; it may still wrap it in a code fence or add a line around it. */
@@ -81,34 +109,40 @@ export function parseTenderAnalysis(raw: string): TenderAnalysis | null {
   return toTenderAnalysis(jsonObjectIn(raw));
 }
 
-const requirementsOf = (value: unknown): Record<string, unknown> => {
+function blockOf(value: unknown, block: AnalysisBlock): Record<string, unknown> {
   const v = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
-  return (typeof v.requirements === "object" && v.requirements !== null ? v.requirements : {}) as Record<string, unknown>;
-};
+  return (typeof v[block] === "object" && v[block] !== null ? v[block] : {}) as Record<string, unknown>;
+}
 
 /**
- * The requirement keys the model did not answer AT ALL.
+ * The keys, in every block, that the model did not answer AT ALL.
  *
  * An absent key and a key whose value is null are not the same thing and must never be conflated: null is an answer
  * ("I looked and the pliego does not state it"), an absent key is a question that was dropped. `toTenderAnalysis` fills
  * every key, so once it has run the difference is gone - this reads the model's own object, before that happens.
  */
-export function missingRequirementKeys(value: unknown): readonly RequirementKey[] {
-  const req = requirementsOf(value);
-  return REQUIREMENT_KEYS.filter((k) => !(k in req));
+export function missingKeys(value: unknown): readonly MissingKey[] {
+  return (Object.keys(BLOCKS) as AnalysisBlock[]).flatMap((block) => {
+    const answered = blockOf(value, block);
+    return BLOCKS[block].filter((k) => !(k in answered)).map((key) => ({ block, key }));
+  });
 }
 
 /**
  * Folds a follow-up answer into the first one. A key that was already answered is NEVER overwritten, so re-asking cannot
- * degrade a good reading, and the patch is accepted both bare (`{"team": ...}`) and wrapped (`{"requirements": {...}}`),
- * because the model is told to reply bare and sometimes wraps it anyway.
+ * degrade a good reading, and the patch is accepted both bare (`{"team": ...}`) and wrapped (`{"requirements": {...}}`,
+ * `{"economics": {...}}`), because the model is told to reply bare and sometimes wraps it anyway. Key names are unique
+ * across blocks, so a bare patch is unambiguous.
  */
-export function mergeRequirementPatch(analysisObject: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
-  const nested = requirementsOf(patch);
-  const flat = { ...patch, ...nested };
-  const merged = { ...requirementsOf(analysisObject) };
-  for (const k of REQUIREMENT_KEYS) if (!(k in merged) && k in flat) merged[k] = flat[k];
-  return { ...analysisObject, requirements: merged };
+export function mergeAnalysisPatch(analysisObject: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+  const flat = { ...patch, ...blockOf(patch, "requirements"), ...blockOf(patch, "economics") };
+  const result: Record<string, unknown> = { ...analysisObject };
+  for (const block of Object.keys(BLOCKS) as AnalysisBlock[]) {
+    const merged = { ...blockOf(analysisObject, block) };
+    for (const k of BLOCKS[block]) if (!(k in merged) && k in flat) merged[k] = flat[k];
+    result[block] = merged;
+  }
+  return result;
 }
 
 export interface DocumentLike {
@@ -142,20 +176,26 @@ export const ANALYSIS_SYSTEM_PROMPT = [
   "Every one of those eight keys must be present in the object. Leaving a key out is a question you did not answer, which is not the same as null, so never leave one out.",
   "A requirement can be stated anywhere in the document, including the technical specifications and the annexes, not only among the administrative conditions. Look there too before writing null.",
   'Anything you name in "viability" as something the bidder must have, hold or prove must also appear under the matching "requirements" key.',
+  '"economics": an object with "budget" (the official budget or estimated contract amount, with the currency),',
+  '"paymentTerms" (how and when the supplier is paid, e.g. days after the invoice is approved) and',
+  '"penalties" (fines and penalties, e.g. SLA breaches and any cap as a percentage of the contract). Quote or closely paraphrase the document, with the clause when it gives one, and use null for any it does not state.',
+  "Every one of those three economics keys must be present too, with the same rule: leaving one out is not the same as null.",
   '"pages": the number of pages of the document, as an integer, or null.',
 ].join("\n");
 
 /**
- * The re-ask when the model answered some requirement keys and dropped others.
+ * The re-ask when the model answered some keys and dropped others, in any block.
  *
  * Only the dropped keys are asked for again, never the whole object: the answers it did give are not regenerated (so a good
  * reading cannot be degraded by a second pass) and the follow-up stays short, which keeps it clear of the output cap that
- * a full re-answer of eight quoted clauses would be fighting.
+ * a full re-answer of eleven quoted clauses would be fighting.
  */
-export function requirementFollowUpPrompt(missing: readonly RequirementKey[]): string {
+export function analysisFollowUpPrompt(missing: readonly MissingKey[]): string {
   const one = missing.length === 1;
+  const blocks = (Object.keys(BLOCKS) as AnalysisBlock[]).filter((b) => missing.some((m) => m.block === b));
+  const where = blocks.map((b) => `"${b}"`).join(" and ");
   return [
-    `Your answer left out ${one ? "this key" : "these keys"} of "requirements": ${missing.map((k) => `"${k}"`).join(", ")}.`,
+    `Your answer left out ${one ? "this key" : "these keys"} of ${where}: ${missing.map((m) => `"${m.key}"`).join(", ")}.`,
     "Read the document again for each one, including the technical specifications and the annexes.",
     `Reply with one JSON object and nothing else, holding exactly ${one ? "that key" : "those keys"} at the top level.`,
     "Quote or closely paraphrase what the document says, with the clause when it gives one, in neutral Spanish.",

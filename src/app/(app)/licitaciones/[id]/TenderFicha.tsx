@@ -53,6 +53,11 @@ function eventText(e: TenderEventView, l: Dictionary["tenderDetail"], triage: Re
 
 function Reading({ analysis, tender, labels: l }: { analysis: TenderAnalysis; tender: { processNumber: string; name: string }; labels: Dictionary["tenderDetail"] }): ReactNode {
   const lines = mustListLines(analysis.requirements, l);
+  const economicsLines = [
+    { label: l.econBudget, value: analysis.economics.budget },
+    { label: l.econPayment, value: analysis.economics.paymentTerms },
+    { label: l.econPenalties, value: analysis.economics.penalties },
+  ];
   return (
     <>
       <p className="strong">{l.analysisSummary}</p>
@@ -70,6 +75,18 @@ function Reading({ analysis, tender, labels: l }: { analysis: TenderAnalysis; te
         ))}
       </ul>
       {analysis.mustListIncluded && <CopyNumber value={mustListText(analysis.requirements, l, tender)} label={l.mustCopy} doneLabel={l.mustCopied} />}
+      <p className="strong">{l.economicsTitle}</p>
+      {analysis.economicsIncluded ? <p className="help">{l.economicsIntro}</p> : <p className="help">{l.economicsReanalyse}</p>}
+      {/* A reading from before the economics block never asked these questions, so no line is shown rather than "not stated". */}
+      {analysis.economicsIncluded && (
+        <ul className="meta">
+          {economicsLines.map((line) => (
+            <li key={line.label}>
+              <span className="strong">{line.label}:</span> {line.value ?? l.reqNotStated}
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }
