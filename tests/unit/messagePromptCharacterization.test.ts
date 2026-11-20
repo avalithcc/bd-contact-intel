@@ -2,7 +2,11 @@
  * Characterization test: pins, byte for byte, what buildOutreachMessagePrompt renders for the Spanish inputs the
  * live callers send (no `purpose`). The prompt is shared by five callers that generate the app's outreach
  * messages in production, and a regression there has no other test watching it. Goldens in
- * tests/unit/fixtures/messagePromptGolden/ were re-captured on 2026-11-17 for an intentional, owner-approved prompt
+ * tests/unit/fixtures/messagePromptGolden/ were re-captured on 2026-11-20 for an intentional, owner-approved prompt
+ * change: Spanish now REQUIRES the opening marks "¿" and "¡" on every channel, where the rule used to ban them, and
+ * the exemplar's closing ask became the conditional "¿Tendrías 15 minutos...?". The ban was the cause of the missing
+ * "¿" the owner reported on 2026-11-19; addSpanishOpeningMarks had been added to repair the output while this prompt
+ * went on ordering the omission. Previously re-captured 2026-11-17 for an intentional, owner-approved prompt
  * change: the subject is now a NOUN FRAGMENT and the headline-shaped example was removed. The owner received
  * "Getnet abre backend y Salesforce en LATAM y España" and found it strange to read - a news bulletin about him
  * rather than a line written to him - and the first shape example was "Affirm suma backend en Card y Fraud", which

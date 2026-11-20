@@ -283,11 +283,18 @@ function summarizeHiring(company: OutreachMessageCompany | null, contactCompanyN
 // Tone/register instruction for rule 2 (Language and tone). Spanish is neutral, professional Spanish on EVERY channel:
 // no voseo, no regionalisms, no slang in any outgoing prospect message. This replaces the earlier decision that kept a
 // Rioplatense voice for LinkedIn DMs; the owner reversed it ("es muy muy informal eso. NO lo quiero en ningun correo
-// saliente"). The channel still matters for the opening-marks rule below, which is about sounding like a real chat
-// message, not about register.
+// saliente").
+//
+// The opening marks were BANNED here, to sound like a real chat message. The owner reversed that on 2026-11-19
+// ("corregí el signo de interrogación"), and addSpanishOpeningMarks was added to repair the output - but this
+// instruction stayed, so the prompt was ordering the omission and a post-step was undoing it, every single draft. A
+// repair that fights its own prompt is not a fix, it is two bugs that cancel: the first draft the repair missed would
+// have shipped the defect. The rule is now stated positively and the repair stays as the net underneath it.
+// It applies on every channel: dropping "¿" is a spelling mistake in Spanish, not a register, and these go to
+// Argentina and the whole region.
 function languageInstruction(channel: OutreachChannel, language: MessageLanguage): string {
   if (language === "es") {
-    return 'Write in neutral, professional Spanish: standard verb forms, no casual regionalisms or slang, no colloquial contractions. Warm and direct, a peer writing to a peer — never a cold sales pitch. Never use the opening marks "¿" or "¡" — only the closing "?" and "!".'
+    return 'Write in neutral, professional Spanish: standard verb forms, no casual regionalisms or slang, no colloquial contractions. Warm and direct, a peer writing to a peer — never a cold sales pitch. Open every question with "¿" and every exclamation with "¡", as written Spanish requires.'
       + (channel === "linkedin" ? " Write like a real LinkedIn chat message: short and natural, but still professional." : "");
   }
   if (language === "pt") {
@@ -311,12 +318,19 @@ function referenceStyleFor(isEmail: boolean, language: MessageLanguage, signatur
   // lines up says shape is copied even over a contradicting rule - so every BD's draft signed as the owner. Macarena
   // reported it on her first sequence: 1 draft, caught before it was sent.
   const sign = signatureFollows ? "" : `\\n\\n${signOff}`;
+  // The Spanish closing ask is CONDITIONAL ("¿Tendrías...?"), not future indicative ("¿Tendrás...?"), and it opens its
+  // question. These drafts go to Argentina and the rest of Latin America, and prospect-facing copy is neutral
+  // professional Spanish, not Rioplatense: "¿Tendrás 15 minutos?" is read as colloquial here and as presuming the
+  // answer elsewhere in the region, while the conditional is the polite default everywhere Spanish is written.
+  // The opening "¿" belongs here too. addSpanishOpeningMarks repairs a missing one after generation, but an exemplar
+  // that omits it is teaching the model to omit it, so the repair was covering for the lesson - shape is copied from
+  // the example even over a contradicting rule (see closingAskRule).
   if (language === "es") {
     return isEmail
       ? `Reference style (do not copy verbatim, tone example only, in Spanish, for a FIRST email with no prior history):
-{"subject": "Backend senior en Card, Fraud y Payments", "body": "Hola Gonzalo,\\n\\nVi que Affirm tiene varias búsquedas abiertas de backend senior en Card, Fraud, Identity y Payments, casi todas remotas en US y Europa. En Avalith armamos equipos de ingenieros senior en timezone alineado a US, integrados en días, para dar capacidad extra mientras se cubren esos roles — no competimos con el proceso de contratación.\\n\\nTendrás 15 minutos la semana próxima para conversar y ver si podemos ayudarlos en alguna oportunidad?${sign}"}`
+{"subject": "Backend senior en Card, Fraud y Payments", "body": "Hola Gonzalo,\\n\\nVi que Affirm tiene varias búsquedas abiertas de backend senior en Card, Fraud, Identity y Payments, casi todas remotas en US y Europa. En Avalith armamos equipos de ingenieros senior en timezone alineado a US, integrados en días, para dar capacidad extra mientras se cubren esos roles — no competimos con el proceso de contratación.\\n\\n¿Tendrías 15 minutos la semana próxima para conversar y ver si podemos ayudarlos en alguna oportunidad?${sign}"}`
       : `Reference style (do not copy verbatim, this is a tone example only, in Spanish, for a FIRST outreach with no prior history):
-"Hola Gonzalo, un gusto saludarte. Soy ${signOff}. Estuve mirando las búsquedas de Affirm y vi que están sumando varias personas senior de backend en Card, Fraud, Identity y Payments, casi todo remoto en US y Europa. Trabajamos desde 2011 armando equipos pequeños de ingenieros senior, horario alineado a US, integrados en días. No es para reemplazar sus búsquedas, es capacidad extra mientras se cubren esos roles. Tendrás 15 minutos la semana próxima para conversar?"`;
+"Hola Gonzalo, un gusto saludarte. Soy ${signOff}. Estuve mirando las búsquedas de Affirm y vi que están sumando varias personas senior de backend en Card, Fraud, Identity y Payments, casi todo remoto en US y Europa. Trabajamos desde 2011 armando equipos pequeños de ingenieros senior, horario alineado a US, integrados en días. No es para reemplazar sus búsquedas, es capacidad extra mientras se cubren esos roles. ¿Tendrías 15 minutos la semana próxima para conversar?"`;
   }
   return isEmail
     ? `Reference style (do not copy verbatim, tone example only, in English, for a FIRST email with no prior history):

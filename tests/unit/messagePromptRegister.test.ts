@@ -60,16 +60,33 @@ for (const channel of CHANNELS) {
   }
 }
 
+// Owner's call, 2026-11-20, when told the audience is Argentina AND the rest of Latin America: the conditional, with
+// its opening mark. "¿Tendrás...?" reads colloquial in Rioplatense and presumes the answer elsewhere in the region;
+// the conditional is the polite default everywhere Spanish is written, and prospect-facing copy is neutral Spanish.
 test("the Spanish email exemplar uses the owner-approved call to action verbatim", () => {
   const { system } = buildOutreachMessagePrompt({ ...BASE, channel: "email", language: "es" });
-  assert.ok(system.includes("Tendrás 15 minutos la semana próxima para conversar y ver si podemos ayudarlos en alguna oportunidad?"));
+  assert.ok(system.includes("¿Tendrías 15 minutos la semana próxima para conversar y ver si podemos ayudarlos en alguna oportunidad?"));
   assert.doesNotMatch(system, /20 minutos/);
+  // The exemplar teaches shape even over a contradicting rule, so it must not demonstrate the defect it is meant to avoid.
+  assert.doesNotMatch(system, /Tendrás/);
+});
+
+/**
+ * The prompt used to ORDER the omission ('Never use the opening marks "¿" or "¡"') while addSpanishOpeningMarks
+ * repaired the output, so two steps cancelled each other and the first draft the repair missed would have shipped the
+ * defect. The instruction is the thing under test: the repair being correct is not evidence that the prompt is.
+ */
+test("the Spanish prompt requires the opening marks on every channel, and never bans them", () => {
+  for (const channel of ["email", "linkedin"] as const) {
+    const { system } = buildOutreachMessagePrompt({ ...BASE, channel, language: "es" });
+    assert.match(system, /Open every question with "¿" and every exclamation with "¡"/, channel);
+    assert.doesNotMatch(system, /[Nn]ever use the opening marks/, channel);
+  }
 });
 
 test("the Spanish LinkedIn prompt is neutral, introduces the sender by name and proposes 15 minutes", () => {
   const { system } = buildOutreachMessagePrompt({ ...BASE, channel: "linkedin", language: "es" });
   assert.match(system, /neutral, professional Spanish/);
-  assert.match(system, /never use the opening marks "¿" or "¡"/i);
   assert.match(system, /Soy Cristian Civita, COO de Avalith/);
   assert.match(system, /15 minutos/);
 });
