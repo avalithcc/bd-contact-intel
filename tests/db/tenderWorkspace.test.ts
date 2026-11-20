@@ -111,3 +111,62 @@ test("a new upload becomes the current document and starts with no analysis: the
     assert.equal(await addTenderDocument({ tenderId: "55555555-5555-4555-8555-555555555555", storagePath: "x/y/z.pdf", filename: "z.pdf", sizeBytes: 1, actorBdId: actor }, tx as never), null);
   });
 });
+
+test("requirement states round-trip, pending stores no row, and an unknown tender or key is refused", async () => {
+  const { setRequirementStatus, getTenderDetail } = await import("@/lib/tenders/workspace");
+  const { db } = await import("@/db");
+  const { tenderRequirementStatus } = await import("@/db/schema");
+  const { eq } = await import("drizzle-orm");
+  await inRolledBackTransaction(async (tx) => {
+    const { actor, tenderId } = await seed(tx);
+    const rows = () => tx.select().from(tenderRequirementStatus).where(eq(tenderRequirementStatus.tenderId, tenderId));
+    assert.deepEqual((await getTenderDetail(tenderId, new Date(), tx as never))!.requirementStatuses, {});
+
+    assert.equal(await setRequirementStatus(tenderId, "team", "have", actor, tx as never), true);
+    assert.equal(await setRequirementStatus(tenderId, "guarantee", "missing", actor, tx as never), true);
+    assert.deepEqual((await getTenderDetail(tenderId, new Date(), tx as never))!.requirementStatuses, { team: "have", guarantee: "missing" });
+    assert.equal((await rows()).length, 2);
+
+    // Changing state updates the one row; going back to pending DELETES it (the table holds decisions only).
+    await setRequirementStatus(tenderId, "team", "missing", actor, tx as never);
+    assert.equal((await rows()).length, 2);
+    await setRequirementStatus(tenderId, "team", "pending", actor, tx as never);
+    await setRequirementStatus(tenderId, "guarantee", "pending", actor, tx as never);
+    assert.equal((await rows()).length, 0);
+    assert.deepEqual((await getTenderDetail(tenderId, new Date(), tx as never))!.requirementStatuses, {});
+
+    assert.equal(await setRequirementStatus("55555555-5555-4555-8555-555555555555", "team", "have", actor, tx as never), false);
+    assert.equal(await setRequirementStatus(tenderId, "ISO 27001" as never, "have", actor, tx as never), false);
+    assert.equal(await setRequirementStatus(tenderId, "team", "yes" as never, actor, tx as never), false);
+    assert.equal((await rows()).length, 0);
+  });
+  void db;
+});
+
+test("a requirement change is logged with the key and the state, once per real change, and the progress log shows who", async () => {
+  const { setRequirementStatus, getTenderDetail } = await import("@/lib/tenders/workspace");
+  await inRolledBackTransaction(async (tx) => {
+    const { actor, tenderId } = await seed(tx);
+    await setRequirementStatus(tenderId, "team", "have", actor, tx as never);
+    await setRequirementStatus(tenderId, "team", "have", actor, tx as never);
+    await setRequirementStatus(tenderId, "affidavits", "pending", actor, tx as never);
+    const events = (await getTenderDetail(tenderId, new Date(), tx as never))!.events;
+    assert.deepEqual(events.map((e) => [e.kind, e.detail.key, e.detail.to, e.actor]), [["requirement", "team", "have", "ZZ Ana"]]);
+  });
+});
+
+test("re-analysing a tender neither loses nor moves the marks: they are keyed by requirement, not by the reading's text", async () => {
+  const { addTenderDocument, saveTenderAnalysis, setRequirementStatus, getTenderDetail } = await import("@/lib/tenders/workspace");
+  await inRolledBackTransaction(async (tx) => {
+    const { actor, tenderId } = await seed(tx);
+    const doc = await addTenderDocument({ tenderId, storagePath: `${actor}/a/one.pdf`, filename: "one.pdf", sizeBytes: 1000, actorBdId: actor }, tx as never);
+    await saveTenderAnalysis(doc!, { ...ANALYSIS, requirements: { ...ANALYSIS.requirements, certifications: "ISO 27001" } }, actor, tx as never);
+    await setRequirementStatus(tenderId, "certifications", "have", actor, tx as never);
+    await setRequirementStatus(tenderId, "guarantee", "missing", actor, tx as never);
+    // The model words every requirement differently the second time (and drops one).
+    await saveTenderAnalysis(doc!, { ...ANALYSIS, requirements: { ...ANALYSIS.requirements, certifications: "Norma ISO 9001 o 27001, art. 4", guarantee: null } }, actor, tx as never);
+    const detail = await getTenderDetail(tenderId, new Date(), tx as never);
+    assert.equal(detail!.documents[0]!.analysis!.requirements.certifications, "Norma ISO 9001 o 27001, art. 4");
+    assert.deepEqual(detail!.requirementStatuses, { certifications: "have", guarantee: "missing" });
+  });
+});

@@ -3,7 +3,7 @@ import { AdminRequiredError } from "@/lib/auth/adminRole";
 import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { getDictionary } from "@/lib/i18n/server";
 import { getTenderDetail } from "@/lib/tenders/workspace";
-import { analyseTenderAction, registerTenderDocumentAction, saveTenderNoteAction, setTenderOwnerAction, setTenderTriageAction } from "../actions";
+import { analyseTenderAction, registerTenderDocumentAction, saveTenderNoteAction, setTenderOwnerAction, setTenderRequirementStatusAction, setTenderTriageAction } from "../actions";
 import { TenderFicha } from "./TenderFicha";
 
 // The admin role gates the page and the day count depends on "now".
@@ -26,7 +26,7 @@ export default async function TenderPage({ params }: { params: Promise<{ id: str
       detail={detail}
       labels={dict.tenderDetail}
       triageLabels={dict.tendersPage.triage}
-      actions={{ saveNote: saveTenderNoteAction, registerDocument: registerTenderDocumentAction, analyse: analyseTenderAction, setTriage: setTenderTriageAction, setOwner: setTenderOwnerAction }}
+      actions={{ saveNote: saveTenderNoteAction, registerDocument: registerTenderDocumentAction, analyse: analyseTenderAction, setTriage: setTenderTriageAction, setOwner: setTenderOwnerAction, setRequirementStatus: setTenderRequirementStatusAction }}
     />
   );
 }

@@ -512,6 +512,13 @@
       "when": 1795724400000,
       "tag": "0072_tender_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1795810800000,
+      "tag": "0073_tender_requirement_status",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import type { Tender, TenderPortal } from "@/db/schema";
 import type { TenderAnalysis } from "./analysis";
+import type { RequirementStatuses } from "./requirementStatus";
 import type { TenderTiming } from "./timing";
 
 /** What the ficha reads. Plain data (no `@/db` value import) so the view and its tests stay client-safe. */
@@ -15,12 +16,12 @@ export interface TenderDocumentView {
   analyzedBy: string | null;
 }
 
-export type TenderEventKind = "triage" | "note" | "document" | "analysis" | "relevance" | "owner";
+export type TenderEventKind = "triage" | "note" | "document" | "analysis" | "relevance" | "owner" | "requirement";
 
 export interface TenderEventView {
   id: string;
   kind: TenderEventKind;
-  detail: { from?: string; to?: string; text?: string; filename?: string };
+  detail: { from?: string; to?: string; text?: string; filename?: string; key?: string };
   createdAt: Date;
   actor: string | null;
 }
@@ -37,6 +38,8 @@ export interface TenderDetail {
   portal: TenderPortal | null;
   /** Every admin, by name, for the owner picker: only an admin can open the section, so only an admin can own a tender. */
   bdOptions: BdOption[];
+  /** The answers given so far, by requirement key; a key that is absent is pending. Independent of the reading: a re-analysis does not touch it. */
+  requirementStatuses: RequirementStatuses;
   /** Newest first. */
   documents: TenderDocumentView[];
   /** Newest first, bounded. */

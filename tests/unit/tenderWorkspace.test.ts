@@ -104,10 +104,11 @@ function detail(over: { documents?: TenderDocumentView[]; events?: TenderEventVi
     documents: over.documents ?? [],
     events: over.events ?? [],
     bdOptions: [],
+    requirementStatuses: {},
   };
 }
 
-const actions = { setTriage: async () => {}, saveNote: async () => true, registerDocument: async () => ({ ok: true }), analyse: async () => ({ ok: true as const }), setOwner: async () => {} };
+const actions = { setTriage: async () => {}, saveNote: async () => true, registerDocument: async () => ({ ok: true }), analyse: async () => ({ ok: true as const }), setOwner: async () => {}, setRequirementStatus: async () => {} };
 // The controls call useRouter().refresh() after a write; a stub router is enough to render them.
 const router = { push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} } as never;
 const render = (d: TenderDetail) =>

@@ -14,7 +14,9 @@ import { TenderDocumentUpload } from "./TenderDocumentUpload";
 import { TenderNoteForm } from "./TenderNoteForm";
 import { TenderOwnerSelect } from "./TenderOwnerSelect";
 import { TenderPortalBlock } from "./TenderPortalBlock";
-import { mustListLines, mustListText } from "@/lib/tenders/mustList";
+import { TenderRequirementStatusSelect } from "./TenderRequirementStatusSelect";
+import { isRequirementKey, type RequirementStatus } from "@/lib/tenders/requirementStatus";
+import { MUST_LIST_ROWS, mustListLines, mustListText } from "@/lib/tenders/mustList";
 
 /** COMPR.AR has no stable link per process (its result links are `__doPostBack`), so the number is pasted into the portal's own search. */
 /**
@@ -30,6 +32,7 @@ export interface TenderFichaActions {
   setTriage(id: string, status: string): Promise<void>;
   analyse(tenderId: string): Promise<{ ok: true } | { ok: false; error: string }>;
   setOwner(id: string, ownerBdId: string): Promise<void>;
+  setRequirementStatus(id: string, key: string, status: string): Promise<void>;
 }
 
 const when = (d: Date) => `${formatArgentinaDayMonthYear(d)}, ${formatArgentinaDayMonthTime(d).split(", ")[1]}`;
@@ -47,13 +50,32 @@ function eventText(e: TenderEventView, l: Dictionary["tenderDetail"], triage: Re
       return fillTemplate(l.eventAnalysis, { filename: e.detail.filename ?? "" });
     case "owner":
       return e.detail.to ? fillTemplate(l.eventOwnerSet, { who: e.detail.to }) : l.eventOwnerCleared;
+    case "requirement": {
+      const key = e.detail.key;
+      const label = key && isRequirementKey(key) ? l[MUST_LIST_ROWS.find(([k]) => k === key)![1]] : (key ?? "");
+      const status: Record<string, string> = { pending: l.reqStatusPending, have: l.reqStatusHave, missing: l.reqStatusMissing };
+      return fillTemplate(l.eventRequirement, { requirement: label, status: status[e.detail.to ?? ""] ?? "" });
+    }
     case "relevance":
       return e.detail.to === "relevant" ? l.eventRelevanceRelevant : e.detail.to === "irrelevant" ? l.eventRelevanceIrrelevant : l.eventRelevanceAuto;
   }
 }
 
-function Reading({ analysis, tender, labels: l }: { analysis: TenderAnalysis; tender: { processNumber: string; name: string }; labels: Dictionary["tenderDetail"] }): ReactNode {
-  const lines = mustListLines(analysis.requirements, l);
+function Reading({
+  analysis,
+  tender,
+  statuses,
+  labels: l,
+  actions,
+}: {
+  analysis: TenderAnalysis;
+  tender: { id: string; processNumber: string; name: string };
+  statuses: TenderDetail["requirementStatuses"];
+  labels: Dictionary["tenderDetail"];
+  actions: TenderFichaActions;
+}): ReactNode {
+  const lines = mustListLines(analysis.requirements, l, statuses);
+  const statusLabels: Record<RequirementStatus, string> = { pending: l.reqStatusPending, have: l.reqStatusHave, missing: l.reqStatusMissing };
   const economicsLines = [
     { label: l.econBudget, value: analysis.economics.budget },
     { label: l.econPayment, value: analysis.economics.paymentTerms },
@@ -70,12 +92,22 @@ function Reading({ analysis, tender, labels: l }: { analysis: TenderAnalysis; te
       <ul className="meta">
         {/* A reading from before the must-list only knows the first four; the rest were never asked, so they are not listed as "not stated". */}
         {(analysis.mustListIncluded ? lines : lines.slice(0, 4)).map((line) => (
-          <li key={line.label}>
-            <span className="strong">{line.label}:</span> {line.value ?? l.reqNotStated}
+          <li key={line.key}>
+            <span className="strong">{line.label}:</span> {line.value ?? l.reqNotStated}{" "}
+            {/* Keyed by the requirement key, not its text: a re-analysis rewrites the text and must not move the answer. */}
+            <TenderRequirementStatusSelect
+              id={tender.id}
+              requirementKey={line.key}
+              value={line.status}
+              labels={statusLabels}
+              ariaLabel={fillTemplate(l.reqStatusLabel, { requirement: line.label })}
+              errorLabel={l.reqStatusError}
+              setStatus={actions.setRequirementStatus}
+            />
           </li>
         ))}
       </ul>
-      {analysis.mustListIncluded && <CopyNumber value={mustListText(analysis.requirements, l, tender)} label={l.mustCopy} doneLabel={l.mustCopied} />}
+      {analysis.mustListIncluded && <CopyNumber value={mustListText(analysis.requirements, l, tender, statuses)} label={l.mustCopy} doneLabel={l.mustCopied} />}
       <p className="strong">{l.economicsTitle}</p>
       {analysis.economicsIncluded ? <p className="help">{l.economicsIntro}</p> : <p className="help">{l.economicsReanalyse}</p>}
       {/* A reading from before the economics block never asked these questions, so no line is shown rather than "not stated". */}
@@ -233,7 +265,7 @@ export function TenderFicha({
                 {fillTemplate(analysis.pages ? l.analysisGeneratedPages : l.analysisGenerated, { filename: doc.filename, pages: String(analysis.pages ?? ""), when: doc.analyzedAt ? when(doc.analyzedAt) : "" })}
                 {doc.analyzedBy ? fillTemplate(l.analysisGeneratedBy, { who: doc.analyzedBy }) : ""}
               </p>
-              <Reading analysis={analysis} tender={t} labels={l} />
+              <Reading analysis={analysis} tender={t} statuses={detail.requirementStatuses} labels={l} actions={actions} />
             </>
           )}
           {doc && !analysis && <p className="meta">{l.analysisPending}</p>}

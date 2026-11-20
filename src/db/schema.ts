@@ -2317,7 +2317,7 @@ export type NewTender = typeof tender.$inferInsert;
  * Its own table rather than audit_log because the log is read on every ficha by tender (audit_log has no index on it) and
  * because these are routine work notes, not the consequential actions audit_log exists for.
  * `kind`: 'triage' (detail {from, to}) | 'note' (detail {text}, "" when cleared) | 'document' (detail {filename}) |
- * 'analysis' (detail {filename}) | 'relevance' (detail {to}) | 'owner' (detail {to: the owner's name, "" when released}). `actor_bd_id` is nulled when a BD is deleted: the history outlives the person.
+ * 'analysis' (detail {filename}) | 'relevance' (detail {to}) | 'owner' (detail {to: the owner's name, "" when released}) | 'requirement' (detail {key, to: 'pending'|'have'|'missing'}). `actor_bd_id` is nulled when a BD is deleted: the history outlives the person.
  */
 export const tenderEvent = pgTable(
   "tender_event",
@@ -2395,6 +2395,31 @@ export const tenderPortal = pgTable(
   (t) => ({
     tenderUnique: uniqueIndex("tender_portal_tender_unique").on(t.tenderId),
     byFetchedAt: index("tender_portal_fetched_at_idx").on(t.fetchedAt),
+  }),
+);
+
+/**
+ * What Avalith has, per requirement of a tender, as the administrative area answers. THREE states on purpose, not a checkbox:
+ * 'pending' (nobody asked yet - stored as NO row), 'have', 'missing'. An unchecked box would mean both "not asked" and "they
+ * said no", which are opposite facts (pending work vs a reason not to bid). Only decisions are stored: setting 'pending' deletes the row.
+ * `requirement_key` is one of the keys of MUST_LIST_ROWS (src/lib/tenders/mustList.ts), NEVER the requirement's text: the text is
+ * model output and changes on every re-analysis, the answer from administration must survive that. `note` is the answer in a few words.
+ */
+export const tenderRequirementStatus = pgTable(
+  "tender_requirement_status",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenderId: uuid("tender_id")
+      .notNull()
+      .references(() => tender.id, { onDelete: "cascade" }),
+    requirementKey: text("requirement_key").notNull(),
+    status: text("status").notNull(),
+    setByBdId: uuid("set_by_bd_id").references(() => bd.id, { onDelete: "set null" }),
+    note: text("note"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tenderKeyUnique: uniqueIndex("tender_requirement_status_tender_key_unique").on(t.tenderId, t.requirementKey),
   }),
 );
 

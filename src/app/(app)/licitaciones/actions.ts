@@ -9,7 +9,8 @@ import { matchesMagic } from "@/lib/email/attachments/magic";
 import { createClient } from "@/lib/supabase/server";
 import { runTenderAnalysis } from "@/lib/tenders/analyse";
 import { MAX_TENDER_DOCUMENT_BYTES, TENDER_DOCUMENTS_BUCKET, checkTenderDocument, tenderDocumentPathBelongsTo } from "@/lib/tenders/document";
-import { addTenderDocument, getCurrentTenderDocument, saveTenderAnalysis, saveTenderNote, setTenderOwner } from "@/lib/tenders/workspace";
+import { addTenderDocument, getCurrentTenderDocument, saveTenderAnalysis, saveTenderNote, setRequirementStatus, setTenderOwner } from "@/lib/tenders/workspace";
+import { isRequirementKey, isRequirementStatus } from "@/lib/tenders/requirementStatus";
 import { isUuid } from "@/lib/uuid";
 import { TenderSheetError } from "@/lib/tenders/parse";
 import { isTenderTriage } from "@/lib/tenders/triage";
@@ -71,6 +72,15 @@ export async function setTenderOwnerAction(id: string, ownerBdId: string): Promi
   const found = await setTenderOwner(id, ownerBdId === "" ? null : ownerBdId, me.id);
   if (!found) throw new Error("Tender or BD not found");
   revalidatePath("/licitaciones");
+  revalidatePath(`/licitaciones/${id}`);
+}
+
+/** An admin records what administration answered for one requirement (pending clears it); the move is logged with who made it. */
+export async function setTenderRequirementStatusAction(id: string, key: string, status: string): Promise<void> {
+  const me = await requireAdmin();
+  if (!isRequirementKey(key) || !isRequirementStatus(status)) throw new Error("Unknown requirement or state");
+  const found = await setRequirementStatus(id, key, status, me.id);
+  if (!found) throw new Error("Tender not found");
   revalidatePath(`/licitaciones/${id}`);
 }
 

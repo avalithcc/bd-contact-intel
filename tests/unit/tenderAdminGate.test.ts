@@ -20,6 +20,7 @@ const EXPECTED_ACTIONS = [
   "setTenderTriageAction",
   "setTenderRelevanceAction",
   "setTenderOwnerAction",
+  "setTenderRequirementStatusAction",
   "saveTenderNoteAction",
   "registerTenderDocumentAction",
   "analyseTenderAction",

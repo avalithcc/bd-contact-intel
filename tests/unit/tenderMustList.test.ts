@@ -83,11 +83,11 @@ function detail(documents: TenderDocumentView[]): TenderDetail {
       aiRelevant: true, aiReason: null, aiClassifiedAt: null, relevanceOverride: null, ownerBdId: null,
       createdAt: new Date("2026-11-01T10:00:00Z"), updatedAt: new Date("2026-11-01T10:00:00Z"), daysLeft: 21, closed: false,
     },
-    portal: null, documents, events: [], bdOptions: [],
+    portal: null, documents, events: [], bdOptions: [], requirementStatuses: {},
   };
 }
 
-const actions = { setTriage: async () => {}, saveNote: async () => true, registerDocument: async () => ({ ok: true }), analyse: async () => ({ ok: true as const }), setOwner: async () => {} };
+const actions = { setTriage: async () => {}, saveNote: async () => true, registerDocument: async () => ({ ok: true }), analyse: async () => ({ ok: true as const }), setOwner: async () => {}, setRequirementStatus: async () => {} };
 const router = { push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} } as never;
 const render = (d: TenderDetail) =>
   renderToStaticMarkup(createElement(AppRouterContext.Provider, { value: router }, createElement(ToastProvider, null, createElement(TenderFicha, { detail: d, labels: es.tenderDetail, triageLabels: es.tendersPage.triage, actions }))));
