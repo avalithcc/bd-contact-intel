@@ -136,32 +136,23 @@ test("the full list puts the furthest opening first, closed tenders last and sti
   });
 });
 
-test("the list carries one budget cell per tender, four distinct states, from the newest document only", async () => {
+test("the list carries one questions cell per tender: deadline, portal silent, or never fetched", async () => {
   const { listTenders } = await import("@/lib/tenders/queries");
-  const { tender, tenderDocument } = await import("@/db/schema");
+  const { tender, tenderPortal } = await import("@/db/schema");
   await inRolledBackTransaction(async (tx) => {
     const open = new Date("2099-01-01T12:00:00Z");
     const ids: Record<string, string> = {};
-    for (const key of ["AMOUNT", "NONE", "OLD", "NODOC", "NOANALYSIS", "SUPERSEDED"]) {
-      const [t] = await tx.insert(tender).values({ processNumber: `ZZ-B-${key}`, name: key, openingAt: open }).returning();
+    for (const key of ["DATE", "NULL", "ABSENT"]) {
+      const [t] = await tx.insert(tender).values({ processNumber: `ZZ-Q-${key}`, name: key, openingAt: open }).returning();
       ids[key] = t!.id;
     }
-    const doc = (key: string, n: number, analysis: unknown, createdAt = new Date()) =>
-      tx.insert(tenderDocument).values({ tenderId: ids[key]!, storagePath: `zz/${key}/${n}`, filename: "p.pdf", sizeBytes: 1, analysis: analysis as never, createdAt });
-    const full = (budgetAmount: string | null) => ({ summary: "s", viability: "v", economicsIncluded: true, economics: { budget: "x", budgetAmount, paymentTerms: null, penalties: null } });
-    await doc("AMOUNT", 1, full("ARS 48.000.000"));
-    await doc("NONE", 1, full(null));
-    await doc("OLD", 1, { summary: "s", viability: "v", economicsIncluded: true, economics: { budget: "x", paymentTerms: null, penalties: null } });
-    await doc("NOANALYSIS", 1, null);
-    await doc("SUPERSEDED", 1, full("ARS 1"), new Date("2020-01-01T00:00:00Z"));
-    await doc("SUPERSEDED", 2, null, new Date("2021-01-01T00:00:00Z"));
-    const { rows } = await listTenders("all", new Date("2098-01-01T00:00:00Z"), 500, tx as never);
-    const state = (k: string) => rows.find((r) => r.processNumber === `ZZ-B-${k}`)!.budgetCell;
-    assert.deepEqual(state("AMOUNT"), { state: "amount", amount: "ARS 48.000.000" });
-    assert.deepEqual(state("NONE"), { state: "bidder_sets" });
-    assert.deepEqual(state("OLD"), { state: "reanalyse" });
-    assert.deepEqual(state("NODOC"), { state: "no_pliego" });
-    assert.deepEqual(state("NOANALYSIS"), { state: "no_pliego" });
-    assert.deepEqual(state("SUPERSEDED"), { state: "no_pliego" });
+    const until = new Date("2098-12-20T20:00:00Z");
+    await tx.insert(tenderPortal).values({ tenderId: ids.DATE!, questionsUntil: until });
+    await tx.insert(tenderPortal).values({ tenderId: ids.NULL!, questionsUntil: null });
+    const { rows } = await listTenders("all", new Date("2098-12-01T00:00:00Z"), 500, tx as never);
+    const cell = (k: string) => rows.find((r) => r.processNumber === `ZZ-Q-${k}`)!.questions;
+    assert.deepEqual(cell("DATE"), { state: "deadline", at: until, daysLeft: 20, tone: "normal" });
+    assert.deepEqual(cell("NULL"), { state: "not_stated" });
+    assert.deepEqual(cell("ABSENT"), { state: "not_fetched" });
   });
 });

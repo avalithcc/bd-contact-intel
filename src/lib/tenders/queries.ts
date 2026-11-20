@@ -1,7 +1,7 @@
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { bd, tender, type Tender } from "@/db/schema";
-import { budgetCellState, type BudgetCell, type BudgetCellInput } from "./budgetCell";
+import { questionsCell, type QuestionsCell } from "./questionsCell";
 import { tenderNotDecidedNoSql } from "./relevanceSql";
 import { tenderTiming, type TenderTiming } from "./timing";
 
@@ -9,33 +9,21 @@ import { tenderTiming, type TenderTiming } from "./timing";
 export const TENDER_LIST_LIMIT = 500;
 
 /** `ownerName` is the owner BD's name, null when nobody owns the tender. */
-export type TenderListRow = Tender & TenderTiming & { ownerName: string | null; budgetCell: BudgetCell };
+export type TenderListRow = Tender & TenderTiming & { ownerName: string | null; questions: QuestionsCell };
 
 /**
- * The newest document's budget facts, as one small jsonb object per tender (a correlated subquery on the
- * tender_document_tender_idx index, so no N+1 and none of the large analysis text leaves the database). Null when the
- * tender has no document. `jsonb_exists` rather than the `?` operator, which a driver would read as a placeholder.
+ * The portal row's question deadline as one small jsonb object (a correlated subquery on the unique tender_id index, so no
+ * N+1). The object is null when no tender_portal row exists, and holds a null `until` when the portal stated no date: the
+ * two are different facts. The instant travels as an ISO string and is parsed back to a Date below.
  */
-const budgetFactsSql = sql<unknown>`(
-  select jsonb_build_object(
-    'hasAnalysis', d.analysis is not null,
-    'included', d.analysis -> 'economicsIncluded',
-    'hasKey', coalesce(jsonb_exists(d.analysis -> 'economics', 'budgetAmount'), false),
-    'amount', d.analysis -> 'economics' -> 'budgetAmount')
-  from tender_document d where d.tender_id = ${tender.id} order by d.created_at desc limit 1)`;
+const portalQuestionsSql = sql<unknown>`(
+  select jsonb_build_object('until', p.questions_until)
+  from tender_portal p where p.tender_id = ${tender.id} limit 1)`;
 
 /** The driver may hand a jsonb back parsed or as text; both are accepted. */
-function toBudgetCell(raw: unknown): BudgetCell {
-  const facts = (typeof raw === "string" ? JSON.parse(raw) : raw) as Record<string, unknown> | null;
-  if (!facts) return budgetCellState({ hasDocument: false, hasAnalysis: false, economicsIncluded: null, hasBudgetAmountKey: false, budgetAmount: null });
-  const input: BudgetCellInput = {
-    hasDocument: true,
-    hasAnalysis: facts.hasAnalysis === true,
-    economicsIncluded: typeof facts.included === "boolean" ? facts.included : null,
-    hasBudgetAmountKey: facts.hasKey === true,
-    budgetAmount: typeof facts.amount === "string" ? facts.amount : null,
-  };
-  return budgetCellState(input);
+function toQuestionsCell(raw: unknown, now: Date): QuestionsCell {
+  const facts = (typeof raw === "string" ? JSON.parse(raw) : raw) as { until?: string | null } | null;
+  return questionsCell({ hasPortalRow: facts != null, questionsUntil: facts?.until ? new Date(facts.until) : null }, now);
 }
 
 /** "relevant": what the BD works from. "all": everything the table holds, discarded and closed included. */
@@ -67,7 +55,7 @@ export async function listTenders(
   const isOpen = sql`${tender.openingAt} >= ${nowIso}::timestamptz`;
   const notDecidedNo = tenderNotDecidedNoSql;
   const found = await database
-    .select({ t: tender, ownerName: bd.name, budget: budgetFactsSql, total: sql<string>`count(*) over ()`, all: sql<string>`(select count(*) from tender)` })
+    .select({ t: tender, ownerName: bd.name, portal: portalQuestionsSql, total: sql<string>`count(*) over ()`, all: sql<string>`(select count(*) from tender)` })
     .from(tender)
     .leftJoin(bd, eq(bd.id, tender.ownerBdId))
     .where(view === "relevant" ? sql`${isOpen} and ${notDecidedNo}` : undefined)
@@ -81,7 +69,7 @@ export async function listTenders(
   // An empty view has no row to carry the table count, which is exactly when "see all" matters most: one extra read, only then.
   const all = found.length > 0 ? Number(found[0]!.all) : Number((await database.select({ n: sql<string>`count(*)` }).from(tender))[0]?.n ?? 0);
   return {
-    rows: found.map(({ t, ownerName, budget }) => ({ ...t, ownerName, budgetCell: toBudgetCell(budget), ...tenderTiming(t.openingAt, now) })),
+    rows: found.map(({ t, ownerName, portal }) => ({ ...t, ownerName, questions: toQuestionsCell(portal, now), ...tenderTiming(t.openingAt, now) })),
     total: found.length === 0 ? 0 : Number(found[0]!.total),
     all,
   };

@@ -6,6 +6,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { getLocale } from "@/lib/i18n/server";
 import { listTenders, type TenderListRow } from "@/lib/tenders/queries";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
+import { SOON_DAYS } from "@/lib/tenders/questionsCell";
 import { isTenderTriage, type TenderTriage } from "@/lib/tenders/triage";
 import { formatArgentinaDayMonthTime } from "@/lib/i18n/format";
 import { TenderImportForm } from "./TenderImportForm";
@@ -17,8 +18,6 @@ import { TenderTriageSelect } from "./TenderTriageSelect";
 // The session decides who may see the page, and the day count depends on "now": neither can be cached.
 export const dynamic = "force-dynamic";
 
-/** Open tenders inside this many days get the warning colour. */
-const SOON_DAYS = 3;
 
 /** `?ver=todas` is the one-click way to everything, discarded and closed included; anything else is the default view. */
 export default async function TendersPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
@@ -83,7 +82,7 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
               <tr>
                 <th className="sorted">{l.colDays}</th>
                 <th>{l.colTitle}</th>
-                <th>{l.colBudget}</th>
+                <th>{l.colQuestionsUntil}</th>
                 <th>{l.colAgency}</th>
                 <th>{l.colRelevance}</th>
                 <th>{l.colPortalState}</th>
@@ -117,7 +116,7 @@ export default async function TendersPage({ searchParams }: { searchParams: Prom
                     </div>
                   </td>
                   <td className="nowrap">
-                    <BudgetCellView cell={r.budgetCell} labels={l} />
+                    <QuestionsCellView cell={r.questions} labels={l} daysText={daysText} />
                   </td>
                   <td>
                     {r.executingUnit}
@@ -181,8 +180,27 @@ function RelevanceCell({ row, labels: l }: { row: TenderListRow; labels: Diction
   );
 }
 
-function BudgetCellView({ cell, labels: l }: { cell: TenderListRow["budgetCell"]; labels: Dictionary["tendersPage"] }) {
-  if (cell.state === "amount") return <span className="mono">{cell.amount}</span>;
-  const text = cell.state === "bidder_sets" ? l.budgetBidderSets : cell.state === "reanalyse" ? l.budgetReanalyse : l.budgetNoPliego;
-  return <span className="meta">{text}</span>;
+function QuestionsCellView({
+  cell,
+  labels: l,
+  daysText,
+}: {
+  cell: TenderListRow["questions"];
+  labels: Dictionary["tendersPage"];
+  daysText: (daysLeft: number, closed: boolean) => string;
+}) {
+  if (cell.state === "not_fetched") return <span className="meta">{l.questionsNotFetched}</span>;
+  if (cell.state === "not_stated") return <span className="meta">{l.questionsNotStated}</span>;
+  const past = cell.tone === "past";
+  return (
+    <>
+      <span className="strong">{formatArgentinaDayMonthTime(cell.at)}</span>
+      <div>
+        <span className={`badge no-dot ${past ? "badge-discarded" : cell.tone === "soon" ? "badge-warn" : "badge-neutral"}`}>
+          {past ? `${l.questionsPast}, ` : ""}
+          {daysText(cell.daysLeft, past)}
+        </span>
+      </div>
+    </>
+  );
 }
