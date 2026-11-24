@@ -5,6 +5,7 @@
  * script loads the snapshot, runs the planner, prints a report, and on
  * --execute applies the writes in ONE transaction with one audit_log row.
  *
+ * The input must be a bare JSON array. DATABASE_URL lives in .env (there is no .env.local).
  * The input file is third-party contact data: keep it outside the repo.
  *
  * Dry run (default) opens no write transaction and prints what it WOULD write.
@@ -14,8 +15,8 @@
  * from old_value of the rows with that source (properties jobTitle, roleGroup).
  *
  * Usage:
- *   npx tsx --env-file=.env.local scripts/backfill-job-titles-from-lusha.ts --file=<json>
- *   npx tsx --env-file=.env.local scripts/backfill-job-titles-from-lusha.ts --file=<json> --execute --actor=<bd id>
+ *   npx tsx --env-file=.env scripts/backfill-job-titles-from-lusha.ts --file=<json>
+ *   npx tsx --env-file=.env scripts/backfill-job-titles-from-lusha.ts --file=<json> --execute --actor=<bd id>
  */
 import { readFileSync } from "node:fs";
 import { and, inArray, isNull, sql } from "drizzle-orm";
