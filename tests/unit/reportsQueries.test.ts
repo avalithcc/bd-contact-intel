@@ -372,3 +372,33 @@ test("the held-meetings KPI and its per-BD column are labelled 'realizadas'; the
   assert.equal(en.reports.meetingsDialogTitle, "Meetings held");
   assert.equal(en.reports.kpiMeetingsScheduled, "Meetings scheduled");
 });
+
+test("buildReportPerBdQuery: 'Personas que respondieron' is its own CTE counting DISTINCT persons, not a count(*) filter on the activity pivot", () => {
+  const { sql } = renderPerBd();
+  assert.doesNotMatch(sql, /filter \(where activity\.type = 'reply_received'\)/i, "counting messages is the bug this replaced");
+  assert.match(sql, /rpt_reply_links as/i);
+  assert.match(sql, /count\(distinct pbc_person_id\)::int as pbc_reply_persons\b/i);
+  assert.match(sql, /left join rpt_reply_pivot on rpt_reply_pivot\.pbc_bd_id = bd\.id/i);
+});
+
+test("buildReportPerBdQuery: a reply must link to our outbound by thread (same bd, not after the reply) OR by the References header (any bd)", () => {
+  const { sql } = renderPerBd();
+  assert.match(sql, /rpt_out_thread\.gmail_thread_id = rpt_inbound\.gmail_thread_id/i);
+  assert.match(sql, /rpt_out_thread\.bd_id = rpt_inbound\.bd_id/i);
+  assert.match(sql, /rpt_out_thread\.sent_at <= rpt_inbound\.sent_at/i);
+  assert.match(sql, /position\(rpt_out_header\.rfc_message_id in rpt_inbound\.rfc_references\) > 0/i);
+  assert.doesNotMatch(sql, /rpt_out_header\.bd_id/i, "Message-IDs are globally unique: the header branch is not scoped by bd");
+});
+
+test("buildReportPerBdQuery: the overall distinct-person count is computed in SQL, one value for the total row", () => {
+  const { sql } = renderPerBd();
+  assert.match(sql, /count\(distinct pbc_person_id\)::int as pbc_reply_persons_total/i);
+  assert.match(sql, /as reply_persons_total/i);
+});
+
+test("ReportsView renders the query's overall distinct count in the total row instead of summing the column", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync("src/app/(app)/admin/reports/ReportsView.tsx", "utf8");
+  assert.doesNotMatch(src, /replyPersons:\s*acc\.replyPersons/, "a sum of distinct-person counts overstates when one person replied to two BDs");
+  assert.match(src, /replyPersonsTotal/);
+});

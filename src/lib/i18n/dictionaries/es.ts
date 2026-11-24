@@ -2858,7 +2858,7 @@ export const es: typeof en = {
     activityCalls: "Llamadas",
     activityMeetings: "Reuniones realizadas",
     activityEmailsSent: "Correos enviados",
-    activityRepliesReceived: "Respuestas recibidas",
+    activityReplyPersons: "Personas que respondieron",
     activityTasksCompleted: "Tareas completadas",
     activityFoot:
       '"Correos enviados" y "Respuestas recibidas" incluyen la sincronización de Gmail. "Tareas completadas" cuenta la última finalización de cada tarea que sigue en estado Hecha hoy, por la fecha en que se completó (no la de la última edición).',

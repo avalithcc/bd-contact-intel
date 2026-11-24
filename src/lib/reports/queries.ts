@@ -331,8 +331,7 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
         count(*) filter (where activity.type = 'whatsapp')::int as pbc_whatsapps,
         count(*) filter (where activity.type = 'whatsapp_no_channel')::int as pbc_whatsapp_no_channel,
         count(*) filter (where activity.type = 'meeting_logged')::int as pbc_meetings,
-        count(*) filter (where activity.type = 'email_sent')::int as pbc_emails_sent,
-        count(*) filter (where activity.type = 'reply_received')::int as pbc_replies_received
+        count(*) filter (where activity.type = 'email_sent')::int as pbc_emails_sent
       from ${activity}
       where activity.actor_bd_id is not null
         and activity.type in (${activityTypes})
@@ -344,6 +343,59 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
         and ${happenedAtSql()} >= ${fromIso}::timestamptz
         and ${happenedAtSql()} < ${toIso}::timestamptz
       group by activity.actor_bd_id
+    ),
+    -- "Personas que respondieron": DISTINCT persons who replied to an email WE sent, by the reply's own date (happenedAtSql). Not messages:
+    -- a long back-and-forth must count once. An inbound reply_received links to our mail when EITHER holds:
+    --   1. thread: an outbound email_message of the SAME bd and the SAME gmail_thread_id, sent at or before the inbound;
+    --   2. header: the inbound's rfc_references contains the rfc_message_id of ANY outbound (Message-IDs are globally unique, so no bd scope).
+    -- Both branches are required, measured on production 2026-11-24: email_message has no in_reply_to column (the header is parsed, never stored),
+    -- and 715 of 2639 inbound rows have a NULL rfc_references, so the header branch alone is blind on 27% of inbound; 199 replies satisfy the
+    -- header branch but not the thread (Gmail re-threaded them), so the thread branch alone loses those. Do not simplify one away.
+    -- The outbound may be from ANY time before the reply: an October send answered in November is a November reply.
+    -- auto_reply_received and email_bounced are other activity types and never enter. The TOTAL row cannot be the sum of the per-BD
+    -- column (one person who replied to two BDs would count twice), hence rpt_reply_total: its own distinct count over the whole period.
+    -- (No backticks in this comment: it lives inside a JS template literal, where a backtick ends the string.)
+    rpt_reply_links as (
+      select activity.actor_bd_id as pbc_bd_id, activity.person_id as pbc_person_id
+      from ${activity}
+      join email_message rpt_inbound
+        on rpt_inbound.bd_id = activity.actor_bd_id
+        and rpt_inbound.gmail_message_id = activity.metadata->>'gmailMessageId'
+        and rpt_inbound.direction = 'inbound'
+      where activity.type = 'reply_received'
+        and activity.deleted_at is null
+        and activity.actor_bd_id is not null
+        and activity.person_id is not null
+        and (${bdId}::uuid is null or activity.actor_bd_id = ${bdId}::uuid)
+        and ${happenedAtSql()} >= ${fromIso}::timestamptz
+        and ${happenedAtSql()} < ${toIso}::timestamptz
+        and (
+          exists (
+            select 1 from email_message rpt_out_thread
+            where rpt_out_thread.direction = 'outbound'
+              and rpt_out_thread.bd_id = rpt_inbound.bd_id
+              and rpt_out_thread.gmail_thread_id = rpt_inbound.gmail_thread_id
+              and rpt_out_thread.sent_at <= rpt_inbound.sent_at
+          )
+          or (
+            rpt_inbound.rfc_references is not null
+            and exists (
+              select 1 from email_message rpt_out_header
+              where rpt_out_header.direction = 'outbound'
+                and rpt_out_header.rfc_message_id is not null
+                and position(rpt_out_header.rfc_message_id in rpt_inbound.rfc_references) > 0
+            )
+          )
+        )
+    ),
+    rpt_reply_pivot as (
+      select pbc_bd_id, count(distinct pbc_person_id)::int as pbc_reply_persons
+      from rpt_reply_links
+      group by pbc_bd_id
+    ),
+    rpt_reply_total as (
+      select count(distinct pbc_person_id)::int as pbc_reply_persons_total
+      from rpt_reply_links
     ),
     rpt_task_completions as (
       select distinct on (task.id)
@@ -398,7 +450,8 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
       coalesce(rpt_activity_pivot.pbc_whatsapp_no_channel, 0) as whatsapp_no_channel,
       coalesce(rpt_activity_pivot.pbc_meetings, 0) as meetings,
       coalesce(rpt_activity_pivot.pbc_emails_sent, 0) as emails_sent,
-      coalesce(rpt_activity_pivot.pbc_replies_received, 0) as replies_received,
+      coalesce(rpt_reply_pivot.pbc_reply_persons, 0) as reply_persons,
+      rpt_reply_total.pbc_reply_persons_total as reply_persons_total,
       coalesce(rpt_tasks_pivot.pbc_tasks_completed, 0) as tasks_completed,
       coalesce(rpt_queue_pivot.pbc_worked, 0) as queue_worked,
       coalesce(rpt_queue_pivot.pbc_postponed, 0) as queue_postponed,
@@ -410,7 +463,9 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
       -- (No backticks in this comment: it lives inside a JS template literal, where a backtick ends the string.)
       bd.follow_up_excluded_role_groups as excluded_role_groups
     from ${bd}
+    cross join rpt_reply_total
     left join rpt_activity_pivot on rpt_activity_pivot.pbc_bd_id = bd.id
+    left join rpt_reply_pivot on rpt_reply_pivot.pbc_bd_id = bd.id
     left join rpt_tasks_pivot on rpt_tasks_pivot.pbc_bd_id = bd.id
     left join rpt_queue_pivot on rpt_queue_pivot.pbc_bd_id = bd.id
     where (${bdId}::uuid is null or bd.id = ${bdId}::uuid)
@@ -451,7 +506,8 @@ export interface ReportPerBdRow {
   whatsappNoChannel: number;
   meetings: number;
   emailsSent: number;
-  repliesReceived: number;
+  /** DISTINCT persons who replied to an email we sent in the period (see rpt_reply_links). Never sum this column: use ReportPerBdResult.replyPersonsTotal. */
+  replyPersons: number;
   tasksCompleted: number;
   queueWorked: number;
   queuePostponed: number;
@@ -459,6 +515,12 @@ export interface ReportPerBdRow {
   queueStillPending: number;
   /** The role groups this BD keeps out of their own follow-up queue (follow-up-role-groups). Read-only for admins. */
   excludedRoleGroups: string[];
+}
+
+export interface ReportPerBdResult {
+  rows: ReportPerBdRow[];
+  /** Distinct persons who replied to an email we sent, over the whole period (all BDs in scope). Not the sum of `rows[].replyPersons`. */
+  replyPersonsTotal: number;
 }
 
 export interface WonCompaniesDrilldownParams {

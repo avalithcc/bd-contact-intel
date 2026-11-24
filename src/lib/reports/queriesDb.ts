@@ -20,7 +20,7 @@ import {
   type ReportAggregatesParams,
   type ReportAggregatesResult,
   type ReportPerBdParams,
-  type ReportPerBdRow,
+  type ReportPerBdResult,
   type WonCompaniesDrilldownParams,
   type WonCompanyDrilldownRawResultRow,
 } from "@/lib/reports/queries";
@@ -113,7 +113,7 @@ function mapCohortRows(rows: readonly CohortDrilldownRawResultRow[]): CohortRow[
   );
 }
 
-export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportPerBdRow[]> {
+export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportPerBdResult> {
   const rows = await db.execute<{
     bd_id: string;
     bd_name: string;
@@ -124,7 +124,8 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     whatsapp_no_channel: number;
     meetings: number;
     emails_sent: number;
-    replies_received: number;
+    reply_persons: number;
+    reply_persons_total: number;
     tasks_completed: number;
     queue_worked: number;
     queue_postponed: number;
@@ -132,7 +133,7 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     queue_still_pending: number;
     excluded_role_groups: string[] | null;
   }>(buildReportPerBdQuery(params));
-  return rows.map((r) => ({
+  const mapped = rows.map((r) => ({
     bdId: r.bd_id,
     bdName: r.bd_name,
     notes: Number(r.notes),
@@ -142,7 +143,7 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     whatsappNoChannel: Number(r.whatsapp_no_channel),
     meetings: Number(r.meetings),
     emailsSent: Number(r.emails_sent),
-    repliesReceived: Number(r.replies_received),
+    replyPersons: Number(r.reply_persons),
     tasksCompleted: Number(r.tasks_completed),
     // The column is NOT NULL with a '{}' default, but the driver can still hand back null for a row that predates
     // nothing here — coalesce in JS rather than trust it, so a missing value renders as "no exclusions", never a crash.
@@ -152,4 +153,5 @@ export async function getReportPerBd(params: ReportPerBdParams): Promise<ReportP
     queueSkipped: Number(r.queue_skipped),
     queueStillPending: Number(r.queue_still_pending),
   }));
+  return { rows: mapped, replyPersonsTotal: rows.length ? Number(rows[0]!.reply_persons_total) : 0 };
 }

@@ -52,7 +52,7 @@ async function figures(period: Parameters<typeof import("@/lib/reports/period").
   const { getMeetingsDrilldown, getReportAggregates, getReportPerBd } = await import("@/lib/reports/queriesDb");
   const range = reportPeriodRange(period, TODAY);
   const agg = await getReportAggregates({ fromIso: range.fromIso, toIso: range.toIso, scheduledToIso: range.endIso, bdId: forBd });
-  const perBd = await getReportPerBd({ fromIso: range.fromIso, toIso: range.toIso, fromDate: range.fromDate, toDateExclusive: range.toDateExclusive, bdId: forBd });
+  const { rows: perBd } = await getReportPerBd({ fromIso: range.fromIso, toIso: range.toIso, fromDate: range.fromDate, toDateExclusive: range.toDateExclusive, bdId: forBd });
   const drill = await getMeetingsDrilldown({ fromIso: range.fromIso, toIso: range.toIso, bdId: forBd });
   return {
     scheduled: agg.meetingsScheduled,

@@ -39,7 +39,7 @@ export default async function ReportsPage({
   // them?"), so this stays sequential rather than implying a speedup that
   // isn't real.
   const aggregates = await getReportAggregates({ fromIso: range.fromIso, toIso: range.toIso, scheduledToIso: range.endIso, bdId });
-  const perBd = await getReportPerBd({
+  const { rows: perBd, replyPersonsTotal } = await getReportPerBd({
     fromIso: range.fromIso,
     toIso: range.toIso,
     fromDate: range.fromDate,
@@ -47,5 +47,5 @@ export default async function ReportsPage({
     bdId,
   });
 
-  return <ReportsView period={period} bdId={bdId} custom={custom} range={range} today={argentinaCalendarDate(now)} aggregates={aggregates} perBd={perBd} />;
+  return <ReportsView period={period} bdId={bdId} custom={custom} range={range} today={argentinaCalendarDate(now)} aggregates={aggregates} perBd={perBd} replyPersonsTotal={replyPersonsTotal} />;
 }

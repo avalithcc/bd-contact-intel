@@ -409,7 +409,7 @@ async function meetingsIn(period: Parameters<typeof import("@/lib/reports/period
   const { reportPeriodRange } = await import("@/lib/reports/period");
   const { getMeetingsDrilldown, getReportPerBd } = await import("@/lib/reports/queriesDb");
   const range = reportPeriodRange(period, NOW);
-  const perBd = await getReportPerBd({ fromIso: range.fromIso, toIso: range.toIso, fromDate: range.fromDate, toDateExclusive: range.toDateExclusive, bdId });
+  const { rows: perBd } = await getReportPerBd({ fromIso: range.fromIso, toIso: range.toIso, fromDate: range.fromDate, toDateExclusive: range.toDateExclusive, bdId });
   const drill = await getMeetingsDrilldown({ fromIso: range.fromIso, toIso: range.toIso, bdId });
   return { count: perBd.find((r) => r.bdId === bdId)!.meetings, listed: drill.length };
 }

@@ -43,7 +43,7 @@ after(async () => {
 test("per-BD report and meetings drill-down do not throw on impossible dates and fall back to created_at", async () => {
   const { getMeetingsDrilldown, getReportPerBd } = await import("@/lib/reports/queriesDb");
   const params = { fromIso: "2026-10-01T03:00:00.000Z", toIso: "2026-10-19T14:00:00.000Z" };
-  const perBd = await getReportPerBd({ ...params, fromDate: "2026-10-01", toDateExclusive: "2026-11-01", bdId });
+  const { rows: perBd } = await getReportPerBd({ ...params, fromDate: "2026-10-01", toDateExclusive: "2026-11-01", bdId });
   const mine = perBd.find((r) => r.bdId === bdId)!;
   assert.equal(mine.meetings, BAD_VALUES.length, "every bad value counted on its created_at; the 2028 leap-day one is in the future");
   assert.equal(mine.calls, 1, "the bad occurredAt falls back to created_at");

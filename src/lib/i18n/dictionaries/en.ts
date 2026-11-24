@@ -2870,7 +2870,7 @@ export const en = {
     activityCalls: "Calls",
     activityMeetings: "Meetings held",
     activityEmailsSent: "Emails sent",
-    activityRepliesReceived: "Replies received",
+    activityReplyPersons: "People who replied",
     activityTasksCompleted: "Tasks completed",
     activityFoot:
       '"Emails sent" and "Replies received" include Gmail sync. "Tasks completed" counts each task\'s latest completion while it is still Done today, by its completion date (not its last edit).',

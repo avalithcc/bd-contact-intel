@@ -143,6 +143,7 @@ export function ReportsView({
   today,
   aggregates,
   perBd,
+  replyPersonsTotal,
 }: {
   period: ReportPeriod;
   bdId: string | null;
@@ -153,6 +154,8 @@ export function ReportsView({
   today: string;
   aggregates: ReportAggregatesResult;
   perBd: ReportPerBdRow[];
+  /** Distinct persons who replied to an email we sent, over the whole period. Never the sum of the per-BD column: a person who answered two BDs would count twice. */
+  replyPersonsTotal: number;
 }) {
   const funnel = buildFunnelBreakdown(aggregates.funnel);
   // Same period + BD as the page's own query, so each dialog lists exactly the
@@ -214,10 +217,9 @@ export function ReportsView({
       calls: acc.calls + r.calls,
       meetings: acc.meetings + r.meetings,
       emailsSent: acc.emailsSent + r.emailsSent,
-      repliesReceived: acc.repliesReceived + r.repliesReceived,
       tasksCompleted: acc.tasksCompleted + r.tasksCompleted,
     }),
-    { notes: 0, callAttempts: 0, calls: 0, meetings: 0, emailsSent: 0, repliesReceived: 0, tasksCompleted: 0 },
+    { notes: 0, callAttempts: 0, calls: 0, meetings: 0, emailsSent: 0, tasksCompleted: 0 },
   );
   const queueTotal = buildQueueAdherenceRow({
     worked: perBdRows.reduce((s, r) => s + r.queue.worked, 0),
@@ -487,7 +489,7 @@ export function ReportsView({
               <th className="right">{dict.activityCalls}</th>
               <th className="right">{dict.activityMeetings}</th>
               <th className="right">{dict.activityEmailsSent}</th>
-              <th className="right">{dict.activityRepliesReceived}</th>
+              <th className="right">{dict.activityReplyPersons}</th>
               <th className="right">{dict.activityTasksCompleted}</th>
             </tr>
           </thead>
@@ -505,7 +507,7 @@ export function ReportsView({
                 <td className="right num">{r.calls}</td>
                 <td className="right num">{r.meetings}</td>
                 <td className="right num">{r.emailsSent}</td>
-                <td className="right num">{r.repliesReceived}</td>
+                <td className="right num">{r.replyPersons}</td>
                 <td className="right num">{r.tasksCompleted}</td>
               </tr>
             ))}
@@ -516,7 +518,7 @@ export function ReportsView({
               <td className="right num strong">{activityTotal.calls}</td>
               <td className="right num strong">{activityTotal.meetings}</td>
               <td className="right num strong">{activityTotal.emailsSent}</td>
-              <td className="right num strong">{activityTotal.repliesReceived}</td>
+              <td className="right num strong">{replyPersonsTotal}</td>
               <td className="right num strong">{activityTotal.tasksCompleted}</td>
             </tr>
           </tbody>
