@@ -74,8 +74,27 @@ test("a blank title is skipped as no_title", () => {
   assert.equal(skipReason(planLushaTitle(lusha({ title: "   " }), crm())), "no_title");
 });
 
-test("a social handle that classifies to nothing is rejected by the classify guard", () => {
-  assert.equal(skipReason(planLushaTitle(lusha({ title: "anaperez87" }), crm())), "title_unclassifiable");
+test("a title that is a handle built from the person's surname is rejected", () => {
+  assert.equal(skipReason(planLushaTitle(lusha({ title: "anaperez87" }), crm())), "title_is_person_name");
+});
+
+test("a title that is the person's surname is rejected", () => {
+  assert.equal(skipReason(planLushaTitle(lusha({ title: "Perez" }), crm())), "title_is_person_name");
+});
+
+test("a real title that classifies to other is WRITTEN and role_group becomes other, not no_position", () => {
+  const r = planLushaTitle(lusha({ title: "Zorblax Wrangler" }), crm());
+  assert.equal(r.action, "write");
+  if (r.action !== "write") return;
+  assert.equal(r.roleGroup, "other");
+  assert.equal(r.historyRows.find((h) => h.property === "roleGroup")?.newValue, "other");
+});
+
+test("a multi-word title containing a short name as a substring is not mistaken for a handle", () => {
+  const people = { firstName: "Mark", lastName: "Ruiz" };
+  for (const title of ["Marketing Manager", "Marketing"]) {
+    assert.equal(planLushaTitle(lusha({ ...people, title }), crm(people)).action, "write", title);
+  }
 });
 
 test("a non-empty CRM job_title is never overwritten", () => {
@@ -101,8 +120,61 @@ test("different domain but same company name still writes (fluxit.com.ar vs flux
 });
 
 test("a CRM person with no name at all goes to needs_review and is never written", () => {
-  const r = planLushaTitle(lusha(), crm({ firstName: null, lastName: "" }));
+  const r = planLushaTitle(lusha(), crm({ email: "zzz@acme.com", firstName: null, lastName: "" }));
   assert.equal(skipReason(r), "needs_review_no_crm_name");
+});
+
+test("with no CRM name, a local-part token matching the returned name writes", () => {
+  const nameless = { firstName: null, lastName: null };
+  for (const [local, f, l] of [["mvalli", "Mauricio", "Valli"], ["acampos", "Agustín", "Campos Ramírez"], ["john.rr", "John", "Abhi"], ["esteban", "Esteban", "Etcheverry"]]) {
+    const r = planLushaTitle(lusha({ email: `${local}@acme.com`, firstName: f, lastName: l }), crm({ email: `${local}@acme.com`, ...nameless }));
+    assert.equal(r.action, "write", local);
+  }
+});
+
+test("with no CRM name and no local-part match it stays in needs_review (suarezg / Juarez)", () => {
+  const e = "suarezg@acme.com";
+  const r = planLushaTitle(lusha({ email: e, firstName: "Federico", lastName: "Juarez" }), crm({ email: e, firstName: null, lastName: null }));
+  assert.equal(skipReason(r), "needs_review_no_crm_name");
+});
+
+test("the local-part fallback does not apply when the CRM has a name", () => {
+  const r = planLushaTitle(lusha({ firstName: "Marcos", lastName: "Gil" }), crm({ email: "marcos.gil@acme.com" }));
+  assert.equal(skipReason(r), "needs_review_name_mismatch");
+});
+
+test("company accepted when Lusha's name contains the email base (Flux IT shape)", () => {
+  const r = planLushaTitle(lusha({ companyName: "Flux IT", companyDomain: "fluxitsoft.com" }), crm({ email: "ana@fluxit.com.ar", company: null }));
+  assert.equal(r.action, "write");
+});
+
+test("company accepted when the email base is contained in Lusha's longer name (Unnax shape)", () => {
+  const r = planLushaTitle(
+    lusha({ companyName: "Unnax - A Powens Group Company", companyDomain: "powens.com" }),
+    crm({ email: "ana@unnax.com", company: null }),
+  );
+  assert.equal(r.action, "write");
+});
+
+test("a genuinely different employer is still needs_review (Spring Automation shape)", () => {
+  const r = planLushaTitle(
+    lusha({ companyName: "Spring Automation", companyDomain: "springautomation.com" }),
+    crm({ email: "ana@hoplonapp.com", company: null }),
+  );
+  assert.equal(skipReason(r), "needs_review_company_mismatch");
+});
+
+test("containment does not fire when the shorter string is under 4 characters", () => {
+  const r = planLushaTitle(
+    lusha({ companyName: "Acme Industrial Holdings", companyDomain: "other.com" }),
+    crm({ email: "ana@ac.com", company: null }),
+  );
+  assert.equal(skipReason(r), "needs_review_company_mismatch");
+});
+
+test("company accepted by equal normalized name when the CRM company is present", () => {
+  const r = planLushaTitle(lusha({ companyName: "Zeta S.R.L.", companyDomain: "zeta.de" }), crm({ company: "Zeta" }));
+  assert.equal(r.action, "write");
 });
 
 test("a returned name sharing no 3+ char token with the CRM name goes to needs_review", () => {

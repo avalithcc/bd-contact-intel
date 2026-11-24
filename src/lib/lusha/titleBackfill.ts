@@ -8,9 +8,10 @@
  *   1. target still qualifies (role_group no_position, blank job_title)
  *   2. Lusha returned a title
  *   3. the title is not Lusha's "Other" (its way of saying it does not know)
- *   4. the title classifies to a real group (not other / no_position)
- *   5. the returned name agrees with the CRM name (needs a CRM name)
- *   6. the company agrees, by email-domain base OR normalized company name
+ *   4. the title is not the person's own name or handle
+ *   5. the returned name agrees with the CRM name; with NO CRM name, the email
+ *      local-part must agree with the returned name instead
+ *   6. the company agrees (see companyAgrees)
  * Skips caused by 5 and 6 are "needs_review_*": a human can adjudicate them.
  */
 import type { NewPersonPropertyHistory } from "@/db/schema";
@@ -50,7 +51,7 @@ export type LushaSkipReason =
   | "crm_title_present"
   | "no_title"
   | "lusha_unknown_title"
-  | "title_unclassifiable"
+  | "title_is_person_name"
   | "needs_review_no_crm_name"
   | "needs_review_name_mismatch"
   | "needs_review_company_mismatch";
@@ -88,18 +89,64 @@ function nameTokens(...parts: Array<string | null | undefined>): string[] {
     .filter((t) => t.length >= 3);
 }
 
+/** Lowercase, accent-free, legal suffixes dropped, everything but a-z0-9 removed. */
 function compactCompany(name: string | null | undefined): string {
-  return name ? normalizeCompanyKey(name).replace(/[^a-z0-9]/g, "") : "";
+  if (!name) return "";
+  return normalizeCompanyKey(name)
+    .replace(/\bltda\b/g, " ")
+    .replace(/[^a-z0-9]/g, "");
 }
 
+/**
+ * Company agreement, any of: (a) Lusha domain base == email domain base;
+ * (b) Lusha name == email base; (c) one contains the other, the shorter being
+ * at least 4 chars; (d) Lusha name == CRM company, when the CRM has one.
+ * (b) and (c) exist because most targets have an empty person.company.
+ */
 function companyAgrees(l: { companyName: string | null; companyDomain: string | null }, crm: LushaTitleCrm): boolean {
-  const emailHost = crm.email.split("@")[1] ?? "";
-  const emailBase = registrableBase(emailHost);
+  const emailBase = compactCompany(registrableBase(crm.email.split("@")[1] ?? ""));
   const lushaBase = l.companyDomain ? registrableBase(l.companyDomain) : "";
   if (emailBase && lushaBase && emailBase === lushaBase) return true;
-  const a = compactCompany(l.companyName);
-  const b = compactCompany(crm.company);
-  return a !== "" && a === b;
+  const name = compactCompany(l.companyName);
+  if (name && emailBase) {
+    if (name === emailBase) return true;
+    const [short, long] = name.length <= emailBase.length ? [name, emailBase] : [emailBase, name];
+    if (short.length >= 4 && long.includes(short)) return true;
+  }
+  const crmCompany = compactCompany(crm.company);
+  return name !== "" && name === crmCompany;
+}
+
+function stripAccents(v: string): string {
+  return v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/**
+ * Guard 4. A title that is the person's own name or a handle built from it
+ * (e.g. a LinkedIn slug) is junk. Rejects when a title token equals a 4+ char
+ * name token, when the letters of the title equal first+last (either order),
+ * or when a one-word title that classifies to "other" contains a name token.
+ * The last clause is limited to "other" so "Marketing" is not killed by a
+ * first name "Mark".
+ */
+function titleIsPersonName(title: string, first: string | null, last: string | null): boolean {
+  const nameToks = nameTokens(first, last).filter((t) => t.length >= 4);
+  const letters = stripAccents(title).replace(/[^a-z]/g, "");
+  const f = stripAccents(first ?? "").replace(/[^a-z]/g, "");
+  const l = stripAccents(last ?? "").replace(/[^a-z]/g, "");
+  if (letters && (letters === f + l || letters === l + f)) return true;
+  const titleToks = stripAccents(title).split(/[^a-z]+/).filter(Boolean);
+  if (titleToks.some((t) => nameToks.includes(t))) return true;
+  const oneWord = !/\s/.test(title.trim());
+  return oneWord && classifyPosition(title) === "other" && nameToks.some((t) => letters.includes(t));
+}
+
+/** Guard 5 fallback, only for a CRM person with no usable name: the email local-part vs the returned name. */
+function localPartAgrees(email: string, first: string | null, last: string | null): boolean {
+  const local = stripAccents(email.split("@")[0] ?? "");
+  const localToks = local.split(/[^a-z]+/).filter((t) => t.length >= 4);
+  const returned = nameTokens(first, last).filter((t) => t.length >= 4);
+  return localToks.some((lt) => returned.some((rt) => lt.includes(rt) || rt.includes(lt)));
 }
 
 export function planLushaTitle(lusha: LushaTitleRecord, crm: LushaTitleCrm | null): LushaTitlePlan {
@@ -115,14 +162,23 @@ export function planLushaTitle(lusha: LushaTitleRecord, crm: LushaTitleCrm | nul
   const title = lusha.title?.trim() ?? "";
   if (!title) return skip("no_title");
   if (title.toLowerCase() === "other") return skip("lusha_unknown_title");
+  if (titleIsPersonName(title, lusha.firstName, lusha.lastName)) return skip("title_is_person_name");
+  // Writing role_group "other" is correct here, unlike writing Lusha's literal
+  // "Other" (guard 3): "other" from classifyPosition means "we know the title
+  // and it is none of our groups", strictly more information than
+  // "no_position" ("we know nothing"). Lusha's "Other" is Lusha saying it does
+  // not know, so it would turn missing data into a false "known" fact.
   const group = classifyPosition(title);
-  if (group === "other" || group === "no_position") return skip("title_unclassifiable");
+  if (group === "no_position") return skip("no_title");
 
   // Guard 5
   const crmTokens = nameTokens(crm.firstName, crm.lastName);
-  if (crmTokens.length === 0) return skip("needs_review_no_crm_name");
-  const returned = new Set(nameTokens(lusha.firstName, lusha.lastName));
-  if (!crmTokens.some((t) => returned.has(t))) return skip("needs_review_name_mismatch");
+  if (crmTokens.length === 0) {
+    if (!localPartAgrees(crm.email, lusha.firstName, lusha.lastName)) return skip("needs_review_no_crm_name");
+  } else {
+    const returned = new Set(nameTokens(lusha.firstName, lusha.lastName));
+    if (!crmTokens.some((t) => returned.has(t))) return skip("needs_review_name_mismatch");
+  }
 
   // Guard 6
   if (!companyAgrees(lusha, crm)) return skip("needs_review_company_mismatch");
