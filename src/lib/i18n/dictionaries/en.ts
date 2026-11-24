@@ -2873,7 +2873,7 @@ export const en = {
     activityReplyPersons: "People who replied",
     activityTasksCompleted: "Tasks completed",
     activityFoot:
-      '"Emails sent" and "Replies received" include Gmail sync. "Tasks completed" counts each task\'s latest completion while it is still Done today, by its completion date (not its last edit).',
+      '"Emails sent" includes Gmail sync. "People who replied" counts each person once, if they answered an email we sent; the total is not the sum of the rows because one person may have replied to two BDs. "Tasks completed" counts each task\'s latest completion while it is still Done today, by its completion date (not its last edit).',
     queueTitle: "Follow-up queue adherence",
     queueWorked: "Worked",
     queuePostponed: "Postponed",

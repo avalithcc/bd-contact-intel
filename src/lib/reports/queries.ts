@@ -90,8 +90,9 @@ function wonAtSql() {
  * as EVERY dial, including one later settled into a `call` (metadata.callActivityId) and hidden from the contact timeline
  * by notFoldedAttemptSql(). That fold is a display rule and must not be applied here: a dial that became a conversation
  * is still a dial, and dropping it would break the dials-to-calls ratio the column exists to show.
+ * reply_received is NOT listed: the reply column moved to its own CTE (rpt_reply_links), which counts distinct persons.
  */
-const ACTIVITY_BY_BD_TYPES = ["note", "call_attempt", "call", "whatsapp", "whatsapp_no_channel", "meeting_logged", "email_sent", "reply_received"] as const;
+const ACTIVITY_BY_BD_TYPES = ["note", "call_attempt", "call", "whatsapp", "whatsapp_no_channel", "meeting_logged", "email_sent"] as const;
 
 /**
  * Midnight UTC of a queue day, as a `timestamptz`. `queue_date` is a `date`,
@@ -347,13 +348,23 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
     -- "Personas que respondieron": DISTINCT persons who replied to an email WE sent, by the reply's own date (happenedAtSql). Not messages:
     -- a long back-and-forth must count once. An inbound reply_received links to our mail when EITHER holds:
     --   1. thread: an outbound email_message of the SAME bd and the SAME gmail_thread_id, sent at or before the inbound;
-    --   2. header: the inbound's rfc_references contains the rfc_message_id of ANY outbound (Message-IDs are globally unique, so no bd scope).
+    --   2. header: the inbound's rfc_references contains the rfc_message_id of an outbound of the SAME bd.
     -- Both branches are required, measured on production 2026-11-24: email_message has no in_reply_to column (the header is parsed, never stored),
     -- and 715 of 2639 inbound rows have a NULL rfc_references, so the header branch alone is blind on 27% of inbound; 199 replies satisfy the
-    -- header branch but not the thread (Gmail re-threaded them), so the thread branch alone loses those. Do not simplify one away.
+    -- header branch but not the thread (Gmail re-threaded them inside one mailbox), so the thread branch alone loses those. Do not simplify one away.
+    -- The header branch is bd-scoped ON PURPOSE: unscoped, BD A (cc'd) would get credit when the contact reply-alls to BD B's mail, because
+    -- A's inbound carries B's Message-ID. Measured 2026-11-24: 160 replies qualified ONLY through another BD's Message-ID, yet the distinct-person
+    -- count was identical (123 vs 123), so scoping costs nothing and removes a false-attribution path. Do not loosen it.
+    -- rfc_message_id <> '' guards position(): position('' in x) is 1, so one empty id would qualify every inbound with references.
     -- The outbound may be from ANY time before the reply: an October send answered in November is a November reply.
     -- auto_reply_received and email_bounced are other activity types and never enter. The TOTAL row cannot be the sum of the per-BD
     -- column (one person who replied to two BDs would count twice), hence rpt_reply_total: its own distinct count over the whole period.
+    -- deleted_at is null is inert, kept for intent: per the schema only a Contact note is ever soft-deleted, so no reply_received row is marked
+    -- (unlike rpt_activity_pivot, which deliberately keeps deleted notes because it asks how much a BD did).
+    -- The inner join to email_message drops nothing today: on 2026-11-24, 0 of 2295 reply_received lacked a gmailMessageId and 0 lacked a
+    -- matching inbound row of the same bd. Re-check that before relying on it if the sync ever changes.
+    -- Cost measured through getReportPerBd on 2026-11-24: 0.8-0.9s for week/month, 2.0s worst case (the 400-day custom window). position() has no
+    -- index behind it on purpose; the period bounds the work. No index and no migration were added for it.
     -- (No backticks in this comment: it lives inside a JS template literal, where a backtick ends the string.)
     rpt_reply_links as (
       select activity.actor_bd_id as pbc_bd_id, activity.person_id as pbc_person_id
@@ -382,7 +393,9 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
             and exists (
               select 1 from email_message rpt_out_header
               where rpt_out_header.direction = 'outbound'
+                and rpt_out_header.bd_id = rpt_inbound.bd_id
                 and rpt_out_header.rfc_message_id is not null
+                and rpt_out_header.rfc_message_id <> ''
                 and position(rpt_out_header.rfc_message_id in rpt_inbound.rfc_references) > 0
             )
           )

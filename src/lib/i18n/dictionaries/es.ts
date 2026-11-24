@@ -2861,7 +2861,7 @@ export const es: typeof en = {
     activityReplyPersons: "Personas que respondieron",
     activityTasksCompleted: "Tareas completadas",
     activityFoot:
-      '"Correos enviados" y "Respuestas recibidas" incluyen la sincronización de Gmail. "Tareas completadas" cuenta la última finalización de cada tarea que sigue en estado Hecha hoy, por la fecha en que se completó (no la de la última edición).',
+      '"Correos enviados" incluye la sincronización de Gmail. "Personas que respondieron" cuenta cada persona una sola vez, si contestó a un correo que enviamos; el total no es la suma de las filas porque una persona puede haber respondido a dos BDs. "Tareas completadas" cuenta la última finalización de cada tarea que sigue en estado Hecha hoy, por la fecha en que se completó (no la de la última edición).',
     queueTitle: "Adherencia a la cola de seguimientos",
     queueWorked: "Trabajados",
     queuePostponed: "Pospuestos",

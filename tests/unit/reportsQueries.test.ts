@@ -196,10 +196,10 @@ test("buildReportPerBdQuery: base is the small bd table, left-joined to each pre
   assert.match(sql, /left join rpt_queue_pivot/i);
 });
 
-test("buildReportPerBdQuery: activity pivot uses effectiveActivityAtSql and the 5 named activity types", () => {
+test("buildReportPerBdQuery: activity pivot uses effectiveActivityAtSql and its named activity types", () => {
   const { sql, params } = renderPerBd();
   assert.match(sql, /when "activity"\."type" = .status_backfill./i);
-  for (const t of ["note", "call", "meeting_logged", "email_sent", "reply_received"]) {
+  for (const t of ["note", "call", "meeting_logged", "email_sent"]) {
     assert.ok(params.includes(t), `expected activity type "${t}" among bound params`);
   }
 });
@@ -381,13 +381,14 @@ test("buildReportPerBdQuery: 'Personas que respondieron' is its own CTE counting
   assert.match(sql, /left join rpt_reply_pivot on rpt_reply_pivot\.pbc_bd_id = bd\.id/i);
 });
 
-test("buildReportPerBdQuery: a reply must link to our outbound by thread (same bd, not after the reply) OR by the References header (any bd)", () => {
+test("buildReportPerBdQuery: a reply must link to our outbound by thread OR by the References header, both scoped to the same bd and the thread one not after the reply", () => {
   const { sql } = renderPerBd();
   assert.match(sql, /rpt_out_thread\.gmail_thread_id = rpt_inbound\.gmail_thread_id/i);
   assert.match(sql, /rpt_out_thread\.bd_id = rpt_inbound\.bd_id/i);
   assert.match(sql, /rpt_out_thread\.sent_at <= rpt_inbound\.sent_at/i);
   assert.match(sql, /position\(rpt_out_header\.rfc_message_id in rpt_inbound\.rfc_references\) > 0/i);
-  assert.doesNotMatch(sql, /rpt_out_header\.bd_id/i, "Message-IDs are globally unique: the header branch is not scoped by bd");
+  assert.match(sql, /rpt_out_header\.bd_id = rpt_inbound\.bd_id/i, "an unscoped header branch credits a BD who was only cc'd on another BD's mail");
+  assert.match(sql, /rpt_out_header\.rfc_message_id <> ''/i, "position('' in x) is 1: one empty Message-ID would qualify every inbound");
 });
 
 test("buildReportPerBdQuery: the overall distinct-person count is computed in SQL, one value for the total row", () => {
@@ -396,9 +397,16 @@ test("buildReportPerBdQuery: the overall distinct-person count is computed in SQ
   assert.match(sql, /as reply_persons_total/i);
 });
 
-test("ReportsView renders the query's overall distinct count in the total row instead of summing the column", async () => {
+test("ReportsView's reply cell in the total row reads replyPersonsTotal, and no reduce in the file adds replyPersons", async () => {
   const { readFileSync } = await import("node:fs");
   const src = readFileSync("src/app/(app)/admin/reports/ReportsView.tsx", "utf8");
-  assert.doesNotMatch(src, /replyPersons:\s*acc\.replyPersons/, "a sum of distinct-person counts overstates when one person replied to two BDs");
-  assert.match(src, /replyPersonsTotal/);
+  assert.doesNotMatch(src, /\+\s*\w+\.replyPersons\b|\breplyPersons\s*\+/, "any addition over replyPersons overstates when one person replied to two BDs");
+  assert.match(src, /<td className="right num strong">\{replyPersonsTotal\}<\/td>/, "the total row's reply cell must render the query's overall distinct count");
+});
+
+test("the Activity footer names no column that does not exist any more", async () => {
+  const { es } = await import("@/lib/i18n/dictionaries/es");
+  const { en } = await import("@/lib/i18n/dictionaries/en");
+  assert.doesNotMatch(JSON.stringify(es), /Respuestas recibidas/);
+  assert.doesNotMatch(JSON.stringify(en), /Replies received/);
 });
