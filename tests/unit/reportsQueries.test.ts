@@ -410,3 +410,13 @@ test("the Activity footer names no column that does not exist any more", async (
   assert.doesNotMatch(JSON.stringify(es), /Respuestas recibidas/);
   assert.doesNotMatch(JSON.stringify(en), /Replies received/);
 });
+
+test("buildReportPerBdQuery: the role-group predicate is 'is distinct from' over a LEFT join, and only the email_sent filter and the reply CTE carry it", () => {
+  const { sql, params } = renderPerBd();
+  assert.doesNotMatch(sql, /(?<!left )join "person" on person\.id = activity\.person_id/i, "an inner join drops the activity with no person");
+  assert.doesNotMatch(sql, /person\.role_group <>/i, "<> is null-propagating and would drop a person with no role group");
+  assert.equal((sql.match(/left join "person" on person\.id = activity\.person_id/gi) ?? []).length, 2, "one in the activity pivot, one in rpt_reply_links");
+  assert.match(sql, /activity\.type = 'email_sent' and person\.role_group is distinct from \$\d+\)/i);
+  assert.equal(sql.match(/person\.role_group is distinct from/gi)!.length, 2, "exactly the email_sent filter and the reply CTE");
+  assert.ok(params.includes("developers"));
+});

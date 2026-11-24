@@ -41,6 +41,7 @@
 import { sql } from "drizzle-orm";
 import { activity, bd, company, followUpQueueItem, meeting, person, sequence, sequenceMember, task } from "@/db/schema";
 import { effectiveActivityAtSql, happenedAtDisplaySql, happenedAtSql, safeTimestamptzText } from "@/lib/contacts/effectiveActivityTime";
+import type { RoleGroupKey } from "@/lib/roleGroups";
 import { WORKED_ACTIVITY_TYPES } from "@/lib/followUp/queueSelection";
 import { notCurrentClientPersonSql } from "@/lib/reports/currentClient";
 import { rateEventActivityTypesSql, rateOutreachActivitySql, rateReplyActivitySql } from "@/lib/reports/replyRateEvidence";
@@ -93,6 +94,30 @@ function wonAtSql() {
  * reply_received is NOT listed: the reply column moved to its own CTE (rpt_reply_links), which counts distinct persons.
  */
 const ACTIVITY_BY_BD_TYPES = ["note", "call_attempt", "call", "whatsapp", "whatsapp_no_channel", "meeting_logged", "email_sent"] as const;
+
+/**
+ * Role groups kept OUT of the two email columns of "Actividad por BD" (Correos enviados, Personas que respondieron): a
+ * developer answering is not a relevant reply for a Business Developer. Typed against RoleGroupKey so a renamed group breaks the
+ * build instead of silently un-filtering. Fixed in code on purpose and NOT driven by bd.follow_up_excluded_role_groups: that is a
+ * per-BD view preference for their own follow-up queue, so using it would let a BD move their own reported numbers and make rows
+ * incomparable across BDs. Both email columns share this list so a row never compares two different populations. Add a group here
+ * and nowhere else.
+ */
+export const REPORT_EXCLUDED_ROLE_GROUPS: readonly RoleGroupKey[] = ["developers"];
+
+/**
+ * The predicate over the LEFT-joined person: true for a person outside every excluded group, for a person with no role_group,
+ * and for an activity with no person at all. It is "is distinct from", never "<>" (null-propagating, it would drop the row) and
+ * the join is never an inner join. Measured on production 2026-11-24: 1 of 2500 email_sent has person_id null (and that
+ * person-less row has no role group either), so an inner join would silently lose a counted email; and 345 of 429 notes have no
+ * person (company- or lead-scoped), which is why this scopes only the email columns.
+ */
+function notInExcludedRoleGroupSql() {
+  return sql.join(
+    REPORT_EXCLUDED_ROLE_GROUPS.map((g) => sql`person.role_group is distinct from ${g}`),
+    sql` and `,
+  );
+}
 
 /**
  * Midnight UTC of a queue day, as a `timestamptz`. `queue_date` is a `date`,
@@ -332,8 +357,10 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
         count(*) filter (where activity.type = 'whatsapp')::int as pbc_whatsapps,
         count(*) filter (where activity.type = 'whatsapp_no_channel')::int as pbc_whatsapp_no_channel,
         count(*) filter (where activity.type = 'meeting_logged')::int as pbc_meetings,
-        count(*) filter (where activity.type = 'email_sent')::int as pbc_emails_sent
+        -- The ONLY column filtered by role group besides rpt_reply_links (see REPORT_EXCLUDED_ROLE_GROUPS); every other column above stays as is.
+        count(*) filter (where activity.type = 'email_sent' and ${notInExcludedRoleGroupSql()})::int as pbc_emails_sent
       from ${activity}
+      left join ${person} on person.id = activity.person_id
       where activity.actor_bd_id is not null
         and activity.type in (${activityTypes})
         and (${bdId}::uuid is null or activity.actor_bd_id = ${bdId}::uuid)
@@ -373,7 +400,9 @@ export function buildReportPerBdQuery({ fromIso, toIso, fromDate, toDateExclusiv
         on rpt_inbound.bd_id = activity.actor_bd_id
         and rpt_inbound.gmail_message_id = activity.metadata->>'gmailMessageId'
         and rpt_inbound.direction = 'inbound'
+      left join ${person} on person.id = activity.person_id
       where activity.type = 'reply_received'
+        and ${notInExcludedRoleGroupSql()}
         and activity.deleted_at is null
         and activity.actor_bd_id is not null
         and activity.person_id is not null
