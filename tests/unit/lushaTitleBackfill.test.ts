@@ -164,6 +164,18 @@ test("a genuinely different employer is still needs_review (Spring Automation sh
   assert.equal(skipReason(r), "needs_review_company_mismatch");
 });
 
+test("an identical hyphenated domain matches: both sides are normalized the same way", () => {
+  // Regression: emailBase was compacted (hyphen stripped) while the Lusha domain base was not, so
+  // pan-energy.com vs www.pan-energy.com compared "panenergy" to "pan-energy" and check (a) failed
+  // on every hyphenated domain. The company name is deliberately unrelated here, so ONLY the domain
+  // check can make this pass.
+  const r = planLushaTitle(
+    lusha({ companyName: "Zzz Holdings", companyDomain: "www.pan-energy.com" }),
+    crm({ email: "ana@pan-energy.com", company: null }),
+  );
+  assert.equal(r.action, "write");
+});
+
 test("containment does not fire when the shorter string is under 4 characters", () => {
   const r = planLushaTitle(
     lusha({ companyName: "Acme Industrial Holdings", companyDomain: "other.com" }),

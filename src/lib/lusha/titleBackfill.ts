@@ -104,8 +104,13 @@ function compactCompany(name: string | null | undefined): string {
  * (b) and (c) exist because most targets have an empty person.company.
  */
 function companyAgrees(l: { companyName: string | null; companyDomain: string | null }, crm: LushaTitleCrm): boolean {
+  // BOTH sides go through compactCompany. They used to not: emailBase was compacted (which strips
+  // the punctuation `[^a-z0-9]`) while lushaBase was raw, so an IDENTICAL hyphenated domain compared
+  // "panenergy" against "pan-energy" and check (a) could never fire. A real record lost its title to
+  // that: an email at pan-energy.com against Lusha's www.pan-energy.com went to needs_review.
+  // Asymmetric normalization of two things being compared is always the bug.
   const emailBase = compactCompany(registrableBase(crm.email.split("@")[1] ?? ""));
-  const lushaBase = l.companyDomain ? registrableBase(l.companyDomain) : "";
+  const lushaBase = l.companyDomain ? compactCompany(registrableBase(l.companyDomain)) : "";
   if (emailBase && lushaBase && emailBase === lushaBase) return true;
   const name = compactCompany(l.companyName);
   if (name && emailBase) {
