@@ -63,7 +63,7 @@ import { BulkResultToast } from "./BulkResultToast";
 import { Board } from "./Board";
 import { redirect } from "next/navigation";
 import { getOutreachContactsPage } from "@/lib/contacts/outreachViewDb";
-import { laneOffersFilter, LANE_URL, legacyViewRedirect, OUTREACH_LANES, resolveOutreachLane } from "@/lib/outreach/lanes";
+import { laneOffersFilter, laneUrl, legacyViewRedirect, OUTREACH_LANES, resolveOutreachLane } from "@/lib/outreach/lanes";
 import {
   buildOutreachViewParams,
   parseOutreachViewFilters,
@@ -334,7 +334,7 @@ function columnCell(
 export default async function ContactsPage({ searchParams }: ContactsPageProps) {
   const sp = await searchParams;
   // The retired `moveToEmail` system view is the ready_for_email lane now; old links must not break.
-  const legacyRedirect = legacyViewRedirect(sp.view);
+  const legacyRedirect = legacyViewRedirect(sp.view, sp);
   if (legacyRedirect) redirect(legacyRedirect);
   // Normalizes the multi-select status chip's repeated `?status=` params
   // (parsed as string[] by Next.js) down to the same comma-joined shape
@@ -523,6 +523,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   // on top of every other currently-active ad-hoc filter/sort/layout, same
   // "preserve everything else" convention as pageHref/layoutHref below.
   function showAllRolesHref(): string {
+    if (isOutreachView) {
+      return `/contacts?${buildOutreachViewParams({ ...(sp as OutreachViewSearchParams), roles: SHOW_ALL_ROLES_PARAM_VALUE }, 1).toString()}`;
+    }
     const params = withAdHocFilterParams(new URLSearchParams());
     params.set("view", activeView.viewKey);
     if (sp.q) params.set("q", sp.q);
@@ -636,8 +639,12 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       label: dict.nav.outreach,
       href: "/contacts?view=outreach",
       active: isOutreachView,
-      // The active lane's own total only. Never a sum of both lanes: a contact can be in both.
-      count: isOutreachView ? outreachPage?.total : undefined,
+      // The active lane's unfiltered size only. Never a sum of both lanes: a contact can be in both.
+      count: isOutreachView
+        ? lane === "hiring"
+          ? outreachPage?.laneSummary.hiring
+          : outreachPage?.laneSummary.readyForEmail
+        : undefined,
     },
     ...savedViewRows.map((v) => ({
       key: `saved:${v.id}`,
@@ -680,6 +687,52 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       </Link>
     );
   }
+
+  const hiddenRolesIndicator = roleVisibility.isDefaultActive ? (
+    <>
+      <span className="dropdown">
+        <span className="chip" title={l.hiddenRolesExceptionHint}>
+          <span className="chip-target">
+            <span className="k">{l.hiddenRolesChipLabel}:</span>{" "}
+            {roleVisibility.hiddenRoleGroups
+              .map((key) => dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key)
+              .join(", ")}{" "}
+            ({l.hiddenRolesExceptionLabel})
+          </span>
+        </span>
+        <details className="dropdown">
+          <summary
+            className="btn btn-ghost btn-sm btn-icon"
+            aria-label={dict.common.roleGroupFilterHintLabel}
+            title={dict.common.roleGroupFilterHintLabel}
+          >
+            <InfoIcon className="icon" />
+          </summary>
+          <div className="menu left" style={{ width: 280 }}>
+            <div className="menu-label">{dict.common.roleGroupFilterHintMenuLabel}</div>
+            {roleVisibility.hiddenRoleGroups.map((key) => {
+              const entry = ROLE_GROUP_PLAYBOOK[key];
+              return (
+                <a key={key} className="menu-item" href={`/playbook#${key}`}>
+                  <span className={`${PRIORITY_BADGE_CLASS[entry.priority]} no-dot`}>
+                    {entry.priorityLabel}
+                  </span>
+                  {dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key}
+                </a>
+              );
+            })}
+            <div className="menu-sep" />
+            <a className="menu-item" href="/playbook">
+              {dict.common.roleGroupFilterGuideLink}
+            </a>
+          </div>
+        </details>
+      </span>
+      <Link href={showAllRolesHref()} className="btn btn-ghost btn-sm">
+        {l.showAllRolesLabel}
+      </Link>
+    </>
+  ) : null;
 
   return (
     <main className="page">
@@ -750,15 +803,12 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           <nav className="view-tabs" aria-label={dict.outreach.laneNavLabel}>
             {OUTREACH_LANES.map((key) => {
               const active = key === lane;
-              const n = active
-                ? outreachPage.total
-                : key === "hiring"
-                  ? outreachPage.laneSummary.hiring
-                  : outreachPage.laneSummary.readyForEmail;
+              // Unfiltered lane size for both lanes; the filtered count is the table footer's "de N".
+              const n = key === "hiring" ? outreachPage.laneSummary.hiring : outreachPage.laneSummary.readyForEmail;
               return (
                 <Link
                   key={key}
-                  href={LANE_URL(key)}
+                  href={laneUrl(key, sp.roles)}
                   className={`view-tab${active ? " active" : ""}`}
                   aria-current={active ? "page" : undefined}
                 >
@@ -788,6 +838,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           <form method="get" action="/contacts" className="filter-toolbar">
             <input type="hidden" name="view" value="outreach" />
             <input type="hidden" name="lane" value={lane} />
+            {sp.roles === SHOW_ALL_ROLES_PARAM_VALUE && <input type="hidden" name="roles" value={SHOW_ALL_ROLES_PARAM_VALUE} />}
             <div className="filter-field">
               <label htmlFor="roleGroup">{dict.common.roleGroupLabel}</label>
               <select id="roleGroup" name="roleGroup" defaultValue={sp.roleGroup ?? ""}>
@@ -912,51 +963,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
               {l.filtersClearAll}
             </Link>
           )}
-          {roleVisibility.isDefaultActive && (
-            <>
-              <span className="dropdown">
-                <span className="chip" title={l.hiddenRolesExceptionHint}>
-                  <span className="chip-target">
-                    <span className="k">{l.hiddenRolesChipLabel}:</span>{" "}
-                    {roleVisibility.hiddenRoleGroups
-                      .map((key) => dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key)
-                      .join(", ")}{" "}
-                    ({l.hiddenRolesExceptionLabel})
-                  </span>
-                </span>
-                <details className="dropdown">
-                  <summary
-                    className="btn btn-ghost btn-sm btn-icon"
-                    aria-label={dict.common.roleGroupFilterHintLabel}
-                    title={dict.common.roleGroupFilterHintLabel}
-                  >
-                    <InfoIcon className="icon" />
-                  </summary>
-                  <div className="menu left" style={{ width: 280 }}>
-                    <div className="menu-label">{dict.common.roleGroupFilterHintMenuLabel}</div>
-                    {roleVisibility.hiddenRoleGroups.map((key) => {
-                      const entry = ROLE_GROUP_PLAYBOOK[key];
-                      return (
-                        <a key={key} className="menu-item" href={`/playbook#${key}`}>
-                          <span className={`${PRIORITY_BADGE_CLASS[entry.priority]} no-dot`}>
-                            {entry.priorityLabel}
-                          </span>
-                          {dict.roleGroups[key as keyof typeof dict.roleGroups] ?? key}
-                        </a>
-                      );
-                    })}
-                    <div className="menu-sep" />
-                    <a className="menu-item" href="/playbook">
-                      {dict.common.roleGroupFilterGuideLink}
-                    </a>
-                  </div>
-                </details>
-              </span>
-              <Link href={showAllRolesHref()} className="btn btn-ghost btn-sm">
-                {l.showAllRolesLabel}
-              </Link>
-            </>
-          )}
+          {hiddenRolesIndicator}
           {!isBoard && (
             <>
               <span className="spacer" />
@@ -988,6 +995,9 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
           )}
         </div>
       )}
+
+      {/* Same chip and "mostrar todos" as the other views: the outreach lanes hide the "No priorizar" groups too. */}
+      {isOutreachView && hiddenRolesIndicator && <div className="toolbar">{hiddenRolesIndicator}</div>}
 
       <BulkResultToast message={bulkMessage} variant={sp.bulkResult === "owner:forbidden" ? "error" : "success"} />
       {sp.bulkLimited === "1" && (

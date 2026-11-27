@@ -166,8 +166,17 @@ export async function listOutreachCandidates(
     [...hiringIndex.values()].map((m) => m.companyKey),
   ).size;
 
+  // The lane badges are UNFILTERED lane sizes. The hiring keys above are narrowed
+  // by the posting filters, so when any is on the unfiltered keys cost one more
+  // index read; without them (and in ready_for_email) the two sets are the same.
+  const postingFilterOn = Boolean(f.market || f.miamiOnly || f.hideOffshore || f.startupsOnly);
+  const summaryKeys =
+    options.hiringIndex || !postingFilterOn
+      ? matchKeys
+      : [...(await getHiringMatchIndex(undefined, undefined, undefined, undefined)).keys()];
+
   if (lane === "hiring" && !matchKeys.length) {
-    const laneSummary = await getOutreachLaneSummary(db, matchKeys, hiddenRoleGroups);
+    const laneSummary = await getOutreachLaneSummary(db, summaryKeys, hiddenRoleGroups);
     return { rows: [], total: 0, page: 1, pageSize, totalPages: 1, hiringCompanyCount: 0, laneSummary };
   }
 
@@ -179,7 +188,11 @@ export async function listOutreachCandidates(
     where.push(outreachNameCondition(name));
   }
 
-  const rows = await selectOutreachRows(db, bdId, and(...where)!, includeNeverMessaged); // query 3
+  // Queries 3 and 4 depend only on keys known by now, so they share one wait.
+  const [rows, laneSummary] = await Promise.all([
+    selectOutreachRows(db, bdId, and(...where)!, includeNeverMessaged), // query 3
+    getOutreachLaneSummary(db, summaryKeys, hiddenRoleGroups), // query 4
+  ]);
 
   const scored: OutreachRow[] = rows.map((r) => {
     // A raw-SQL aggregate comes back from the driver as a possibly
@@ -227,8 +240,6 @@ export async function listOutreachCandidates(
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const pageRows = scored.slice((safePage - 1) * pageSize, safePage * pageSize);
-
-  const laneSummary = await getOutreachLaneSummary(db, matchKeys, hiddenRoleGroups); // query 4
 
   return {
     rows: pageRows,

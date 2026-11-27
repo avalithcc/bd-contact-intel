@@ -54,9 +54,26 @@ export interface OutreachLaneSummary {
   sources: { backfill: number; emailSent: number; linkedin: number };
 }
 
-export const LANE_URL = (lane: OutreachLane): string => `/contacts?view=outreach&lane=${lane}`;
+/** Lane tab href. `roles=all` (the "mostrar todos" escape) must survive a lane click. */
+export function laneUrl(lane: OutreachLane, rolesParam?: string): string {
+  const params = new URLSearchParams({ view: "outreach", lane });
+  if (rolesParam === "all") params.set("roles", "all");
+  return `/contacts?${params.toString()}`;
+}
 
-/** The retired `moveToEmail` system view lives on as a lane; old links must still land somewhere useful. */
-export function legacyViewRedirect(viewParam: string | undefined): string | null {
-  return viewParam === "moveToEmail" ? LANE_URL("ready_for_email") : null;
+/**
+ * The retired `moveToEmail` system view lives on as a lane; old links must still land somewhere useful.
+ * The rest of the query string (`q`, `page`, `roles`, ...) is forwarded; `view` and `lane` are the redirect's own.
+ */
+export function legacyViewRedirect(
+  viewParam: string | undefined,
+  rest: Record<string, string | string[] | undefined> = {},
+): string | null {
+  if (viewParam !== "moveToEmail") return null;
+  const params = new URLSearchParams({ view: "outreach", lane: "ready_for_email" });
+  for (const [k, v] of Object.entries(rest)) {
+    if (k === "view" || k === "lane" || v === undefined) continue;
+    for (const item of Array.isArray(v) ? v : [v]) params.append(k, item);
+  }
+  return `/contacts?${params.toString()}`;
 }
