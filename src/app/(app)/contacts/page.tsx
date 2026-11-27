@@ -61,7 +61,9 @@ import { pickBulkActionsLabels } from "@/lib/contacts/labels";
 import { BulkActionsBar } from "./BulkActionsBar";
 import { BulkResultToast } from "./BulkResultToast";
 import { Board } from "./Board";
+import { redirect } from "next/navigation";
 import { getOutreachContactsPage } from "@/lib/contacts/outreachViewDb";
+import { laneOffersFilter, LANE_URL, legacyViewRedirect, OUTREACH_LANES, resolveOutreachLane } from "@/lib/outreach/lanes";
 import {
   buildOutreachViewParams,
   parseOutreachViewFilters,
@@ -129,6 +131,7 @@ interface ContactsPageProps {
     // "Outreach" system view filters (task 15a-2; owner decision
     // 2026-09-26): same param names/semantics as `/outreach`'s own
     // searchParams — see src/lib/contacts/outreachViewParams.ts.
+    lane?: string;
     roleGroup?: string;
     companyCategory?: string;
     market?: string;
@@ -330,6 +333,9 @@ function columnCell(
  */
 export default async function ContactsPage({ searchParams }: ContactsPageProps) {
   const sp = await searchParams;
+  // The retired `moveToEmail` system view is the ready_for_email lane now; old links must not break.
+  const legacyRedirect = legacyViewRedirect(sp.view);
+  if (legacyRedirect) redirect(legacyRedirect);
   // Normalizes the multi-select status chip's repeated `?status=` params
   // (parsed as string[] by Next.js) down to the same comma-joined shape
   // every other ad-hoc filter/href-building helper below expects.
@@ -401,8 +407,8 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   // badges), the "Exportar"/CSV href and bulk "select all N filtered"
   // (bulkActions.ts/bulkMessageActions.ts re-resolve it server-side from the
   // forwarded `roles` field), so none of them can disagree on which rows are
-  // hidden. Never applied to the Outreach view (a separate hiring-crossover
-  // read, outreachViewDb.ts) or to the follow-up queue.
+  // hidden. The Outreach view (both lanes, outreachViewDb.ts) receives it too;
+  // only the follow-up queue is exempt.
   const roleVisibility = resolveRoleVisibility(sp.roles, effectiveFilters.roleGroup);
 
   // Column picker (task 13.1): a `?columns=` query override wins (used by
@@ -458,6 +464,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
   const relTime = (d: Date) => relativeTime(d, locale);
   const messageLabels = pickGenerateMessageLabels(dict);
   const outreachFilters = parseOutreachViewFilters(sp);
+  const lane = resolveOutreachLane(sp.lane);
 
   const [listPage, systemViewCounts, boardColumns, outreachPage] = await Promise.all([
     isOutreachView || isBoard
@@ -478,7 +485,10 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       ? getContactBoardColumns(effectiveFilters, me.id, sp.q, dict, hiringKeys, roleVisibility.hiddenRoleGroups)
       : null,
     isOutreachView
-      ? getOutreachContactsPage(me.id, outreachFilters, page, PAGE_SIZE, relTime, dict)
+      ? getOutreachContactsPage(me.id, outreachFilters, page, PAGE_SIZE, relTime, dict, {
+          lane,
+          hiddenRoleGroups: roleVisibility.hiddenRoleGroups,
+        })
       : null,
   ]);
 
@@ -626,6 +636,8 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       label: dict.nav.outreach,
       href: "/contacts?view=outreach",
       active: isOutreachView,
+      // The active lane's own total only. Never a sum of both lanes: a contact can be in both.
+      count: isOutreachView ? outreachPage?.total : undefined,
     },
     ...savedViewRows.map((v) => ({
       key: `saved:${v.id}`,
@@ -733,11 +745,49 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
         />
       </nav>
 
+      {isOutreachView && outreachPage && (
+        <>
+          <nav className="view-tabs" aria-label={dict.outreach.laneNavLabel}>
+            {OUTREACH_LANES.map((key) => {
+              const active = key === lane;
+              const n = active
+                ? outreachPage.total
+                : key === "hiring"
+                  ? outreachPage.laneSummary.hiring
+                  : outreachPage.laneSummary.readyForEmail;
+              return (
+                <Link
+                  key={key}
+                  href={LANE_URL(key)}
+                  className={`view-tab${active ? " active" : ""}`}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {key === "hiring" ? dict.outreach.laneHiringLabel : dict.outreach.laneReadyLabel}
+                  <span className="count">{n}</span>
+                  <LinkPendingDot />
+                </Link>
+              );
+            })}
+          </nav>
+          <p className="meta lane-legend">
+            {lane === "hiring"
+              ? dict.outreach.laneHiringLegend(outreachPage.hiringCompanyCount)
+              : dict.outreach.laneReadyLegend(
+                  outreachPage.laneSummary.readyForEmail,
+                  outreachPage.laneSummary.sources.backfill,
+                  outreachPage.laneSummary.sources.emailSent,
+                  outreachPage.laneSummary.sources.linkedin,
+                )}
+          </p>
+        </>
+      )}
+
       {isOutreachView ? (
         <section className="panel">
           <div className="eyebrow">{dict.common.filterEyebrow}</div>
           <form method="get" action="/contacts" className="filter-toolbar">
             <input type="hidden" name="view" value="outreach" />
+            <input type="hidden" name="lane" value={lane} />
             <div className="filter-field">
               <label htmlFor="roleGroup">{dict.common.roleGroupLabel}</label>
               <select id="roleGroup" name="roleGroup" defaultValue={sp.roleGroup ?? ""}>
@@ -770,45 +820,49 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                 ))}
               </select>
             </div>
-            <div className="filter-field">
-              <label htmlFor="market">{dict.common.marketLabel}</label>
-              <select id="market" name="market" defaultValue={sp.market ?? ""}>
-                <option value="">{dict.common.allMarkets}</option>
-                {MARKETS.map((m) => (
-                  <option key={m} value={m}>
-                    {dict.markets[m]}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="filter-checkbox-group" role="group">
-              {sp.market === "us" && (
-                <div className="filter-checkbox">
-                  <label htmlFor="miamiOnly" className="checkbox-label">
-                    <input id="miamiOnly" name="miamiOnly" type="checkbox" defaultChecked={sp.miamiOnly === "on"} />
-                    {dict.common.miamiOnlyLabel}
-                  </label>
+            {laneOffersFilter(lane, "market") && (
+              <>
+                <div className="filter-field">
+                  <label htmlFor="market">{dict.common.marketLabel}</label>
+                  <select id="market" name="market" defaultValue={sp.market ?? ""}>
+                    <option value="">{dict.common.allMarkets}</option>
+                    {MARKETS.map((m) => (
+                      <option key={m} value={m}>
+                        {dict.markets[m]}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
-              <div className="filter-checkbox">
-                <label htmlFor="excludeNever" className="checkbox-label">
-                  <input id="excludeNever" name="excludeNever" type="checkbox" defaultChecked={sp.excludeNever === "on"} />
-                  {dict.outreach.excludeNeverMessaged}
-                </label>
-              </div>
-              <div className="filter-checkbox">
-                <label htmlFor="hideOffshore" className="checkbox-label">
-                  <input id="hideOffshore" name="hideOffshore" type="checkbox" defaultChecked={sp.hideOffshore === "on"} />
-                  {dict.common.hideOffshoreLabel}
-                </label>
-              </div>
-              <div className="filter-checkbox">
-                <label htmlFor="startupsOnly" className="checkbox-label">
-                  <input id="startupsOnly" name="startupsOnly" type="checkbox" defaultChecked={sp.startupsOnly === "on"} />
-                  {dict.outreach.startupsOnlyLabel}
-                </label>
-              </div>
-            </div>
+                <div className="filter-checkbox-group" role="group">
+                  {sp.market === "us" && (
+                    <div className="filter-checkbox">
+                      <label htmlFor="miamiOnly" className="checkbox-label">
+                        <input id="miamiOnly" name="miamiOnly" type="checkbox" defaultChecked={sp.miamiOnly === "on"} />
+                        {dict.common.miamiOnlyLabel}
+                      </label>
+                    </div>
+                  )}
+                  <div className="filter-checkbox">
+                    <label htmlFor="excludeNever" className="checkbox-label">
+                      <input id="excludeNever" name="excludeNever" type="checkbox" defaultChecked={sp.excludeNever === "on"} />
+                      {dict.outreach.excludeNeverMessaged}
+                    </label>
+                  </div>
+                  <div className="filter-checkbox">
+                    <label htmlFor="hideOffshore" className="checkbox-label">
+                      <input id="hideOffshore" name="hideOffshore" type="checkbox" defaultChecked={sp.hideOffshore === "on"} />
+                      {dict.common.hideOffshoreLabel}
+                    </label>
+                  </div>
+                  <div className="filter-checkbox">
+                    <label htmlFor="startupsOnly" className="checkbox-label">
+                      <input id="startupsOnly" name="startupsOnly" type="checkbox" defaultChecked={sp.startupsOnly === "on"} />
+                      {dict.outreach.startupsOnlyLabel}
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
             <button type="submit" className="filter-submit">
               {dict.common.filter}
             </button>
@@ -943,7 +997,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
       )}
 
       {isOutreachView ? (
-        outreachPage && !outreachPage.hiringCompanyCount ? (
+        outreachPage && lane === "hiring" && !outreachPage.hiringCompanyCount ? (
           // Same two-tier empty state as /outreach (parity gap closed): no
           // hiring companies synced at all is a different, more actionable
           // message than "synced, but none of your contacts match".
@@ -952,7 +1006,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
             <Link href="/hiring">{dict.outreach.noHiringCompaniesLinkText}</Link>
             {dict.outreach.noHiringCompaniesSuffix}
           </p>
-        ) : outreachPage && outreachPage.hiringCompanyCount > 0 && !outreachPage.rows.length ? (
+        ) : outreachPage && lane === "hiring" && outreachPage.hiringCompanyCount > 0 && !outreachPage.rows.length ? (
           <p className="muted">
             {dict.outreach.noMatchingContacts(
               outreachPage.hiringCompanyCount,
@@ -970,8 +1024,6 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                   <th>{dict.outreach.tableName}</th>
                   <th>{dict.outreach.tablePosition}</th>
                   <th>{dict.outreach.tableCompany}</th>
-                  <th>{dict.outreach.tableRoleGroup}</th>
-                  <th>{dict.outreach.tableOpenRoles}</th>
                   <th>{dict.outreach.tableLastContact}</th>
                   <th>{dict.outreach.tableWhy}</th>
                   <th>{dict.outreach.tableMessage}</th>
@@ -1004,8 +1056,6 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                         </span>
                       )}
                     </td>
-                    <td>{r.roleGroup ? dict.roleGroups[r.roleGroup] : "—"}</td>
-                    <td>{r.openItCount}</td>
                     <td className="nowrap meta">{r.lastActivity ? `${r.lastActivity.label} · ${relTime(r.lastActivity.createdAt)}` : "—"}</td>
                     <td>
                       <div className="reason-chips">

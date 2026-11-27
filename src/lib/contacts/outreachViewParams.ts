@@ -11,6 +11,7 @@ import { ROLE_GROUPS, type RoleGroupKey } from "@/lib/roleGroups";
 import { COMPANY_CATEGORIES, type CompanyCategoryKey } from "@/lib/companyCategories";
 import { isMarketKey } from "@/lib/hiring/markets";
 import type { OutreachFilters } from "@/lib/outreach/ranking";
+import { isOutreachLane } from "@/lib/outreach/lanes";
 
 const ROLE_GROUP_KEYS = new Set(ROLE_GROUPS.map((g) => g.key));
 const COMPANY_CATEGORY_KEYS = new Set(COMPANY_CATEGORIES.map((c) => c.key));
@@ -28,6 +29,8 @@ export function isCompanyCategoryKey(v: string | undefined): v is CompanyCategor
  * `/outreach` -> `/contacts?view=outreach` redirect mapping, task 15c, is a
  * straight pass-through for every field here). */
 export interface OutreachViewSearchParams {
+  lane?: string;
+  roles?: string;
   roleGroup?: string;
   companyCategory?: string;
   market?: string;
@@ -68,6 +71,9 @@ export function parseOutreachViewFilters(sp: OutreachViewSearchParams): Outreach
 export function buildOutreachViewParams(sp: OutreachViewSearchParams, page: number): URLSearchParams {
   const params = new URLSearchParams();
   params.set("view", "outreach");
+  if (isOutreachLane(sp.lane)) params.set("lane", sp.lane);
+  // The `?roles=all` escape hatch (roleVisibility.ts) must survive pagination.
+  if (sp.roles === "all") params.set("roles", "all");
   if (isRoleGroupKey(sp.roleGroup)) params.set("roleGroup", sp.roleGroup);
   if (isCompanyCategoryKey(sp.companyCategory)) params.set("companyCategory", sp.companyCategory);
   if (isMarketKey(sp.market)) params.set("market", sp.market);

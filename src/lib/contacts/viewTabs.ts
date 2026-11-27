@@ -25,19 +25,16 @@ export interface ViewTabItem {
 /** Owner-chosen pinned set — SYSTEM_VIEWS keys (src/lib/contacts/views.ts),
  * in the exact display order requested.
  *
- * `outreachReady` was swapped out for `moveToEmail` on 2026-09-28. Measured
- * against production that day: outreachReady returned 22 contacts while
- * moveToEmail returned 3,460 — the contacts already messaged on LinkedIn who
- * have a verified email, which is the segment the product strategy is about
- * (first touch on LinkedIn, then move to email or a call). A pinned slot
- * showing 22 rows while the largest actionable list sat behind the "Más
- * vistas" menu was backwards.
+ * The fourth slot belongs to "outreach" (A quién contactar), the queue. The
+ * `moveToEmail` population that held it since 2026-09-28 moved into the
+ * outreach view as its `ready_for_email` lane, so the queue now owns the
+ * pinned slot and the lane is one click away inside it.
  *
  * The set stays at four. This row competes for horizontal width, and the
  * bulk actions bar on this same page had to gain `flex-wrap` the same day
  * after overflowing at 1024px — a fifth pinned tab invites the same bug.
  * `outreachReady` remains available in the overflow menu. */
-export const PINNED_VIEW_TAB_KEYS: readonly string[] = ["all", "mine", "notContacted", "moveToEmail"];
+export const PINNED_VIEW_TAB_KEYS: readonly string[] = ["all", "mine", "notContacted", "outreach"];
 
 export interface SplitViewTabsResult {
   pinned: ViewTabItem[];

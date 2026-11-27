@@ -104,3 +104,11 @@ test("buildOutreachRedirectQuery defaults page to 1 for a missing/invalid page p
   assert.equal(new URLSearchParams(buildOutreachRedirectQuery({ page: "bogus" })).get("page"), "1");
   assert.equal(new URLSearchParams(buildOutreachRedirectQuery({ page: "0" })).get("page"), "1");
 });
+
+test("buildOutreachViewParams carries a valid lane and roles=all across pages, and drops an unknown lane", () => {
+  const ready = buildOutreachViewParams({ lane: "ready_for_email", roles: "all" }, 3);
+  assert.equal(ready.get("lane"), "ready_for_email");
+  assert.equal(ready.get("roles"), "all");
+  assert.equal(buildOutreachViewParams({ lane: "bogus", roles: "nope" }, 1).has("lane"), false);
+  assert.equal(buildOutreachViewParams({ lane: "bogus", roles: "nope" }, 1).has("roles"), false);
+});

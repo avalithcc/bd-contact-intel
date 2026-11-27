@@ -1,4 +1,6 @@
 import { and, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { roleGroupVisibilityCondition } from "@/lib/contacts/roleVisibility";
+import { applyLaneFilters, type OutreachLane, type OutreachLaneSummary } from "@/lib/outreach/lanes";
 import { termContainsSql } from "@/lib/search/accentInsensitive";
 import { db } from "@/db";
 import { company, contact, conversation, message, person, personBdConnection, personIdMap } from "@/db/schema";
@@ -90,8 +92,10 @@ export async function getRecentOutreachHistory(
 }
 
 /**
- * Ranked "who should I message this week?" list: Contacts whose company is
- * currently hiring IT, ordered by relationship strength then seniority then
+ * Ranked "who should I message this week?" list for one lane (see
+ * src/lib/outreach/lanes.ts): `hiring` = Contacts whose company is currently
+ * hiring IT, `ready_for_email` = contacted with a verified email (no hiring
+ * restriction). Ordered by relationship strength then seniority then
  * hiring urgency (see compareOutreachRows).
  *
  * Re-scoped off `bdId` (task 5.3; proposal success criterion "no `bdId`
@@ -114,7 +118,8 @@ export async function getRecentOutreachHistory(
  * — a known, documented gap closed by Phase 9's unified `/contacts/[id]`
  * record page (design D8), not this change.
  *
- * Exactly 3 fixed queries regardless of page number or total contact count:
+ * Exactly 4 fixed queries regardless of page number or total contact count
+ * (query 4 is the lane summary, see getOutreachLaneSummary):
  * (1)+(2) the two queries behind getHiringMatchIndex (open postings,
  * aliases — shared with /hiring, not BD-scoped), and (3) one `person`
  * query (aggregated over its connections) pre-filtered to only companies
@@ -143,28 +148,33 @@ export async function listOutreachCandidates(
   filters: OutreachFilters = {},
   page = 1,
   pageSize = 25,
-): Promise<OutreachPage> {
-  const includeNeverMessaged = filters.includeNeverMessaged ?? true;
+  options: OutreachListOptions = {},
+): Promise<OutreachPage & { laneSummary: OutreachLaneSummary }> {
+  const lane = options.lane ?? "hiring";
+  // The lane decides which filters exist: in ready_for_email the posting-derived
+  // ones are IGNORED here, not merely hidden by the page.
+  const f = applyLaneFilters(lane, filters);
+  const includeNeverMessaged = f.includeNeverMessaged ?? true;
+  const hiddenRoleGroups = options.hiddenRoleGroups ?? [];
 
-  const hiringIndex = await getHiringMatchIndex(
-    filters.market,
-    filters.miamiOnly,
-    filters.hideOffshore,
-    filters.startupsOnly,
-  ); // queries 1-2
+  // Computed in BOTH lanes (openItCount, the "Contratando" badge and the
+  // open-roles chip depend on it); applied as a population filter only in `hiring`.
+  const hiringIndex =
+    options.hiringIndex ?? (await getHiringMatchIndex(f.market, f.miamiOnly, f.hideOffshore, f.startupsOnly)); // queries 1-2
   const matchKeys = [...hiringIndex.keys()];
   const hiringCompanyCount = new Set(
     [...hiringIndex.values()].map((m) => m.companyKey),
   ).size;
 
-  if (!matchKeys.length) {
-    return { rows: [], total: 0, page: 1, pageSize, totalPages: 1, hiringCompanyCount: 0 };
+  if (lane === "hiring" && !matchKeys.length) {
+    const laneSummary = await getOutreachLaneSummary(db, matchKeys, hiddenRoleGroups);
+    return { rows: [], total: 0, page: 1, pageSize, totalPages: 1, hiringCompanyCount: 0, laneSummary };
   }
 
-  const where = [isNull(person.mergedIntoId), inArray(person.companyKey, matchKeys)];
-  if (filters.roleGroup) where.push(eq(person.roleGroup, filters.roleGroup));
-  if (filters.companyCategory) where.push(eq(person.companyCategory, filters.companyCategory));
-  const name = filters.name?.trim();
+  const where = outreachLaneWhere(lane, matchKeys, hiddenRoleGroups);
+  if (f.roleGroup) where.push(eq(person.roleGroup, f.roleGroup));
+  if (f.companyCategory) where.push(eq(person.companyCategory, f.companyCategory));
+  const name = f.name?.trim();
   if (name) {
     where.push(outreachNameCondition(name));
   }
@@ -218,6 +228,8 @@ export async function listOutreachCandidates(
   const safePage = Math.min(Math.max(1, page), totalPages);
   const pageRows = scored.slice((safePage - 1) * pageSize, safePage * pageSize);
 
+  const laneSummary = await getOutreachLaneSummary(db, matchKeys, hiddenRoleGroups); // query 4
+
   return {
     rows: pageRows,
     total,
@@ -225,6 +237,71 @@ export async function listOutreachCandidates(
     pageSize,
     totalPages,
     hiringCompanyCount,
+    laneSummary,
+  };
+}
+
+export interface OutreachListOptions {
+  /** Defaults to `hiring`. */
+  lane?: OutreachLane;
+  /** Role groups the BD playbook says not to prioritize (resolveRoleVisibility); the BUYER-CHAMPION exception lives in roleGroupVisibilityCondition. */
+  hiddenRoleGroups?: readonly RoleGroupKey[];
+  /** Test seam: skips the two hiring-index queries. Production never passes it. */
+  hiringIndex?: Map<string, HiringMatch>;
+}
+
+/**
+ * `ready_for_email` population: already contacted AND a verified email.
+ * Deliberately does NOT exclude contacts who already received an email: a
+ * `contacted` person emailed once who has not replied still needs a follow-up.
+ * `probable` (pattern-derived) addresses stay out on purpose.
+ */
+export const readyForEmailCondition = (): SQL =>
+  and(eq(person.status, "contacted"), eq(person.emailStatus, "verified"))!;
+
+/** The population of one lane, shared by the ranked fetch and the lane counts so they cannot drift. */
+export function outreachLaneWhere(
+  lane: OutreachLane,
+  matchKeys: readonly string[],
+  hiddenRoleGroups: readonly RoleGroupKey[],
+): SQL[] {
+  const where: SQL[] = [isNull(person.mergedIntoId)];
+  const visibility = roleGroupVisibilityCondition(hiddenRoleGroups);
+  if (visibility) where.push(visibility);
+  where.push(lane === "hiring" ? inArray(person.companyKey, [...matchKeys]) : readyForEmailCondition());
+  return where;
+}
+
+/**
+ * Both lane sizes plus where the ready lane's "contacted" came from, in ONE
+ * statement over the lane populations (no ranked fetch). The three sources
+ * are independent `filter (where ...)` counts, so they overlap and need not
+ * sum to the lane. `person.id` is literal SQL inside the subqueries: drizzle
+ * re-renders a bare column of the outer table wrongly there.
+ */
+export async function getOutreachLaneSummary(
+  database: typeof db,
+  matchKeys: readonly string[],
+  hiddenRoleGroups: readonly RoleGroupKey[],
+): Promise<OutreachLaneSummary> {
+  const hiringCond = matchKeys.length ? inArray(person.companyKey, [...matchKeys]) : sql`false`;
+  const ready = readyForEmailCondition();
+  const visibility = roleGroupVisibilityCondition(hiddenRoleGroups);
+  const [r] = await database
+    .select({
+      hiring: sql<string>`count(*) filter (where ${hiringCond})`,
+      ready: sql<string>`count(*) filter (where ${ready})`,
+      backfill: sql<string>`count(*) filter (where ${ready} and exists (select 1 from activity ab where ab.person_id = person.id and ab.type = 'status_backfill'))`,
+      emailSent: sql<string>`count(*) filter (where ${ready} and exists (select 1 from activity ae where ae.person_id = person.id and ae.type = 'email_sent'))`,
+      linkedin: sql<string>`count(*) filter (where ${ready} and exists (select 1 from person_bd_connection pl where pl.person_id = person.id and pl.sent_count > 0))`,
+    })
+    .from(person)
+    .where(and(isNull(person.mergedIntoId), visibility, or(hiringCond, ready)));
+  // Aggregates come back from postgres-js as strings.
+  return {
+    hiring: Number(r!.hiring),
+    readyForEmail: Number(r!.ready),
+    sources: { backfill: Number(r!.backfill), emailSent: Number(r!.emailSent), linkedin: Number(r!.linkedin) },
   };
 }
 

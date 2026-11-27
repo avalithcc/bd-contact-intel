@@ -445,11 +445,24 @@ export const es: typeof en = {
       }${companyCategoryFilterActive ? " en esta industria" : ""}${
         messageHistoryFilterActive ? " con historial de mensajes" : ""
       }${startupsOnlyFilterActive ? " en una empresa clasificada como startup" : ""}. Intenta limpiar el filtro de arriba.`,
+    laneNavLabel: "Carriles de A quién contactar",
+    laneHiringLabel: "Con vacante abierta",
+    laneReadyLabel: "Para enviar correo",
+    laneHiringLegend: (companies) =>
+      `La empresa tiene avisos de IT abiertos y frescos.${
+        companies > 0 ? ` Hoy hay ${companies} empresa${companies === 1 ? "" : "s"} en esa condición.` : ""
+      }`,
+    laneReadyLegend: (total, backfill, emailSent, linkedin) =>
+      `${
+        total === 1
+          ? "Está acá porque tiene el correo verificado, ya figura como contactado y nunca respondió"
+          : "Están acá porque tienen el correo verificado, ya figuran como contactados y nunca respondieron"
+      }: el próximo paso es un correo. De dónde viene ese «contactado»: ${backfill} del import de HubSpot, ${emailSent} de un correo que ${
+        emailSent === 1 ? "le" : "les"
+      } mandamos desde el CRM y ${linkedin} de un mensaje de LinkedIn.`,
     tableName: "Nombre",
     tablePosition: "Cargo",
     tableCompany: "Empresa",
-    tableRoleGroup: "Grupo de rol",
-    tableOpenRoles: "Roles de IT abiertos",
     tableLastContact: "Último contacto",
     tableWhy: "Por qué",
     tableMessage: "Mensaje",
@@ -3520,7 +3533,6 @@ export const es: typeof en = {
       newVerified: "Nuevos con correo verificado",
       hiring: "Con vacantes abiertas",
       outreachReady: "Listos para Outreach",
-      moveToEmail: "Pasar a correo",
     },
     colName: "Nombre",
     colCompany: "Empresa",
