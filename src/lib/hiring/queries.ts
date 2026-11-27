@@ -73,6 +73,47 @@ interface ResolvedHiringCompany {
 }
 
 /**
+ * The one WHERE clause of the open-IT-posting reads (resolveHiringCompanies and the aggregated match index below),
+ * so the four filters cannot drift between them. `hideOffshore` counts over ALL of a company's open fresh IT
+ * postings (the correlated subqueries), deliberately NOT narrowed by `market`/`miamiOnly`.
+ */
+function openItPostingFilters(
+  market?: MarketKey,
+  miamiOnly?: boolean,
+  hideOffshore?: boolean,
+  startupsOnly?: boolean,
+) {
+  return and(
+    eq(jobPosting.isIt, true),
+    openFreshPostingCondition(),
+    market ? eq(jobPosting.market, market) : undefined,
+    miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
+    startupsOnly ? eq(targetCompany.isStartup, true) : undefined,
+    // Offshore-heavy = strictly more open offshore postings than open
+    // LATAM postings for the same company (see isOffshoreHeavy). Two
+    // correlated scalar-count subqueries compared directly, rather than
+    // a single NOT EXISTS, because this is now a comparison between two
+    // aggregates, not a presence check — still one SQL statement, same
+    // query count as before.
+    hideOffshore
+      ? sql`(
+          select count(*) filter (where jp2.is_offshore_hub = true)
+          from job_posting jp2
+          where jp2.company_key = ${jobPosting.companyKey}
+            and jp2.is_it = true
+            and ${openFreshPostingSql("jp2")}
+        ) <= (
+          select count(*) filter (where jp2.market = 'latam')
+          from job_posting jp2
+          where jp2.company_key = ${jobPosting.companyKey}
+            and jp2.is_it = true
+            and ${openFreshPostingSql("jp2")}
+        )`
+      : undefined,
+  );
+}
+
+/**
  * Shared alias-resolution step for hiring signals: which target companies
  * currently have at least one open IT posting, those postings, and every
  * `company_alias` key that should count as "the same company" for matching
@@ -154,36 +195,7 @@ export async function resolveHiringCompanies(
     })
     .from(jobPosting)
     .innerJoin(targetCompany, eq(jobPosting.companyKey, targetCompany.companyKey))
-    .where(
-      and(
-        eq(jobPosting.isIt, true),
-        openFreshPostingCondition(),
-        market ? eq(jobPosting.market, market) : undefined,
-        miamiOnly ? eq(jobPosting.isMiami, true) : undefined,
-        startupsOnly ? eq(targetCompany.isStartup, true) : undefined,
-        // Offshore-heavy = strictly more open offshore postings than open
-        // LATAM postings for the same company (see isOffshoreHeavy). Two
-        // correlated scalar-count subqueries compared directly, rather than
-        // a single NOT EXISTS, because this is now a comparison between two
-        // aggregates, not a presence check — still one SQL statement, same
-        // query count as before.
-        hideOffshore
-          ? sql`(
-              select count(*) filter (where jp2.is_offshore_hub = true)
-              from job_posting jp2
-              where jp2.company_key = ${jobPosting.companyKey}
-                and jp2.is_it = true
-                and ${openFreshPostingSql("jp2")}
-            ) <= (
-              select count(*) filter (where jp2.market = 'latam')
-              from job_posting jp2
-              where jp2.company_key = ${jobPosting.companyKey}
-                and jp2.is_it = true
-                and ${openFreshPostingSql("jp2")}
-            )`
-          : undefined,
-      ),
-    )
+    .where(openItPostingFilters(market, miamiOnly, hideOffshore, startupsOnly))
     // `postedAt desc` alone is not a deterministic order: same-date postings
     // (common — a company posts a batch on the same day) came back in
     // whatever order Postgres felt like, which could reshuffle between
@@ -375,9 +387,9 @@ export interface HiringMatch {
  * company" (canonical `target_company.company_key` plus every
  * `company_alias` pointing at it) — reuses the same alias resolution as
  * getCompanyHiringSummaries (via resolveHiringCompanies) rather than
- * duplicating it. Used by /outreach for an O(1) per-contact hiring lookup.
- * Not BD-scoped — job postings/target companies are shared data. Two fixed
- * queries regardless of caller. `market`, `miamiOnly`, `hideOffshore` and
+ * duplicating it. Used by /outreach for an O(1) per-contact hiring lookup, built from one count-only statement (see the body).
+ * Not BD-scoped — job postings/target companies are shared data. One
+ * aggregated statement regardless of caller. `market`, `miamiOnly`, `hideOffshore` and
  * `startupsOnly` flow into resolveHiringCompanies' SQL WHERE clause, same as
  * getCompanyHiringSummaries above.
  *
@@ -396,20 +408,38 @@ const getHiringMatchIndexCached = cache(async function getHiringMatchIndexUncach
   hideOffshore?: boolean,
   startupsOnly?: boolean,
 ): Promise<Map<string, HiringMatch>> {
-  const companies = await resolveHiringCompanies(market, miamiOnly, hideOffshore, startupsOnly);
+  // ONE statement, counted in Postgres: the index needs counts, not the 1,000+ posting rows (title, URL, dates)
+  // resolveHiringCompanies ships to Node. Same filters via openItPostingFilters; the counts are over the filtered
+  // postings, as before. Aliases come from a correlated subquery, NOT a join: a join would multiply count(*) by the
+  // number of aliases.
+  const rows = await db
+    .select({
+      companyKey: jobPosting.companyKey,
+      displayName: sql<string>`max(${targetCompany.displayName})`,
+      openItCount: sql<number>`count(*)::int`,
+      offshoreItCount: sql<number>`(count(*) filter (where ${jobPosting.isOffshoreHub} = true))::int`,
+      latamItCount: sql<number>`(count(*) filter (where ${jobPosting.market} = 'latam'))::int`,
+      isStartup: sql<boolean | null>`bool_or(${targetCompany.isStartup})`,
+      startupReason: sql<string | null>`max(${targetCompany.startupReason})`,
+      aliasKeys: sql<string[]>`coalesce((select array_agg(ca.alias_key) from company_alias ca where ca.company_key = ${jobPosting.companyKey}), '{}')`,
+    })
+    .from(jobPosting)
+    .innerJoin(targetCompany, eq(jobPosting.companyKey, targetCompany.companyKey))
+    .where(openItPostingFilters(market, miamiOnly, hideOffshore, startupsOnly))
+    .groupBy(jobPosting.companyKey);
   const index = new Map<string, HiringMatch>();
-  for (const c of companies.values()) {
+  for (const r of rows) {
     const match: HiringMatch = {
-      companyKey: c.companyKey,
-      displayName: c.displayName,
-      openItCount: c.postings.length,
-      offshoreItCount: c.offshoreItCount,
-      latamItCount: c.latamItCount,
-      isStartup: c.isStartup,
-      startupReason: c.startupReason,
-      offshoreHeavy: c.offshoreHeavy,
+      companyKey: r.companyKey,
+      displayName: r.displayName,
+      openItCount: r.openItCount,
+      offshoreItCount: r.offshoreItCount,
+      latamItCount: r.latamItCount,
+      isStartup: r.isStartup,
+      startupReason: r.startupReason,
+      offshoreHeavy: isOffshoreHeavy(r.offshoreItCount, r.latamItCount),
     };
-    for (const key of c.matchKeys) index.set(key, match);
+    for (const key of [r.companyKey, ...r.aliasKeys]) index.set(key, match);
   }
   return index;
 });
