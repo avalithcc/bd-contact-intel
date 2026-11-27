@@ -118,21 +118,23 @@ export async function getRecentOutreachHistory(
  * — a known, documented gap closed by Phase 9's unified `/contacts/[id]`
  * record page (design D8), not this change.
  *
- * Exactly 4 fixed queries regardless of page number or total contact count
- * (query 4 is the lane summary, see getOutreachLaneSummary):
- * (1)+(2) the two queries behind getHiringMatchIndex (open postings,
- * aliases — shared with /hiring, not BD-scoped), and (3) one `person`
- * query (aggregated over its connections) pre-filtered to only companies
- * with an open IT posting, so the row count stays bounded by the hiring
- * crossover rather than the full Contact base. Scoring, sorting and
- * pagination happen in JS over that single fetched set — no per-row or
- * per-page query. `filters.market` and `filters.startupsOnly` narrow queries
- * (1)-(2) via getHiringMatchIndex's SQL WHERE clause, so the query count
- * stays exactly 3 whether or not they're set. `filters.companyCategory`
- * narrows query (3) the same way `filters.roleGroup` does — a plain `person`
+ * Exactly 3 fixed statements regardless of page number or total contact count:
+ * (1) the single aggregated statement behind getHiringMatchIndex (counts in
+ * Postgres, aliases via a correlated subquery; shared with /hiring, not
+ * BD-scoped), (2) one `person` query (aggregated over its connections)
+ * restricted to the lane's population, and (3) the lane summary
+ * (getOutreachLaneSummary). (2) and (3) need only keys known after (1), so they
+ * run in parallel: 1 + 1 round trips of wait. The one exception: in the
+ * `hiring` lane with a posting filter on (market, miamiOnly, hideOffshore,
+ * startupsOnly), the lane badges need the UNFILTERED keys, which costs one more
+ * getHiringMatchIndex statement. Scoring, sorting and pagination happen in JS
+ * over the single fetched set — no per-row or per-page query. `filters.market`
+ * and `filters.startupsOnly` narrow (1) via its SQL WHERE clause, so they never
+ * change the statement count of the page itself. `filters.companyCategory`
+ * narrows (2) the same way `filters.roleGroup` does — a plain `person`
  * column, no extra query either.
  *
- * Fresh-review fix: query (3) used to `leftJoin` `person_bd_connection`
+ * Fresh-review fix: the person query (2) used to `leftJoin` `person_bd_connection`
  * directly alongside `person_id_map`/`contact` (also a `leftJoin`, one row
  * per connected BD's own legacy contact row) in the SAME query, so a person
  * connected to N BDs with M legacy contact rows fanned out to N×M rows
@@ -160,7 +162,7 @@ export async function listOutreachCandidates(
   // Computed in BOTH lanes (openItCount, the "Contratando" badge and the
   // open-roles chip depend on it); applied as a population filter only in `hiring`.
   const hiringIndex =
-    options.hiringIndex ?? (await getHiringMatchIndex(f.market, f.miamiOnly, f.hideOffshore, f.startupsOnly)); // queries 1-2
+    options.hiringIndex ?? (await getHiringMatchIndex(f.market, f.miamiOnly, f.hideOffshore, f.startupsOnly)); // statement 1
   const matchKeys = [...hiringIndex.keys()];
   const hiringCompanyCount = new Set(
     [...hiringIndex.values()].map((m) => m.companyKey),
@@ -190,8 +192,8 @@ export async function listOutreachCandidates(
 
   // Queries 3 and 4 depend only on keys known by now, so they share one wait.
   const [rows, laneSummary] = await Promise.all([
-    selectOutreachRows(db, bdId, and(...where)!, includeNeverMessaged), // query 3
-    getOutreachLaneSummary(db, summaryKeys, hiddenRoleGroups), // query 4
+    selectOutreachRows(db, bdId, and(...where)!, includeNeverMessaged), // statement 2
+    getOutreachLaneSummary(db, summaryKeys, hiddenRoleGroups), // statement 3
   ]);
 
   const scored: OutreachRow[] = rows.map((r) => {

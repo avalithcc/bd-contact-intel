@@ -127,3 +127,23 @@ test("local timing: aggregated index vs the two-statement per-posting read", asy
   };
   console.log(`timing (local, tiny data) aggregated=${await med(() => getHiringMatchIndex(undefined, undefined, undefined, undefined))}ms reference=${await med(() => referenceIndex())}ms`);
 });
+
+// Absolute assertions on the new index alone: both sides of the equivalence comparison share openItPostingFilters, so a
+// mutation of one of its conditions would change both sides and pass unnoticed there.
+test("startupsOnly keeps only classified startups: unclassified (null) and confirmed non-startups are absent", async () => {
+  const { getHiringMatchIndex } = await import("@/lib/hiring/queries");
+  const idx = await getHiringMatchIndex(undefined, undefined, undefined, true);
+  assert.equal(idx.has(k("startup")), true);
+  assert.equal(idx.has(k("heavyus")), true);
+  assert.equal(idx.has(k("heavy")), false, "is_startup NULL is excluded");
+  assert.equal(idx.has(k("balanced")), false);
+  assert.equal(idx.has(k("notstartup")), false);
+  assert.equal(idx.get(k("startup"))!.openItCount, 3, "the startup filter is on the company, so its postings are all counted");
+});
+
+test("miamiOnly counts only the Miami posting: the startup company drops from 3 postings to 1 and everyone without one is absent", async () => {
+  const { getHiringMatchIndex } = await import("@/lib/hiring/queries");
+  const idx = await getHiringMatchIndex("us", true, undefined, undefined);
+  assert.equal(idx.get(k("startup"))!.openItCount, 1);
+  for (const n of ["heavy", "balanced", "heavyus", "notstartup"]) assert.equal(idx.has(k(n)), false, n);
+});
