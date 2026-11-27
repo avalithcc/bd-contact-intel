@@ -15,10 +15,10 @@ function tab(key: string, active = false): ViewTabItem {
 }
 
 // Guards the owner's choice, so changing the pinned set must be deliberate.
-// `outreachReady` was swapped for `moveToEmail` on 2026-09-28: measured against
-// production, outreachReady held 22 contacts and moveToEmail held 3,460.
+// The `moveToEmail` population moved into the outreach view as a lane, and the
+// queue now owns the pinned slot.
 test("PINNED_VIEW_TAB_KEYS matches the owner-chosen pinned set", () => {
-  assert.deepEqual(PINNED_VIEW_TAB_KEYS, ["all", "mine", "notContacted", "moveToEmail"]);
+  assert.deepEqual(PINNED_VIEW_TAB_KEYS, ["all", "mine", "notContacted", "outreach"]);
 });
 
 // The set stays at four: this row competes for horizontal width, and the bulk
@@ -28,11 +28,11 @@ test("PINNED_VIEW_TAB_KEYS stays at four tabs", () => {
 });
 
 test("splitViewTabs: pinned tabs come first, in PINNED_VIEW_TAB_KEYS order, regardless of input order", () => {
-  const items = [tab("notContacted"), tab("hiring"), tab("all"), tab("mine"), tab("moveToEmail")];
+  const items = [tab("notContacted"), tab("hiring"), tab("all"), tab("mine"), tab("outreach")];
   const result = splitViewTabs(items);
   assert.deepEqual(
     result.pinned.map((t) => t.key),
-    ["all", "mine", "notContacted", "moveToEmail"],
+    ["all", "mine", "notContacted", "outreach"],
   );
 });
 
@@ -41,7 +41,7 @@ test("splitViewTabs: everything not in PINNED_VIEW_TAB_KEYS goes to overflow, in
   const result = splitViewTabs(items);
   assert.deepEqual(
     result.overflow.map((t) => t.key),
-    ["hiring", "newVerified", "outreach", "saved:1"],
+    ["hiring", "newVerified", "saved:1"],
   );
 });
 

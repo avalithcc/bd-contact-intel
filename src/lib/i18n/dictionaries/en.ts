@@ -459,11 +459,19 @@ export const en = {
       }${companyCategoryFilterActive ? " in this industry" : ""}${
         messageHistoryFilterActive ? " with a message history" : ""
       }${startupsOnlyFilterActive ? " at a company classified as a startup" : ""}. Try clearing the filter above.`,
+    laneNavLabel: "Who to contact lanes",
+    laneHiringLabel: "Open role",
+    laneReadyLabel: "Ready for email",
+    laneHiringLegend: (companies: number) =>
+      `The company has fresh open IT postings.${
+        companies > 0 ? ` Right now ${companies} compan${companies === 1 ? "y is" : "ies are"} in that condition.` : ""
+      }`,
+    // English reads the same at 1 and at n ("they"), so the lane total is unused here.
+    laneReadyLegend: (_total: number, backfill: number, emailSent: number, linkedin: number) =>
+      `They are here because their email is verified, they already count as contacted and they never replied: the next step is an email. Where that "contacted" comes from: ${backfill} from the HubSpot import, ${emailSent} from an email we sent from the CRM and ${linkedin} from a LinkedIn message.`,
     tableName: "Name",
     tablePosition: "Position",
     tableCompany: "Company",
-    tableRoleGroup: "Role group",
-    tableOpenRoles: "Open IT roles",
     tableLastContact: "Last contact",
     tableWhy: "Why",
     tableMessage: "Message",
@@ -3524,7 +3532,6 @@ export const en = {
       newVerified: "New with verified email",
       hiring: "Hiring companies",
       outreachReady: "Outreach-ready",
-      moveToEmail: "Move to email",
     },
     colName: "Name",
     colCompany: "Company",

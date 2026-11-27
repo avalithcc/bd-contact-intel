@@ -1699,3 +1699,6 @@ button.danger:not(.qa):hover:not(:disabled) {
   background: var(--color-accent-soft);
   border-color: var(--color-border-strong);
 }
+
+/* Legend under the outreach lane tabs (outreach-lanes mockup): sits tight under the tabs, then breathes before the filter panel. */
+.lane-legend { margin: calc(-1 * var(--space-xs)) 0 var(--space-lg); }

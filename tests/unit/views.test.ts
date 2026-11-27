@@ -11,28 +11,14 @@ import {
   SYSTEM_VIEWS,
 } from "@/lib/contacts/views";
 
-test("moveToEmail system view filters on contacted status + verified email, nothing else", () => {
-  const view = SYSTEM_VIEWS.find((v) => v.key === "moveToEmail");
-  assert.ok(view);
-  assert.deepEqual(view.filters, { status: ["contacted"], emailVerified: true });
+test("moveToEmail is retired as a system view: its population is the ready_for_email lane, one entry point only", () => {
+  assert.equal(SYSTEM_VIEWS.some((v) => (v.key as string) === "moveToEmail"), false);
+  assert.equal(isSystemViewKey("moveToEmail"), false);
+  assert.deepEqual(systemViewFilters("moveToEmail" as never), {});
 });
 
-test("moveToEmail does not exclude hiring-only or any other ad-hoc filter (no extra keys)", () => {
-  const view = SYSTEM_VIEWS.find((v) => v.key === "moveToEmail")!;
-  assert.deepEqual(Object.keys(view.filters).sort(), ["emailVerified", "status"]);
-});
-
-test("isSystemViewKey recognizes moveToEmail", () => {
-  assert.equal(isSystemViewKey("moveToEmail"), true);
-});
-
-test("systemViewFilters('moveToEmail') round-trips the same filters as the SYSTEM_VIEWS entry", () => {
-  assert.deepEqual(systemViewFilters("moveToEmail"), { status: ["contacted"], emailVerified: true });
-});
-
-test("resolveActiveView('moveToEmail') resolves to the moveToEmail system view, not a saved view", () => {
+test("resolveActiveView('moveToEmail') no longer resolves to a system view (the page redirects it before this runs)", () => {
   const active = resolveActiveView("moveToEmail", []);
-  assert.equal(active.viewKey, "moveToEmail");
+  assert.equal(active.viewKey, "all");
   assert.equal(active.isSaved, false);
-  assert.deepEqual(active.filters, { status: ["contacted"], emailVerified: true });
 });
