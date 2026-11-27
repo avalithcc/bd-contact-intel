@@ -4,6 +4,7 @@ import {
   applyLaneFilters,
   DEFAULT_OUTREACH_LANE,
   laneOffersFilter,
+  laneUrl,
   legacyViewRedirect,
   OUTREACH_LANES,
   resolveOutreachLane,
@@ -64,6 +65,23 @@ test("applyLaneFilters is pure: same input twice gives the same output and the i
 test("legacyViewRedirect maps the retired moveToEmail view to the ready_for_email lane and nothing else", () => {
   assert.equal(legacyViewRedirect("moveToEmail"), "/contacts?view=outreach&lane=ready_for_email");
   for (const v of [undefined, "all", "outreach", "bogus"]) assert.equal(legacyViewRedirect(v), null);
+});
+
+test("legacyViewRedirect forwards the rest of the query string but never a stale view or lane", () => {
+  const url = legacyViewRedirect("moveToEmail", { q: "ana", page: "3", roles: "all", view: "moveToEmail", lane: "hiring", status: ["a", "b"] });
+  const params = new URL(url!, "http://x").searchParams;
+  assert.equal(params.get("view"), "outreach");
+  assert.deepEqual(params.getAll("lane"), ["ready_for_email"]);
+  assert.equal(params.get("q"), "ana");
+  assert.equal(params.get("page"), "3");
+  assert.equal(params.get("roles"), "all");
+  assert.deepEqual(params.getAll("status"), ["a", "b"]);
+});
+
+test("laneUrl carries roles=all and nothing else of roles", () => {
+  assert.equal(laneUrl("hiring"), "/contacts?view=outreach&lane=hiring");
+  assert.equal(laneUrl("ready_for_email", "all"), "/contacts?view=outreach&lane=ready_for_email&roles=all");
+  assert.equal(laneUrl("hiring", "nope"), "/contacts?view=outreach&lane=hiring");
 });
 
 for (const [name, d] of [["es", es], ["en", en]] as const) {

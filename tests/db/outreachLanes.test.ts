@@ -16,6 +16,7 @@ const run = randomUUID().slice(0, 8);
 const lastName = `Lane${run}`;
 const hiringKey = `zz-${run}-hiring`;
 const plainKey = `zz-${run}-plain`;
+const offshoreKey = `zz-${run}-offshore`;
 const ids: Record<string, string> = {};
 const personIds: string[] = [];
 let bdId = "";
@@ -46,6 +47,8 @@ const SEEDS: Record<string, Seed> = {
   hiddenDevHiring: { key: hiringKey, status: "new", emailStatus: "none", roleGroup: "developers" },
   buyerDevPlain: { key: plainKey, status: "contacted", emailStatus: "verified", roleGroup: "developers", contactType: "BUYER-CHAMPION" },
   buyerDevHiring: { key: hiringKey, status: "new", emailStatus: "none", roleGroup: "developers", contactType: "BUYER-CHAMPION" },
+  // An offshore-hub posting: hideOffshore, if honored, would drop this company from the hiring index.
+  offshoreContactedVerified: { key: offshoreKey, status: "contacted", emailStatus: "verified" },
   nullRolePlain: { key: plainKey, status: "contacted", emailStatus: "verified", roleGroup: null },
 };
 
@@ -58,11 +61,15 @@ before(async () => {
   const [me] = await db.insert(bd).values({ email: `zz-lane-${run}@example.test`, name: "ZZ lane" }).returning();
   bdId = me!.id;
   // The hiring company goes through the real producer: target_company + a fresh open IT posting.
-  for (const k of [hiringKey, plainKey]) await db.insert(company).values({ companyKey: k, displayName: k });
-  await db.insert(targetCompany).values({ companyKey: hiringKey, displayName: hiringKey, ats: "lever", config: {} });
+  for (const k of [hiringKey, plainKey, offshoreKey]) await db.insert(company).values({ companyKey: k, displayName: k });
+  for (const k of [hiringKey, offshoreKey]) await db.insert(targetCompany).values({ companyKey: k, displayName: k, ats: "lever", config: {} });
   await db.insert(jobPosting).values({
     companyKey: hiringKey, externalId: "1", title: "Engineer", location: "Austin, TX", url: "https://example.test",
     isIt: true, market: "us", postedAt: new Date(), firstSeen: new Date(), closedAt: null,
+  });
+  await db.insert(jobPosting).values({
+    companyKey: offshoreKey, externalId: "1", title: "Engineer", location: "Bangalore, India", url: "https://example.test", isOffshoreHub: true,
+    isIt: true, market: "other", postedAt: new Date(), firstSeen: new Date(), closedAt: null,
   });
 
   let mergeTarget: string | null = null;
@@ -92,9 +99,9 @@ after(async () => {
     await db.delete(personBdConnection).where(inArray(personBdConnection.personId, personIds));
     await db.delete(person).where(inArray(person.id, personIds));
   }
-  await db.delete(jobPosting).where(inArray(jobPosting.companyKey, [hiringKey, plainKey]));
-  await db.delete(targetCompany).where(eq(targetCompany.companyKey, hiringKey));
-  await db.delete(company).where(inArray(company.companyKey, [hiringKey, plainKey]));
+  await db.delete(jobPosting).where(inArray(jobPosting.companyKey, [hiringKey, offshoreKey]));
+  await db.delete(targetCompany).where(inArray(targetCompany.companyKey, [hiringKey, offshoreKey]));
+  await db.delete(company).where(inArray(company.companyKey, [hiringKey, plainKey, offshoreKey]));
   if (bdId) await db.delete(bd).where(eq(bd.id, bdId));
   await db.$client.end();
 });
@@ -116,7 +123,7 @@ async function lane(laneKey: "hiring" | "ready_for_email", opts: { hidden?: stri
 const HIDDEN = ["developers", "sales_bd"];
 const readyAll = [
   "hiringContactedVerified", "plainContactedVerifiedBackfill", "plainContactedVerifiedEmailSent", "plainContactedVerifiedLinkedin",
-  "hiddenDevPlain", "buyerDevPlain", "nullRolePlain",
+  "hiddenDevPlain", "buyerDevPlain", "nullRolePlain", "offshoreContactedVerified",
 ].sort();
 
 test("ready_for_email still returns its rows when the hiring index is EMPTY (the old early return would have returned none)", async () => {
@@ -136,7 +143,7 @@ test("ready_for_email population is contacted + verified email, minus merged, pr
 
 test("hiring population is exactly the contacts at companies with a fresh open IT posting, whatever their status or email", async () => {
   const { names } = await lane("hiring");
-  assert.deepEqual(names, ["buyerDevHiring", "hiddenDevHiring", "hiringContactedVerified", "hiringNew"]);
+  assert.deepEqual(names, ["buyerDevHiring", "hiddenDevHiring", "hiringContactedVerified", "hiringNew", "offshoreContactedVerified"]);
 });
 
 test("a hidden role group is excluded from both lanes while a BUYER-CHAMPION in that group and a NULL role group stay", async () => {
@@ -149,18 +156,39 @@ test("a hidden role group is excluded from both lanes while a BUYER-CHAMPION in 
   const hiring = await lane("hiring", { hidden: HIDDEN });
   assert.equal(hiring.names.includes("hiddenDevHiring"), false);
   assert.ok(hiring.names.includes("buyerDevHiring"));
-  assert.deepEqual(hiring.names, ["buyerDevHiring", "hiringContactedVerified", "hiringNew"]);
+  assert.deepEqual(hiring.names, ["buyerDevHiring", "hiringContactedVerified", "hiringNew", "offshoreContactedVerified"]);
 });
 
-test("ready_for_email IGNORES market, miamiOnly, hideOffshore, startupsOnly and excludeNever even when they are in the filters", async () => {
+test("ready_for_email IGNORES excludeNever: a contact who was never messaged stays in the lane", async () => {
   const plain = await lane("ready_for_email");
-  // startupsOnly + a market no posting matches would empty the lane if they were honored; excludeNever would drop everyone with no LinkedIn messages.
-  const loaded = await lane("ready_for_email", {
-    filters: { market: "latam", miamiOnly: true, hideOffshore: true, startupsOnly: true, includeNeverMessaged: false },
-  });
+  const loaded = await lane("ready_for_email", { filters: { includeNeverMessaged: false } });
   assert.deepEqual(loaded.names, plain.names);
   assert.ok(loaded.names.length > 0);
 });
+
+// In ready_for_email the hiring index never reaches the WHERE, so a posting filter that leaked through would only
+// narrow the INDEX: rows stay the same and openItCount / the Contratando badge silently drop. Assert on openItCount.
+for (const [key, filters, who] of [
+  ["market", { market: "latam" }, "hiringContactedVerified"],
+  ["miamiOnly", { market: "us", miamiOnly: true }, "hiringContactedVerified"],
+  ["startupsOnly", { startupsOnly: true }, "hiringContactedVerified"],
+  ["hideOffshore", { hideOffshore: true }, "offshoreContactedVerified"],
+] as const) {
+  test(`ready_for_email ignores ${key}: the contact's openItCount is the unfiltered value, not the filtered index's`, async () => {
+    const open = async (f: object) => {
+      const { page } = await lane("ready_for_email", { filters: f });
+      const row = page.rows.find((r) => r.firstName === who)!;
+      return { count: row.openItCount, rows: page.rows.length };
+    };
+    const base = await open({});
+    assert.equal(base.count, 1, "unfiltered, the seeded posting counts");
+    const filtered = await open(filters);
+    assert.deepEqual(filtered, base);
+    // The same filter in the hiring lane DOES narrow the index (proof the filter would have bitten here).
+    const { page } = await lane("hiring", { filters });
+    assert.equal(page.rows.some((r) => r.firstName === who), false, `${key} must narrow the hiring lane`);
+  });
+}
 
 test("hiring keeps its posting-derived filters: excludeNever drops everyone who was never messaged", async () => {
   const all = await lane("hiring");
@@ -192,4 +220,12 @@ test("an empty hiring key list gives a hiring count of 0 and does not break the 
   const s = await getOutreachLaneSummary(db, [], []);
   assert.equal(s.hiring, 0);
   assert.equal(s.readyForEmail - baseline.readyForEmail, readyAll.length);
+});
+
+test("lane badges are UNFILTERED lane sizes: a name search and a posting filter move the table total, never the summary", async () => {
+  const plain = await lane("hiring");
+  const narrowed = await lane("hiring", { filters: { name: `${lastName}x`, market: "latam" } });
+  assert.equal(narrowed.page.total, 0);
+  assert.equal(narrowed.page.laneSummary.hiring, plain.page.laneSummary.hiring);
+  assert.equal(narrowed.page.laneSummary.readyForEmail, plain.page.laneSummary.readyForEmail);
 });
