@@ -12,6 +12,7 @@
 import { outreachReasons, type OutreachFilters, type OutreachRow } from "@/lib/outreach/ranking";
 import { mapLastActivityRaw } from "@/lib/contacts/inlineDerivedColumns";
 import type { LastActivityEntry } from "@/lib/contacts/lastActivity";
+import { resolvePreviousContact, type PreviousContact } from "@/lib/outreach/previousContact";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
 export type { OutreachFilters };
@@ -23,6 +24,8 @@ export interface OutreachContactRow extends OutreachRow {
   reasons: string[];
   // Named newest activity ("Correo enviado"), same mapping as the contacts list.
   lastActivity: LastActivityEntry | null;
+  // Which CRM user previously had contact ("Contacto previo"); null = sin registro.
+  previousContact: PreviousContact | null;
 }
 
 /** Pure mapping step: attaches the same reason chips /outreach shows, in
@@ -36,5 +39,6 @@ export function attachOutreachReasons(
     ...r,
     reasons: outreachReasons(r, relativeTime, dict),
     lastActivity: mapLastActivityRaw(r.lastActivityRaw, dict),
+    previousContact: resolvePreviousContact(r.previousContactRaw, { bdId: r.ownerBdId, name: r.ownerName }, dict),
   }));
 }

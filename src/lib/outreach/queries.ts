@@ -6,6 +6,8 @@ import { db } from "@/db";
 import { company, contact, conversation, message, person, personBdConnection, personIdMap } from "@/db/schema";
 import { isDormant } from "@/lib/queries";
 import { lastActivityRawSql } from "@/lib/contacts/lastActivityRawSql";
+import { previousContactRawSql } from "@/lib/contacts/previousContactRawSql";
+import type { PreviousContactRaw } from "@/lib/outreach/previousContact";
 import { lastContactAtSql } from "@/lib/outreach/lastContact";
 import { getHiringMatchIndex, type HiringMatch } from "@/lib/hiring/queries";
 import { resolveCompanyDisplayName } from "@/lib/contacts/companyDisplayName";
@@ -222,6 +224,9 @@ export async function listOutreachCandidates(
       messageCount: r.messageCount,
       lastMessageAt,
       lastActivityRaw: r.lastActivityRaw,
+      previousContactRaw: r.previousContactRaw,
+      ownerBdId: r.ownerBdId,
+      ownerName: r.ownerName,
       reciprocal: r.reciprocal,
       dormant,
       isLeadership: isLeadershipRoleGroup(r.roleGroup),
@@ -370,6 +375,14 @@ export async function selectOutreachRows(
       // Named newest activity (same subquery as the contacts list). A scalar
       // subquery keyed on person.id: one value per person, no fan-out.
       lastActivityRaw: sql<InlineLastActivityRaw | null>`${lastActivityRawSql(person.id)}`,
+      // Which CRM user last had a recorded touch (scalar subquery, no fan-out),
+      // and the owner as the labelled fallback. `person.owner_bd_id` is a bare
+      // column of the GROUP BY table, so it needs no aggregate wrapper.
+      previousContactRaw: sql<PreviousContactRaw | null>`${previousContactRawSql(person.id)}`,
+      ownerBdId: person.ownerBdId,
+      // Resolved in the statement, not by a roster read: a third statement in the
+      // page's parallel wait measured about +1s on this database.
+      ownerName: sql<string | null>`(select b.name from bd b where b.id = ${person.ownerBdId})`,
       reciprocal: sql<boolean>`coalesce(bool_or(${pbcAgg.reciprocal}), false)`,
     })
     .from(person)

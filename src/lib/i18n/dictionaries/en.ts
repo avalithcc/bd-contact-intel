@@ -473,6 +473,10 @@ export const en = {
     tablePosition: "Position",
     tableCompany: "Company",
     tableLastContact: "Last contact",
+    // Which CRM user had contact before. "owner" is an assignment, not a contact, hence its own label.
+    tablePreviousContact: "Previous contact",
+    previousContactOwner: "Owner",
+    previousContactNone: "no record",
     tableWhy: "Why",
     tableMessage: "Message",
     // Defensive only: every row of the outreach view carries a person id, so
