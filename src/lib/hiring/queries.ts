@@ -124,9 +124,11 @@ function openItPostingFilters(
  *
  * Two fixed queries regardless of caller — (1) open IT postings joined with
  * their target company's display name, (2) the aliases for those
- * companies — factored out here so getCompanyHiringSummaries (/hiring),
- * getHiringMatchIndex (/outreach) and getWhatsNewFeed (/whats-new) all
- * reuse it instead of each running their own alias lookup.
+ * companies — factored out here so getCompanyHiringSummaries (/hiring) and
+ * getWhatsNewFeed (/whats-new) reuse it instead of each running their own
+ * alias lookup. getHiringMatchIndex (/outreach and the other index callers)
+ * does NOT use it any more: it needs counts only and builds them in ONE
+ * aggregated statement over the same filters (openItPostingFilters).
  *
  * `market` narrows query (1) to postings in that market bucket via a SQL
  * WHERE condition — not a post-fetch JS filter — so passing it never
