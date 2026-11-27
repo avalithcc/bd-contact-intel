@@ -5,6 +5,7 @@ import { isAdminRole } from "@/lib/auth/adminRole";
 import { getDictionary, getLocale } from "@/lib/i18n/server";
 import { Avatar } from "@/components/Avatar";
 import { initialsFromName } from "@/components/initials";
+import { formatDayMonth } from "@/lib/outreach/previousContact";
 import { companyLogoInitials } from "@/lib/contacts/companyLogo";
 import { pickListPhone, toTelHref } from "@/lib/phone";
 import { anyPhoneNeedsReview } from "@/lib/phoneReview";
@@ -1035,6 +1036,7 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                   <th>{dict.outreach.tablePosition}</th>
                   <th>{dict.outreach.tableCompany}</th>
                   <th>{dict.outreach.tableLastContact}</th>
+                  <th>{dict.outreach.tablePreviousContact}</th>
                   <th>{dict.outreach.tableWhy}</th>
                   <th>{dict.outreach.tableMessage}</th>
                 </tr>
@@ -1067,6 +1069,27 @@ export default async function ContactsPage({ searchParams }: ContactsPageProps) 
                       )}
                     </td>
                     <td className="nowrap meta">{r.lastActivity ? `${r.lastActivity.label} · ${relTime(r.lastActivity.createdAt)}` : "—"}</td>
+                    <td className="nowrap">
+                      {r.previousContact ? (
+                        <>
+                          <span className="owner-chip">
+                            <Avatar
+                              id={r.previousContact.bdId}
+                              initials={initialsFromName(r.previousContact.name)}
+                              variant="bd"
+                              size="sm"
+                            />
+                            {r.previousContact.name}
+                          </span>
+                          <div className="meta">
+                            {r.previousContact.label}
+                            {r.previousContact.at ? ` · ${formatDayMonth(r.previousContact.at)}` : ""}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="meta">— {dict.outreach.previousContactNone}</span>
+                      )}
+                    </td>
                     <td>
                       <div className="reason-chips">
                         {r.reasons.map((reason) => (

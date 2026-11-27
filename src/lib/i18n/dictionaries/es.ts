@@ -464,6 +464,10 @@ export const es: typeof en = {
     tablePosition: "Cargo",
     tableCompany: "Empresa",
     tableLastContact: "Último contacto",
+    // Quién del CRM tuvo contacto antes. "dueño" es una asignación, no un contacto: por eso lleva su propia etiqueta.
+    tablePreviousContact: "Contacto previo",
+    previousContactOwner: "Dueño",
+    previousContactNone: "sin registro",
     tableWhy: "Por qué",
     tableMessage: "Mensaje",
     // Defensivo: toda fila de la vista tiene id de persona, así que el control

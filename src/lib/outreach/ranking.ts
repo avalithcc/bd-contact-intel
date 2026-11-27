@@ -16,6 +16,7 @@ import type { RoleGroupKey } from "@/lib/roleGroups";
 import type { CompanyCategoryKey } from "@/lib/companyCategories";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 import type { InlineLastActivityRaw } from "@/lib/contacts/inlineDerivedColumns";
+import type { PreviousContactRaw } from "@/lib/outreach/previousContact";
 
 export type { HiringMatch };
 
@@ -118,6 +119,12 @@ export interface OutreachRow {
   // "Último contacto" cell. Display only: ranking keeps using lastMessageAt.
   // Optional because whatsnew builds OutreachRow-shaped rows without it.
   lastActivityRaw?: InlineLastActivityRaw | null;
+  // Raw newest attributed touch (previousContactRawSql) and the person's owner,
+  // the inputs of the "Contacto previo" cell. Display only. Optional because
+  // whatsnew builds OutreachRow-shaped rows without them.
+  previousContactRaw?: PreviousContactRaw | null;
+  ownerBdId?: string | null;
+  ownerName?: string | null;
   reciprocal: boolean;
   dormant: boolean;
   isLeadership: boolean;
